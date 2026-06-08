@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Pagos a Contratistas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- SheetJS for Excel parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF and AutoTable for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Header -->
+        <header class="header">
+            <div class="logo">
+                <h1>Calc<span>Pago</span></h1>
+            </div>
+            <div class="actions" style="display: flex; gap: 0.5rem; align-items: center;">
+                <button id="btn-theme-toggle" class="btn btn-outline btn-icon-only" title="Cambiar Tema" style="font-size: 1.2rem;">🌓</button>
+                <button id="btn-config" class="btn btn-outline btn-icon-only" title="Configurar Tabla de Oferta">⚙️</button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Overlay for Setup (Tabla Oferta) -->
+            <div id="setup-overlay" class="overlay hidden">
+                <div class="modal large-modal">
+                    <div class="modal-header">
+                        <h2>Configuración de Proveedores</h2>
+                        <button id="close-setup" class="btn-icon">✖</button>
+                    </div>
+                    
+                    <div class="tabs">
+                        <button class="tab-btn active" data-target="tab-upload">Cargar Excel</button>
+                        <button class="tab-btn" data-target="tab-manage">Gestionar Proveedores</button>
+                    </div>
+
+                    <div class="tab-content active" id="tab-upload">
+                        <p>Sube el archivo <strong>TABLA OFERTA CONTRATISTA DE MAESTROS.xlsx</strong> para calibrar los precios automáticamente.</p>
+                        <div class="drop-zone" id="drop-zone-oferta">
+                            <p>Arrastra el archivo aquí o haz clic</p>
+                            <input type="file" id="input-oferta" accept=".xlsx, .xls" hidden>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="tab-manage">
+                        <div class="manage-header">
+                            <select id="manage-provider-select" class="custom-select">
+                                <option value="">-- Seleccionar Proveedor --</option>
+                            </select>
+                            <button id="btn-add-provider" class="btn btn-outline">+ Nuevo Proveedor</button>
+                        </div>
+                        
+                        <div id="provider-editor" class="hidden">
+                            <div class="provider-name-edit">
+                                <input type="text" id="edit-provider-name" placeholder="Nombre del Proveedor" class="custom-input">
+                                <button id="btn-save-provider" class="btn btn-primary">Guardar</button>
+                                <button id="btn-delete-provider" class="btn btn-danger">Eliminar</button>
+                            </div>
+                            
+                            <h4>Actividades y Precios</h4>
+                            <div class="activities-list" id="activities-list">
+                                <!-- Filas de actividades -->
+                            </div>
+                            <button id="btn-add-activity" class="btn btn-text">+ Añadir Actividad</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard / Results -->
+            <section class="dashboard" id="dashboard">
+                <header class="dashboard-header">
+                    <h2>Resumen de Pagos</h2>
+                    
+                    <!-- Compact Upload Controls -->
+                    <div class="compact-upload-bar">
+                        <div class="compact-control" style="border-right: 1px solid var(--glass-border); padding-right: 1.5rem;">
+                            <label for="search-ot">Buscar OT:</label>
+                            <input type="text" id="search-ot" class="custom-input" placeholder="Ej. 12345" style="width: 130px; padding: 0.5rem; font-size: 0.9rem;">
+                        </div>
+                        <div class="compact-control">
+                            <label for="initial-provider-select">Proveedor:</label>
+                            <select id="initial-provider-select" class="custom-select">
+                                <option value="">-- Seleccionar --</option>
+                            </select>
+                        </div>
+                        <div class="compact-control drop-zone-compact" id="drop-zone-ot">
+                            <span class="icon">📄</span>
+                            <span>Arrastrar Estado OT aquí</span>
+                            <input type="file" id="input-ot" accept=".xlsx, .xls" hidden>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="dashboard-layout">
+                    <!-- Left Column: Data & Summaries -->
+                    <div class="dashboard-main">
+                        <!-- Summary Cards -->
+                        <div class="summary-cards" id="summary-cards">
+                            <!-- Cards will be injected here by JS -->
+                        </div>
+
+                        <!-- Validation Table -->
+                        <div class="table-container" style="margin-bottom: 1.5rem;">
+                            <div class="table-header-row">
+                                <h3>Validación de Actividades</h3>
+                                <button id="btn-add-activity" class="btn btn-outline">➕ Agregar Actividad Extra</button>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button id="btn-save-progress" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" title="Descargar estado actual">💾 Guardar</button>
+                                    <label for="input-load-progress" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; cursor: pointer; margin: 0;" title="Cargar archivo JSON guardado">📂 Cargar</label>
+                                    <input type="file" id="input-load-progress" accept=".json" hidden>
+                                    <button id="btn-clear-validations" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; margin-left: 1rem; color: #F59E0B; border-color: #F59E0B;" title="Limpiar solo las selecciones de semanas">🧹 Limpiar Validaciones</button>
+                                    <button id="btn-clear-data" class="btn btn-danger" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; background-color: var(--danger); color: white; border: none;" title="Limpiar todos los datos y archivo subido">🗑️ Limpiar Todo</button>
+                                </div>
+                            </div>
+                            <div class="table-scroll" style="max-height: 65vh;">
+                                <table class="data-table" id="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Orden de Trabajo</th>
+                                            <th>Fecha</th>
+                                            <th>Actividad</th>
+                                            <th>Asignado A</th>
+                                            <th>Semana 1</th>
+                                            <th>Semana 2</th>
+                                            <th>Semana 3</th>
+                                            <th>Semana 4</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-body">
+                                        <tr class="empty-row"><td colspan="8">No hay datos. Selecciona un proveedor y carga un Estado de OT.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Consolidado Table -->
+                        <div class="table-container" style="margin-bottom: 1.5rem; border-left: 4px solid var(--accent);">
+                            <div class="table-header-row">
+                                <h3>Consolidado de Pago por Semana</h3>
+                            </div>
+                            <div id="consolidated-weeks-container" style="padding: 1rem;">
+                                <p style="color: var(--text-muted); text-align: center; margin: 2rem 0;">No hay actividades validadas. Seleccione actividades arriba para ver los consolidados.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Column: Calculator -->
+                    <aside class="dashboard-sidebar">
+                        <div class="calculator" id="calculator">
+                            <div class="calc-display">
+                                <div class="calc-history" id="calc-history"></div>
+                                <div class="calc-current" id="calc-current">0</div>
+                            </div>
+                            <div class="calc-keys">
+                                <button class="calc-btn operator" data-action="clear">C</button>
+                                <button class="calc-btn operator" data-action="delete">DEL</button>
+                                <button class="calc-btn operator" data-action="percent">%</button>
+                                <button class="calc-btn operator calc-divide" data-action="divide">÷</button>
+                                
+                                <button class="calc-btn number">7</button>
+                                <button class="calc-btn number">8</button>
+                                <button class="calc-btn number">9</button>
+                                <button class="calc-btn operator calc-multiply" data-action="multiply">×</button>
+                                
+                                <button class="calc-btn number">4</button>
+                                <button class="calc-btn number">5</button>
+                                <button class="calc-btn number">6</button>
+                                <button class="calc-btn operator calc-subtract" data-action="subtract">-</button>
+                                
+                                <button class="calc-btn number">1</button>
+                                <button class="calc-btn number">2</button>
+                                <button class="calc-btn number">3</button>
+                                <button class="calc-btn operator calc-add" data-action="add">+</button>
+                                
+                                <button class="calc-btn number calc-zero">0</button>
+                                <button class="calc-btn number decimal">.</button>
+                                <button class="calc-btn equals" data-action="calculate">=</button>
+                            </div>
+                        </div>
+
+                        <!-- Provider Prices Table -->
+                        <div class="provider-prices-container">
+                            <h4>Precios del Proveedor</h4>
+                            <div class="table-scroll small-scroll">
+                                <table class="data-table prices-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Actividad</th>
+                                            <th style="text-align:right;">Precio</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="provider-prices-body">
+                                        <tr><td colspan="2" style="text-align:center; color:var(--text-muted);">Seleccione un proveedor arriba.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </section>
+        </main>
+
+        <!-- Overlay for Manual Activity -->
+        <div id="manual-activity-overlay" class="overlay hidden">
+            <div class="modal">
+                <h2>Agregar Actividad Manual</h2>
+                <div class="form-group">
+                    <label>Número de Orden / RNN</label>
+                    <input type="text" id="manual-order" class="custom-input" placeholder="Ej. 101026007">
+                </div>
+                <div class="form-group">
+                    <label>Mes</label>
+                    <select id="manual-month" class="custom-select">
+                        <option value="ENERO">ENERO</option>
+                        <option value="FEBRERO">FEBRERO</option>
+                        <option value="MARZO">MARZO</option>
+                        <option value="ABRIL">ABRIL</option>
+                        <option value="MAYO">MAYO</option>
+                        <option value="JUNIO">JUNIO</option>
+                        <option value="JULIO">JULIO</option>
+                        <option value="AGOSTO">AGOSTO</option>
+                        <option value="SEPTIEMBRE">SEPTIEMBRE</option>
+                        <option value="OCTUBRE">OCTUBRE</option>
+                        <option value="NOVIEMBRE">NOVIEMBRE</option>
+                        <option value="DICIEMBRE">DICIEMBRE</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Proveedor</label>
+                    <select id="manual-provider" class="custom-select">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Actividad</label>
+                    <select id="manual-activity" class="custom-select">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Semana</label>
+                    <select id="manual-week" class="custom-select">
+                        <option value="1">Semana 1</option>
+                        <option value="2">Semana 2</option>
+                        <option value="3">Semana 3</option>
+                        <option value="4">Semana 4</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button id="close-manual" class="btn btn-text">Cancelar</button>
+                    <button id="save-manual" class="btn btn-outline" style="background: var(--primary); color: white; border: none;">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
