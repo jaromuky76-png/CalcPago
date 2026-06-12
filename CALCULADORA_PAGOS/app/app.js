@@ -712,6 +712,14 @@ function calculateAndRenderSummary() {
                 
                 if (weekDeds && weekDeds.length > 0) {
                     weekDeds.forEach((ded, idx) => {
+                        // Multi-month support for deductions
+                        if (ded.linkedId && selectedMonth !== 'ALL') {
+                            const linkedItem = currentOTData.find(d => d.id === ded.linkedId);
+                            if (linkedItem && linkedItem.mes !== selectedMonth) {
+                                return; // Skip if it belongs to another month
+                            }
+                        }
+
                         totalDeductions += ded.amount;
                         dedBodyHTML += `
                             <tr style="background-color: rgba(220, 38, 38, 0.05);">
@@ -924,7 +932,8 @@ document.getElementById('btn-save-progress')?.addEventListener('click', async ()
     let savedCount = 0;
     currentOTData.forEach(item => {
         if (item.semana !== null && item.proveedor === selectedProvider) {
-            saveState[item.orden] = item.semana;
+            const key = `${item.orden}_${item.mes}`;
+            saveState[key] = item.semana;
             savedCount++;
         }
     });
@@ -1004,9 +1013,15 @@ document.getElementById('input-load-progress')?.addEventListener('change', (e) =
             let restoredCount = 0;
             currentOTData.forEach(item => {
                 // Solo restaurar de este proveedor para no mezclar
-                if (item.proveedor === selectedProvider && saveState[item.orden] !== undefined) {
-                    item.semana = saveState[item.orden];
-                    restoredCount++;
+                if (item.proveedor === selectedProvider) {
+                    const key = `${item.orden}_${item.mes}`;
+                    if (saveState[key] !== undefined) {
+                        item.semana = saveState[key];
+                        restoredCount++;
+                    } else if (saveState[item.orden] !== undefined) { // Backward compatibility
+                        item.semana = saveState[item.orden];
+                        restoredCount++;
+                    }
                 }
             });
 

@@ -83,10 +83,16 @@
                             <label for="search-ot">Buscar OT:</label>
                             <input type="text" id="search-ot" class="custom-input" placeholder="Ej. 12345" style="width: 130px; padding: 0.5rem; font-size: 0.9rem;">
                         </div>
-                        <div class="compact-control">
+                        <div class="compact-control" style="border-right: 1px solid var(--glass-border); padding-right: 1.5rem;">
                             <label for="initial-provider-select">Proveedor:</label>
                             <select id="initial-provider-select" class="custom-select">
                                 <option value="">-- Seleccionar --</option>
+                            </select>
+                        </div>
+                        <div class="compact-control">
+                            <label for="month-filter">Mes de Validación:</label>
+                            <select id="month-filter" class="custom-select">
+                                <option value="ALL">Todos los Meses</option>
                             </select>
                         </div>
                         <div class="compact-control drop-zone-compact" id="drop-zone-ot">
