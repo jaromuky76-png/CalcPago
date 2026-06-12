@@ -285,8 +285,16 @@ function handleOfertaUpload(file) {
                 }
             });
 
-            // Reemplazar completamente para eliminar basura antigua (como RMS)
-            tablaOferta = parsedData;
+            // En lugar de reemplazar completamente, fusionamos los datos (Merge)
+            // Esto permite mantener los proveedores o actividades previas.
+            Object.keys(parsedData).forEach(provider => {
+                if (!tablaOferta[provider]) {
+                    tablaOferta[provider] = {};
+                }
+                Object.keys(parsedData[provider]).forEach(act => {
+                    tablaOferta[provider][act] = parsedData[provider][act];
+                });
+            });
             saveAndRefresh();
             
             // Visual success indicator
