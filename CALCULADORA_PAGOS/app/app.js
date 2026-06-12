@@ -696,6 +696,28 @@ function calculateAndRenderSummary() {
 
         for (let w = 1; w <= 4; w++) {
             const week = consolidatedByWeek[w];
+            
+            // Inyectar Extras en la data de la semana antes de renderizar
+            if (!providerExtras[selectedProvider]) providerExtras[selectedProvider] = {};
+            if (!providerExtras[selectedProvider][selectedMonth]) providerExtras[selectedProvider][selectedMonth] = { 1: [], 2: [], 3: [], 4: [] };
+            const weekExtras = providerExtras[selectedProvider][selectedMonth][w];
+            
+            if (weekExtras && weekExtras.length > 0) {
+                week.hasData = true; // Forzar a que la semana se muestre si hay extras
+                weekExtras.forEach(extra => {
+                    const mappedName = extra.actividad.toUpperCase(); // Forzar mayúsculas para coincidir
+                    if (!week.data[mappedName]) {
+                        week.data[mappedName] = { cantidad: 0, precioUnitario: extra.valor, total: 0 };
+                    }
+                    week.data[mappedName].cantidad += 1;
+                    week.data[mappedName].total += extra.valor;
+                    week.total += extra.valor;
+                    
+                    totals[`sem${w}`] += extra.valor;
+                    totals.total += extra.valor;
+                });
+            }
+
             if (week.hasData) {
                 generatedAny = true;
                 
@@ -743,34 +765,24 @@ function calculateAndRenderSummary() {
                     });
                 }
                 
-                let extraBodyHTML = '';
-                let totalExtras = 0;
-                
-                if (!providerExtras[selectedProvider]) providerExtras[selectedProvider] = {};
-                if (!providerExtras[selectedProvider][selectedMonth]) providerExtras[selectedProvider][selectedMonth] = { 1: [], 2: [], 3: [], 4: [] };
-                const weekExtras = providerExtras[selectedProvider][selectedMonth][w];
-
+                let extrasListHTML = '';
                 if (weekExtras && weekExtras.length > 0) {
-                    weekExtras.forEach((extra, idx) => {
-                        totalExtras += extra.valor;
-                        extraBodyHTML += `
-                            <tr style="background-color: rgba(16, 185, 129, 0.05);">
-                                <td><span style="font-size: 0.75rem; background: #10B981; color: white; padding: 2px 6px; border-radius: 4px; margin-right: 8px;">Extra</span> [${extra.orden}] ${extra.actividad}</td>
-                                <td style="text-align:center;">1</td>
-                                <td style="text-align:right;">C$${extra.valor.toFixed(2)}</td>
-                                <td style="text-align:right; font-weight:600; color:#10B981;">C$${extra.valor.toFixed(2)}
-                                    <button class="btn-icon btn-remove-extra" data-week="${w}" data-idx="${idx}" style="margin-left: 10px; color: var(--danger); padding: 0;" title="Eliminar extra">✖</button>
-                                </td>
-                            </tr>
-                        `;
-                    });
+                    extrasListHTML = `
+                        <div style="padding: 0.5rem 1rem; background: rgba(16, 185, 129, 0.05); border-top: 1px solid var(--glass-border); font-size: 0.8rem;">
+                            <strong style="color: #10B981; display: block; margin-bottom: 0.3rem;">Extras Añadidos en esta semana:</strong>
+                            <ul style="list-style: none; padding: 0; margin: 0;">
+                                ${weekExtras.map((extra, idx) => `
+                                    <li style="display: flex; justify-content: space-between; margin-bottom: 0.2rem; align-items: center;">
+                                        <span>[${extra.fecha}] Orden: ${extra.orden} - ${extra.actividad} (C$${extra.valor.toFixed(2)})</span>
+                                        <button class="btn-icon btn-remove-extra" data-week="${w}" data-idx="${idx}" style="color: var(--danger); padding: 0 4px;" title="Eliminar extra">✖</button>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
                 }
-                
-                const finalTotal = week.total - totalDeductions + totalExtras;
-                
-                // Actualizar los totales globales para las cards de resumen
-                totals[`sem${w}`] += totalExtras;
-                totals.total += totalExtras;
+
+                const finalTotal = week.total - totalDeductions;
 
                 const wColor = {
                     1: '#3B82F6', // Azul
@@ -804,7 +816,6 @@ function calculateAndRenderSummary() {
                                 </thead>
                                 <tbody>
                                     ${tbodyHTML}
-                                    ${extraBodyHTML}
                                     ${dedBodyHTML}
                                 </tbody>
                                 <tfoot style="font-weight: 700; background: rgba(0,0,0,0.05);">
@@ -815,8 +826,10 @@ function calculateAndRenderSummary() {
                                 </tfoot>
                             </table>
                         </div>
+                        ${extrasListHTML}
                         <div style="padding: 1rem; background: rgba(0,0,0,0.02); display: flex; gap: 0.5rem; align-items: center; border-top: 1px solid var(--glass-border);">
                             <span style="font-size: 0.8rem; font-weight: bold; color: #10B981; width: 60px;">+ Extra:</span>
+                            <input type="date" id="extra-date-${w}" class="custom-input" style="width: 110px; font-size: 0.85rem; padding: 0.4rem;" title="Fecha de ejecución">
                             <input type="text" id="extra-orden-${w}" placeholder="No. Orden" class="custom-input" style="width: 100px; font-size: 0.85rem; padding: 0.4rem;">
                             <input type="text" id="extra-name-${w}" placeholder="Actividad" class="custom-input" style="flex: 1; font-size: 0.85rem; padding: 0.4rem;">
                             <input type="number" id="extra-amount-${w}" placeholder="Monto (C$)" class="custom-input" style="width: 100px; font-size: 0.85rem; padding: 0.4rem;">
@@ -871,20 +884,23 @@ function calculateAndRenderSummary() {
             document.querySelectorAll('.btn-add-extra').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const w = parseInt(e.target.getAttribute('data-week'));
+                    const dateInput = document.getElementById(`extra-date-${w}`);
                     const ordenInput = document.getElementById(`extra-orden-${w}`);
                     const nameInput = document.getElementById(`extra-name-${w}`);
                     const amountInput = document.getElementById(`extra-amount-${w}`);
+                    
+                    const fecha = dateInput.value;
                     const orden = ordenInput.value.trim();
                     const actividad = nameInput.value.trim();
                     const valor = parseFloat(amountInput.value);
                     
-                    if (orden && actividad && !isNaN(valor) && valor > 0) {
+                    if (fecha && orden && actividad && !isNaN(valor) && valor > 0) {
                         if (!providerExtras[selectedProvider]) providerExtras[selectedProvider] = {};
                         if (!providerExtras[selectedProvider][selectedMonth]) providerExtras[selectedProvider][selectedMonth] = { 1: [], 2: [], 3: [], 4: [] };
-                        providerExtras[selectedProvider][selectedMonth][w].push({ orden, actividad, valor });
+                        providerExtras[selectedProvider][selectedMonth][w].push({ fecha, orden, actividad, valor });
                         calculateAndRenderSummary();
                     } else {
-                        alert("Por favor complete No. Orden, Actividad y un Valor mayor a 0.");
+                        alert("Por favor complete Fecha, No. Orden, Actividad y un Valor mayor a 0.");
                     }
                 });
             });
@@ -1210,23 +1226,16 @@ function handlePDFGeneration(e) {
     
     // Agregamos los extras al detalle también
     let totalExtras = 0;
-    let extraRowsForConsolidado = [];
     if (providerExtras[selectedProvider] && providerExtras[selectedProvider][selectedMonth] && providerExtras[selectedProvider][selectedMonth][targetWeek]) {
         const weekExtras = providerExtras[selectedProvider][selectedMonth][targetWeek];
         weekExtras.forEach(extra => {
             detailData.push([
                 `[EXTRA] ${extra.orden}`,
-                '-',
+                extra.fecha || '-',
                 extra.actividad,
                 `Semana ${targetWeek}`
             ]);
             totalExtras += extra.valor;
-            extraRowsForConsolidado.push([
-                `[EXTRA] ${extra.actividad}`,
-                '1',
-                `C$${extra.valor.toFixed(2)}`,
-                `C$${extra.valor.toFixed(2)}`
-            ]);
         });
     }
     
@@ -1259,15 +1268,30 @@ function handlePDFGeneration(e) {
         grandTotal += price;
     });
     
+    // Agrupamos los extras directamente en el Consolidado para que se fusionen con las regulares
+    if (providerExtras[selectedProvider] && providerExtras[selectedProvider][selectedMonth] && providerExtras[selectedProvider][selectedMonth][targetWeek]) {
+        const weekExtras = providerExtras[selectedProvider][selectedMonth][targetWeek];
+        weekExtras.forEach(extra => {
+            const mappedName = extra.actividad.toUpperCase();
+            if (!consolidatedData[mappedName]) {
+                consolidatedData[mappedName] = {
+                    cantidad: 0,
+                    precioUnitario: extra.valor,
+                    total: 0
+                };
+            }
+            consolidatedData[mappedName].cantidad += 1;
+            consolidatedData[mappedName].total += extra.valor;
+            grandTotal += extra.valor;
+        });
+    }
+    
     const consBody = Object.keys(consolidatedData).map(act => [
         act,
         consolidatedData[act].cantidad.toString(),
         `C$${consolidatedData[act].precioUnitario.toFixed(2)}`,
         `C$${consolidatedData[act].total.toFixed(2)}`
     ]);
-    
-    // Agregamos los extras al cuerpo del consolidado
-    extraRowsForConsolidado.forEach(row => consBody.push(row));
     
     // Add deductions to PDF
     let totalDeductions = 0;
@@ -1289,7 +1313,7 @@ function handlePDFGeneration(e) {
         });
     }
     
-    const finalTotal = grandTotal - totalDeductions + totalExtras;
+    const finalTotal = grandTotal - totalDeductions;
     
     let finalY = doc.lastAutoTable.finalY || 145;
     
