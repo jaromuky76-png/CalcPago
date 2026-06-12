@@ -5,6 +5,8 @@ let tablaOferta = {}; // Formato: { "GLOBAL AIR": { "Actividad 1": 100, ... }, "
 let currentOTData = []; // Array de objetos con datos de la OT
 let selectedProvider = 'ALL';
 let providerDeductions = {}; // { "GLOBAL AIR": { 1: [{name, amount}], 2: [], ... } }
+let providerFacturas = {}; // { provider: { month: { 1: "FAC", 2: "" } } }
+let providerExtras = {}; // { provider: { month: { 1: [{orden, actividad, valor}], ... } } }
 
 // DOM Elements
 const btnConfig = document.getElementById('btn-config');
@@ -741,7 +743,34 @@ function calculateAndRenderSummary() {
                     });
                 }
                 
-                const finalTotal = week.total - totalDeductions;
+                let extraBodyHTML = '';
+                let totalExtras = 0;
+                
+                if (!providerExtras[selectedProvider]) providerExtras[selectedProvider] = {};
+                if (!providerExtras[selectedProvider][selectedMonth]) providerExtras[selectedProvider][selectedMonth] = { 1: [], 2: [], 3: [], 4: [] };
+                const weekExtras = providerExtras[selectedProvider][selectedMonth][w];
+
+                if (weekExtras && weekExtras.length > 0) {
+                    weekExtras.forEach((extra, idx) => {
+                        totalExtras += extra.valor;
+                        extraBodyHTML += `
+                            <tr style="background-color: rgba(16, 185, 129, 0.05);">
+                                <td><span style="font-size: 0.75rem; background: #10B981; color: white; padding: 2px 6px; border-radius: 4px; margin-right: 8px;">Extra</span> [${extra.orden}] ${extra.actividad}</td>
+                                <td style="text-align:center;">1</td>
+                                <td style="text-align:right;">C$${extra.valor.toFixed(2)}</td>
+                                <td style="text-align:right; font-weight:600; color:#10B981;">C$${extra.valor.toFixed(2)}
+                                    <button class="btn-icon btn-remove-extra" data-week="${w}" data-idx="${idx}" style="margin-left: 10px; color: var(--danger); padding: 0;" title="Eliminar extra">✖</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+                
+                const finalTotal = week.total - totalDeductions + totalExtras;
+                
+                // Actualizar los totales globales para las cards de resumen
+                totals[`sem${w}`] += totalExtras;
+                totals.total += totalExtras;
 
                 const wColor = {
                     1: '#3B82F6', // Azul
@@ -750,10 +779,17 @@ function calculateAndRenderSummary() {
                     4: '#14B8A6'  // Teal
                 }[w];
 
+                if (!providerFacturas[selectedProvider]) providerFacturas[selectedProvider] = {};
+                if (!providerFacturas[selectedProvider][selectedMonth]) providerFacturas[selectedProvider][selectedMonth] = { 1: '', 2: '', 3: '', 4: '' };
+                const currentFactura = providerFacturas[selectedProvider][selectedMonth][w] || '';
+
                 const tableHTML = `
                     <div style="margin-bottom: 2rem; border: 1px solid ${wColor}80; border-radius: 8px; overflow: hidden; background: var(--bg-panel); box-shadow: 0 4px 6px -1px ${wColor}22;">
                         <div style="background: ${wColor}15; border-bottom: 1px solid ${wColor}40; padding: 0.8rem 1.2rem; display: flex; justify-content: space-between; align-items: center;">
-                            <h4 style="margin: 0; font-size: 1.1rem; color: ${wColor}; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">Semana ${w}</h4>
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <h4 style="margin: 0; font-size: 1.1rem; color: ${wColor}; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">Semana ${w}</h4>
+                                <input type="text" class="custom-input invoice-input" data-week="${w}" placeholder="No. Factura" value="${currentFactura}" style="padding: 0.3rem 0.5rem; font-size: 0.85rem; width: 150px; border-color: ${wColor}40;" title="Factura del proveedor">
+                            </div>
                             <button class="btn btn-primary btn-pdf-dynamic" data-week="${w}" style="background-color: ${wColor}; border-color: ${wColor}; color: white; padding: 0.4rem 0.8rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s;">📄 Descargar PDF</button>
                         </div>
                         <div class="table-scroll" style="max-height: none;">
@@ -768,6 +804,7 @@ function calculateAndRenderSummary() {
                                 </thead>
                                 <tbody>
                                     ${tbodyHTML}
+                                    ${extraBodyHTML}
                                     ${dedBodyHTML}
                                 </tbody>
                                 <tfoot style="font-weight: 700; background: rgba(0,0,0,0.05);">
@@ -779,9 +816,17 @@ function calculateAndRenderSummary() {
                             </table>
                         </div>
                         <div style="padding: 1rem; background: rgba(0,0,0,0.02); display: flex; gap: 0.5rem; align-items: center; border-top: 1px solid var(--glass-border);">
+                            <span style="font-size: 0.8rem; font-weight: bold; color: #10B981; width: 60px;">+ Extra:</span>
+                            <input type="text" id="extra-orden-${w}" placeholder="No. Orden" class="custom-input" style="width: 100px; font-size: 0.85rem; padding: 0.4rem;">
+                            <input type="text" id="extra-name-${w}" placeholder="Actividad" class="custom-input" style="flex: 1; font-size: 0.85rem; padding: 0.4rem;">
+                            <input type="number" id="extra-amount-${w}" placeholder="Monto (C$)" class="custom-input" style="width: 100px; font-size: 0.85rem; padding: 0.4rem;">
+                            <button class="btn btn-outline btn-add-extra" data-week="${w}" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: #10B981; border-color: #10B981;">Agregar</button>
+                        </div>
+                        <div style="padding: 1rem; padding-top: 0; background: rgba(0,0,0,0.02); display: flex; gap: 0.5rem; align-items: center;">
+                            <span style="font-size: 0.8rem; font-weight: bold; color: var(--danger); width: 60px;">- Reclamo:</span>
                             <input type="text" id="deduction-name-${w}" placeholder="Motivo de deducción / Reclamo" class="custom-input" style="flex: 1; font-size: 0.85rem; padding: 0.4rem;">
-                            <input type="number" id="deduction-amount-${w}" placeholder="Monto (C$)" class="custom-input" style="width: 120px; font-size: 0.85rem; padding: 0.4rem;">
-                            <button class="btn btn-outline btn-add-deduction" data-week="${w}" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: var(--danger); border-color: var(--danger);">+ Aplicar Descuento</button>
+                            <input type="number" id="deduction-amount-${w}" placeholder="Monto (C$)" class="custom-input" style="width: 100px; font-size: 0.85rem; padding: 0.4rem;">
+                            <button class="btn btn-outline btn-add-deduction" data-week="${w}" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: var(--danger); border-color: var(--danger);">Descontar</button>
                         </div>
                     </div>
                 `;
@@ -820,6 +865,50 @@ function calculateAndRenderSummary() {
                     const idx = parseInt(e.target.getAttribute('data-idx'));
                     providerDeductions[selectedProvider][w].splice(idx, 1);
                     calculateAndRenderSummary();
+                });
+            });
+
+            document.querySelectorAll('.btn-add-extra').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    if (selectedMonth === 'ALL') {
+                        alert("Por favor, selecciona un 'Mes de Validación' específico arriba para poder agregar actividades extra a ese mes.");
+                        return;
+                    }
+                    const w = parseInt(e.target.getAttribute('data-week'));
+                    const ordenInput = document.getElementById(`extra-orden-${w}`);
+                    const nameInput = document.getElementById(`extra-name-${w}`);
+                    const amountInput = document.getElementById(`extra-amount-${w}`);
+                    const orden = ordenInput.value.trim();
+                    const actividad = nameInput.value.trim();
+                    const valor = parseFloat(amountInput.value);
+                    
+                    if (orden && actividad && !isNaN(valor) && valor > 0) {
+                        if (!providerExtras[selectedProvider]) providerExtras[selectedProvider] = {};
+                        if (!providerExtras[selectedProvider][selectedMonth]) providerExtras[selectedProvider][selectedMonth] = { 1: [], 2: [], 3: [], 4: [] };
+                        providerExtras[selectedProvider][selectedMonth][w].push({ orden, actividad, valor });
+                        calculateAndRenderSummary();
+                    } else {
+                        alert("Por favor complete No. Orden, Actividad y un Valor mayor a 0.");
+                    }
+                });
+            });
+
+            document.querySelectorAll('.btn-remove-extra').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const w = parseInt(e.target.getAttribute('data-week'));
+                    const idx = parseInt(e.target.getAttribute('data-idx'));
+                    providerExtras[selectedProvider][selectedMonth][w].splice(idx, 1);
+                    calculateAndRenderSummary();
+                });
+            });
+
+            document.querySelectorAll('.invoice-input').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    if (selectedMonth === 'ALL') return;
+                    const w = parseInt(e.target.getAttribute('data-week'));
+                    if (!providerFacturas[selectedProvider]) providerFacturas[selectedProvider] = {};
+                    if (!providerFacturas[selectedProvider][selectedMonth]) providerFacturas[selectedProvider][selectedMonth] = { 1: '', 2: '', 3: '', 4: '' };
+                    providerFacturas[selectedProvider][selectedMonth][w] = e.target.value;
                 });
             });
         }
@@ -952,9 +1041,11 @@ document.getElementById('btn-save-progress')?.addEventListener('click', async ()
     }
 
     const saveObj = {
-        version: 2,
+        version: 3,
         validations: saveState,
-        deductions: providerDeductions[selectedProvider] || { 1: [], 2: [], 3: [], 4: [] }
+        deductions: providerDeductions[selectedProvider] || { 1: [], 2: [], 3: [], 4: [] },
+        extras: providerExtras[selectedProvider] || {},
+        facturas: providerFacturas[selectedProvider] || {}
     };
     
     const jsonString = JSON.stringify(saveObj, null, 2);
@@ -1010,10 +1101,15 @@ document.getElementById('input-load-progress')?.addEventListener('change', (e) =
             const saveObj = JSON.parse(event.target.result);
             let saveState = {};
             
-            if (saveObj.version === 2) {
+            if (saveObj.version >= 2) {
                 saveState = saveObj.validations;
                 if (!providerDeductions[selectedProvider]) providerDeductions[selectedProvider] = { 1: [], 2: [], 3: [], 4: [] };
                 providerDeductions[selectedProvider] = saveObj.deductions || { 1: [], 2: [], 3: [], 4: [] };
+                
+                if (saveObj.version >= 3) {
+                    providerExtras[selectedProvider] = saveObj.extras || {};
+                    providerFacturas[selectedProvider] = saveObj.facturas || {};
+                }
             } else {
                 saveState = saveObj; // v1 format
             }
@@ -1086,7 +1182,13 @@ function handlePDFGeneration(e) {
     doc.text(`Proveedor: ${selectedProvider}`, 40, 75);
     doc.text(`Fecha de Emisión: ${reportDate}`, 40, 95);
 
-    const invoiceNum = document.getElementById('invoice-input')?.value || 'N/A';
+    const selectedMonth = document.getElementById('month-filter')?.value || 'ALL';
+    
+    let invoiceNum = 'N/A';
+    if (providerFacturas[selectedProvider] && providerFacturas[selectedProvider][selectedMonth] && providerFacturas[selectedProvider][selectedMonth][targetWeek]) {
+        invoiceNum = providerFacturas[selectedProvider][selectedMonth][targetWeek];
+    }
+    
     doc.setFont("helvetica", "bold");
     doc.text(`Factura / Referencia: ${invoiceNum}`, 40, 115);
     doc.setFont("helvetica", "normal");
@@ -1110,6 +1212,28 @@ function handlePDFGeneration(e) {
         item.actividad,
         `Semana ${item.semana}`
     ]);
+    
+    // Agregamos los extras al detalle también
+    let totalExtras = 0;
+    let extraRowsForConsolidado = [];
+    if (providerExtras[selectedProvider] && providerExtras[selectedProvider][selectedMonth] && providerExtras[selectedProvider][selectedMonth][targetWeek]) {
+        const weekExtras = providerExtras[selectedProvider][selectedMonth][targetWeek];
+        weekExtras.forEach(extra => {
+            detailData.push([
+                `[EXTRA] ${extra.orden}`,
+                '-',
+                extra.actividad,
+                `Semana ${targetWeek}`
+            ]);
+            totalExtras += extra.valor;
+            extraRowsForConsolidado.push([
+                `[EXTRA] ${extra.actividad}`,
+                '1',
+                `C$${extra.valor.toFixed(2)}`,
+                `C$${extra.valor.toFixed(2)}`
+            ]);
+        });
+    }
     
     doc.autoTable({
         startY: 145,
@@ -1147,11 +1271,19 @@ function handlePDFGeneration(e) {
         `C$${consolidatedData[act].total.toFixed(2)}`
     ]);
     
+    // Agregamos los extras al cuerpo del consolidado
+    extraRowsForConsolidado.forEach(row => consBody.push(row));
+    
     // Add deductions to PDF
     let totalDeductions = 0;
     if (providerDeductions[selectedProvider] && providerDeductions[selectedProvider][targetWeek]) {
         const weekDeds = providerDeductions[selectedProvider][targetWeek];
         weekDeds.forEach(ded => {
+            // Support multi-month deduction filtering
+            if (ded.linkedId && selectedMonth !== 'ALL') {
+                const linkedItem = currentOTData.find(d => d.id === ded.linkedId);
+                if (linkedItem && linkedItem.mes !== selectedMonth) return;
+            }
             totalDeductions += ded.amount;
             consBody.push([
                 `[RECLAMO / DESCUENTO] ${ded.name}`,
@@ -1162,7 +1294,7 @@ function handlePDFGeneration(e) {
         });
     }
     
-    const finalTotal = grandTotal - totalDeductions;
+    const finalTotal = grandTotal - totalDeductions + totalExtras;
     
     let finalY = doc.lastAutoTable.finalY || 145;
     
