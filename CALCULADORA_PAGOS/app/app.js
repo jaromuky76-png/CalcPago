@@ -870,10 +870,6 @@ function calculateAndRenderSummary() {
 
             document.querySelectorAll('.btn-add-extra').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    if (selectedMonth === 'ALL') {
-                        alert("Por favor, selecciona un 'Mes de Validación' específico arriba para poder agregar actividades extra a ese mes.");
-                        return;
-                    }
                     const w = parseInt(e.target.getAttribute('data-week'));
                     const ordenInput = document.getElementById(`extra-orden-${w}`);
                     const nameInput = document.getElementById(`extra-name-${w}`);
@@ -904,7 +900,6 @@ function calculateAndRenderSummary() {
 
             document.querySelectorAll('.invoice-input').forEach(input => {
                 input.addEventListener('change', (e) => {
-                    if (selectedMonth === 'ALL') return;
                     const w = parseInt(e.target.getAttribute('data-week'));
                     if (!providerFacturas[selectedProvider]) providerFacturas[selectedProvider] = {};
                     if (!providerFacturas[selectedProvider][selectedMonth]) providerFacturas[selectedProvider][selectedMonth] = { 1: '', 2: '', 3: '', 4: '' };
