@@ -1519,19 +1519,21 @@ function handlePDFGeneration(e) {
 // -- Theme Toggle --
 const btnThemeToggle = document.getElementById('btn-theme-toggle');
 if (btnThemeToggle) {
-    const savedTheme = localStorage.getItem('calcPago_theme') || 'dark';
-    if (savedTheme === 'light') {
+    const savedTheme = localStorage.getItem('calcPago_theme') || 'light';
+    if (savedTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
         document.documentElement.setAttribute('data-theme', 'light');
     }
 
     btnThemeToggle.addEventListener('click', () => {
         const currentTheme = document.documentElement.getAttribute('data-theme');
-        if (currentTheme === 'light') {
-            document.documentElement.removeAttribute('data-theme');
-            localStorage.setItem('calcPago_theme', 'dark');
-        } else {
+        if (currentTheme === 'dark') {
             document.documentElement.setAttribute('data-theme', 'light');
             localStorage.setItem('calcPago_theme', 'light');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('calcPago_theme', 'dark');
         }
     });
 }
