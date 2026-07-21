@@ -275,6 +275,59 @@ body {
     color: #94A3B8;
 }
 
+/* Área Grande y Cómoda para Arrastrar Estado de OT */
+.drop-zone-ot-large {
+    background: #FFFFFF;
+    border: 2px dashed #00A859;
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 15px rgba(0, 168, 89, 0.05);
+    margin-bottom: 0.5rem;
+}
+
+[data-theme="dark"] .drop-zone-ot-large {
+    background: var(--bg-panel);
+    border-color: #059669;
+}
+
+.drop-zone-ot-large:hover, .drop-zone-ot-large.dragover {
+    background: var(--primary-pastel);
+    border-color: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 168, 89, 0.18);
+}
+
+.drop-zone-icon {
+    font-size: 2.2rem;
+    background: #E6F4EA;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.drop-zone-text strong {
+    display: block;
+    font-size: 1rem;
+    color: var(--primary);
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+}
+
+.drop-zone-text p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
 .drop-zone-compact {
     padding: 0.5rem 1.2rem;
     border: 2px dashed #A7F3D0;

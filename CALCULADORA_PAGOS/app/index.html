@@ -77,31 +77,36 @@
                 <header class="dashboard-header">
                     <h2>Resumen de Pagos</h2>
                     
-                    <!-- Compact Upload Controls -->
+                    <!-- Compact Upload & Filter Controls -->
                     <div class="compact-upload-bar">
-                        <div class="compact-control" style="border-right: 1px solid var(--glass-border); padding-right: 1.5rem;">
-                            <label for="search-ot">Buscar OT:</label>
-                            <input type="text" id="search-ot" class="custom-input" placeholder="Ej. 12345" style="width: 130px; padding: 0.5rem; font-size: 0.9rem;">
+                        <div class="compact-control" style="border-right: 1px solid var(--glass-border); padding-right: 1.2rem;">
+                            <label for="search-ot">🔍 Buscar OT:</label>
+                            <input type="text" id="search-ot" class="custom-input" placeholder="Ej. 12345" style="width: 120px; padding: 0.45rem; font-size: 0.88rem;">
                         </div>
-                        <div class="compact-control" style="border-right: 1px solid var(--glass-border); padding-right: 1.5rem;">
-                            <label for="initial-provider-select">Proveedor:</label>
+                        <div class="compact-control" style="border-right: 1px solid var(--glass-border); padding-right: 1.2rem;">
+                            <label for="initial-provider-select">👤 Proveedor:</label>
                             <select id="initial-provider-select" class="custom-select">
                                 <option value="">-- Seleccionar --</option>
                             </select>
                         </div>
                         <div class="compact-control">
-                            <label for="month-filter">Mes de Validación:</label>
+                            <label for="month-filter">📅 Mes de Validación:</label>
                             <select id="month-filter" class="custom-select">
                                 <option value="ALL">Todos los Meses</option>
                             </select>
                         </div>
-                        <div class="compact-control drop-zone-compact" id="drop-zone-ot">
-                            <span class="icon">📄</span>
-                            <span>Arrastrar Estado OT aquí</span>
-                            <input type="file" id="input-ot" accept=".xlsx, .xls" hidden>
-                        </div>
                     </div>
                 </header>
+
+                <!-- Dedicated Large Drop Zone for Estado de OT -->
+                <div class="drop-zone-ot-large" id="drop-zone-ot">
+                    <div class="drop-zone-icon">📥</div>
+                    <div class="drop-zone-text">
+                        <strong>Arrastra tus archivos de Estado de OT aquí</strong>
+                        <p>Haz clic para seleccionar o suelta tus archivos Excel (.xlsx, .xls) de cualquier mes</p>
+                    </div>
+                    <input type="file" id="input-ot" accept=".xlsx, .xls" multiple hidden>
+                </div>
 
                 <div class="dashboard-layout">
                     <!-- Left Column: Data & Summaries -->
