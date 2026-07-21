@@ -37,6 +37,109 @@ document.addEventListener('DOMContentLoaded', () => {
 btnConfig.addEventListener('click', () => setupOverlay.classList.remove('hidden'));
 closeSetup.addEventListener('click', () => setupOverlay.classList.add('hidden'));
 
+// -- Manual OT Overlay Logic --
+const btnOpenManualOT = document.getElementById('btn-open-manual-ot');
+const manualActivityOverlay = document.getElementById('manual-activity-overlay');
+const closeManual = document.getElementById('close-manual');
+const saveManual = document.getElementById('save-manual');
+
+if (btnOpenManualOT && manualActivityOverlay) {
+    btnOpenManualOT.addEventListener('click', () => {
+        const manualProviderSelect = document.getElementById('manual-provider');
+        const manualMonthSelect = document.getElementById('manual-month');
+        const manualDateInput = document.getElementById('manual-date');
+        
+        if (manualDateInput && !manualDateInput.value) {
+            manualDateInput.value = new Date().toISOString().split('T')[0];
+        }
+
+        if (manualProviderSelect) {
+            manualProviderSelect.innerHTML = '';
+            const providers = Object.keys(tablaOferta);
+            if (providers.length === 0) {
+                manualProviderSelect.innerHTML = '<option value="">-- Sin Proveedores --</option>';
+            } else {
+                providers.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p;
+                    opt.textContent = p;
+                    if (selectedProvider !== 'ALL' && p === selectedProvider) {
+                        opt.selected = true;
+                    }
+                    manualProviderSelect.appendChild(opt);
+                });
+            }
+        }
+
+        if (manualMonthSelect) {
+            const currentMonthFilter = document.getElementById('month-filter')?.value;
+            if (currentMonthFilter && currentMonthFilter !== 'ALL') {
+                manualMonthSelect.value = currentMonthFilter;
+            }
+        }
+
+        manualActivityOverlay.classList.remove('hidden');
+    });
+
+    closeManual?.addEventListener('click', () => {
+        manualActivityOverlay.classList.add('hidden');
+    });
+
+    saveManual?.addEventListener('click', () => {
+        const orden = document.getElementById('manual-order')?.value.trim();
+        const rawDate = document.getElementById('manual-date')?.value;
+        const proveedor = document.getElementById('manual-provider')?.value;
+        const mes = document.getElementById('manual-month')?.value;
+        const actividad = document.getElementById('manual-activity')?.value.trim();
+
+        if (!orden) {
+            alert("Por favor ingrese el Número de Orden / OT.");
+            return;
+        }
+        if (!proveedor) {
+            alert("Por favor seleccione un Proveedor.");
+            return;
+        }
+        if (!actividad) {
+            alert("Por favor ingrese la Actividad.");
+            return;
+        }
+
+        let formattedDate = '';
+        if (rawDate) {
+            const parts = rawDate.split('-');
+            if (parts.length === 3) {
+                formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            } else {
+                formattedDate = rawDate;
+            }
+        } else {
+            formattedDate = new Date().toLocaleDateString('es-NI');
+        }
+
+        const newOT = {
+            id: 'manual_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            orden: orden,
+            fecha: formattedDate,
+            actividad: actividad,
+            proveedor: proveedor,
+            mes: mes || 'JUNIO',
+            semana: null,
+            isManual: true
+        };
+
+        currentOTData.unshift(newOT);
+        renderTable();
+        calculateAndRenderSummary();
+
+        document.getElementById('manual-order').value = '';
+        document.getElementById('manual-activity').value = '';
+        manualActivityOverlay.classList.add('hidden');
+
+        alert(`¡OT ${orden} agregada con éxito! Aparece en la lista para que le selecciones la semana cuando desees.`);
+    });
+}
+
 // Drag and drop setup
 setupDragAndDrop(dropZoneOferta, inputOferta, handleOfertaUpload);
 setupDragAndDrop(dropZoneOT, inputOT, handleOTUpload);
@@ -614,6 +717,10 @@ function findProviderPrice(actividadStr, providerPrices) {
         } else {
             bestKey = providerKeys.find(k => k.toUpperCase().includes('VISITA A DOMICILIO') || k.toUpperCase() === 'VISITA');
         }
+    }
+
+    if (!bestKey && (actUpper.includes('DIAGNOSTICO') || actUpper.includes('DIAGNÓSTICO'))) {
+        bestKey = providerKeys.find(k => k.toUpperCase().includes('VISITA A DOMICILIO') || k.toUpperCase().includes('VISITA') || k.toUpperCase().includes('DIAGNOSTICO') || k.toUpperCase().includes('DIAGNÓSTICO'));
     }
     
     if (!bestKey && (actUpper.includes('DESINSTALACION') || actUpper.includes('DESINSTALACIÓN'))) {
@@ -1336,22 +1443,60 @@ function handlePDFGeneration(e) {
         }
     });
     
+    // Control y Auditoría: Órdenes Autorizadas para Pago
+    const paidOTList = [];
+    validatedActivities.forEach(item => {
+        if (item.orden) paidOTList.push(item.orden);
+    });
+    if (providerExtras[selectedProvider] && providerExtras[selectedProvider][selectedMonth] && providerExtras[selectedProvider][selectedMonth][targetWeek]) {
+        const weekExtras = providerExtras[selectedProvider][selectedMonth][targetWeek];
+        weekExtras.forEach(extra => {
+            if (extra.orden) paidOTList.push(`${extra.orden} (Extra)`);
+        });
+    }
+
+    finalY = (doc.lastAutoTable ? doc.lastAutoTable.finalY : finalY) + 20;
+
+    if (finalY > doc.internal.pageSize.height - 180) {
+        doc.addPage();
+        finalY = 40;
+    }
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(verdeSINSA[0], verdeSINSA[1], verdeSINSA[2]);
+    doc.text(`CONTROL Y AUDITORÍA: ÓRDENES AUTORIZADAS PARA PAGO (${paidOTList.length} OT${paidOTList.length !== 1 ? 's' : ''})`, 40, finalY);
+
+    const otTextString = paidOTList.length > 0 ? paidOTList.join(', ') : 'Ninguna';
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(grisOscuro[0], grisOscuro[1], grisOscuro[2]);
+
+    const splitOTs = doc.splitTextToSize(`Órdenes liquidadas: ${otTextString}`, doc.internal.pageSize.width - 90);
+    const boxHeight = Math.max(32, splitOTs.length * 12 + 16);
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(40, finalY + 8, doc.internal.pageSize.width - 80, boxHeight, 4, 4, 'FD');
+
+    doc.text(splitOTs, 50, finalY + 22);
+
+    finalY += boxHeight + 20;
+
     // Signatures
-    finalY = doc.lastAutoTable.finalY || finalY + 100;
-    
-    if(finalY > doc.internal.pageSize.height - 100) {
+    if (finalY > doc.internal.pageSize.height - 100) {
         doc.addPage();
         finalY = 50;
     }
-    
+
     doc.setDrawColor(74, 85, 104);
-    doc.line(80, finalY + 80, 250, finalY + 80);
+    doc.line(80, finalY + 40, 250, finalY + 40);
     doc.setFontSize(11);
-    doc.text("MAESTROS DE SINSA", 100, finalY + 95);
-    
-    doc.line(360, finalY + 80, 530, finalY + 80);
-    doc.text(`PROVEEDOR: ${selectedProvider}`, 360, finalY + 95);
-    
+    doc.text("MAESTROS DE SINSA", 100, finalY + 55);
+
+    doc.line(360, finalY + 40, 530, finalY + 40);
+    doc.text(`PROVEEDOR: ${selectedProvider}`, 360, finalY + 55);
+
     doc.save(`Reporte_Validacion_${selectedProvider}_Semana_${targetWeek}.pdf`);
 }
 
