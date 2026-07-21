@@ -555,10 +555,23 @@ document.getElementById('initial-provider-select').addEventListener('change', (e
     updateProviderPricesTable();
 });
 
-// Search functionality
-document.getElementById('search-ot')?.addEventListener('input', (e) => {
+// Search functionality sync
+const searchTopInput = document.getElementById('search-ot');
+const searchTableInput = document.getElementById('table-search-ot');
+const btnTableSearch = document.getElementById('btn-table-search');
+
+function triggerSearchSync(val) {
+    if (searchTopInput && searchTopInput.value !== val) searchTopInput.value = val;
+    if (searchTableInput && searchTableInput.value !== val) searchTableInput.value = val;
     renderTable();
     calculateAndRenderSummary();
+}
+
+searchTopInput?.addEventListener('input', (e) => triggerSearchSync(e.target.value));
+searchTableInput?.addEventListener('input', (e) => triggerSearchSync(e.target.value));
+btnTableSearch?.addEventListener('click', () => {
+    const val = searchTableInput?.value || searchTopInput?.value || '';
+    triggerSearchSync(val);
 });
 
 function updateProviderPricesTable() {
@@ -599,7 +612,7 @@ function renderTable() {
         return;
     }
 
-    const searchTerm = document.getElementById('search-ot')?.value.trim().toLowerCase() || '';
+    const searchTerm = (document.getElementById('table-search-ot')?.value || document.getElementById('search-ot')?.value || '').trim().toLowerCase();
     const selectedMonth = document.getElementById('month-filter')?.value || 'ALL';
 
     const filteredData = currentOTData.filter(d => {
@@ -614,6 +627,9 @@ function renderTable() {
         tableBody.innerHTML = '<tr class="empty-row"><td colspan="8">No hay resultados.</td></tr>';
         return;
     }
+
+    // Ordenar OTs por número de orden de menor a mayor
+    filteredData.sort((a, b) => a.orden.localeCompare(b.orden, undefined, { numeric: true, sensitivity: 'base' }));
 
     filteredData.forEach(item => {
         const tr = document.createElement('tr');
@@ -759,7 +775,7 @@ function calculateAndRenderSummary() {
         total: 0
     };
 
-    const searchTerm = document.getElementById('search-ot')?.value.trim().toLowerCase() || '';
+    const searchTerm = (document.getElementById('table-search-ot')?.value || document.getElementById('search-ot')?.value || '').trim().toLowerCase();
     const selectedMonth = document.getElementById('month-filter')?.value || 'ALL';
 
     const filteredData = currentOTData.filter(d => {

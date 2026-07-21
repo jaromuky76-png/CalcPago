@@ -114,7 +114,13 @@
                         <!-- Validation Table -->
                         <div class="table-container" style="margin-bottom: 1.5rem;">
                             <div class="table-header-row">
-                                <h3>Validación de Actividades</h3>
+                                <div style="display: flex; align-items: center; gap: 0.8rem;">
+                                    <h3>Validación de Actividades</h3>
+                                    <div style="display: flex; align-items: center; gap: 0.3rem;">
+                                        <input type="text" id="table-search-ot" class="custom-input" placeholder="🔍 Buscar OT..." style="font-size: 0.8rem; padding: 0.4rem 0.6rem; width: 150px;" title="Buscar por número de orden">
+                                        <button id="btn-table-search" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.6rem;" title="Buscar">🔍 Buscar</button>
+                                    </div>
+                                </div>
                                 <div style="display: flex; gap: 0.5rem;">
                                     <button id="btn-open-manual-ot" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: #10B981; border-color: #10B981; font-weight: 600;" title="Agregar una Orden de Trabajo manualmente">➕ Agregar OT Manual</button>
                                     <button id="btn-save-progress" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" title="Descargar estado actual">💾 Guardar</button>
