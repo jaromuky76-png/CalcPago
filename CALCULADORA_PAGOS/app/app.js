@@ -25,11 +25,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedOferta = localStorage.getItem('calcPago_tablaOferta');
     if (savedOferta) {
         tablaOferta = JSON.parse(savedOferta);
-        console.log("Tabla de Oferta cargada desde memoria", tablaOferta);
-        updateInitialProviderSelect();
-        updateManageProviderSelect();
+    }
+    
+    // Auto-restaurar estado de la sesión guardado previamente
+    const savedStateStr = localStorage.getItem('calcPago_workspaceState');
+    if (savedStateStr) {
+        try {
+            const state = JSON.parse(savedStateStr);
+            if (state.tablaOferta) tablaOferta = state.tablaOferta;
+            if (state.currentOTData && state.currentOTData.length > 0) {
+                currentOTData = state.currentOTData.map(d => ({
+                    ...d,
+                    fechaObj: d.fechaObj ? new Date(d.fechaObj) : new Date()
+                }));
+            }
+            if (state.providerDeductions) providerDeductions = state.providerDeductions;
+            if (state.providerFacturas) providerFacturas = state.providerFacturas;
+            if (state.providerExtras) providerExtras = state.providerExtras;
+            if (state.selectedProvider) selectedProvider = state.selectedProvider;
+
+            updateInitialProviderSelect();
+            updateManageProviderSelect();
+            updateMonthFilter();
+            renderTable();
+            calculateAndRenderSummary();
+            updateProviderPricesTable();
+            console.log("Área de trabajo restaurada automáticamente desde memoria.");
+        } catch (err) {
+            console.error("Error al restaurar área de trabajo previa:", err);
+        }
     } else {
-        setupOverlay.classList.remove('hidden');
+        if (Object.keys(tablaOferta).length > 0) {
+            updateInitialProviderSelect();
+            updateManageProviderSelect();
+        } else {
+            setupOverlay.classList.remove('hidden');
+        }
     }
 });
 
@@ -536,6 +567,7 @@ function handleOTUpload(file) {
             renderTable();
             calculateAndRenderSummary();
             updateProviderPricesTable();
+            saveWorkspaceState();
 
             if (replacedCount > 0) {
                 alert(`¡Estado de OT actualizado con éxito!\nSe reemplazaron ${replacedCount} registros anteriores del mes (${fileMonthDetected}) con la versión más reciente del archivo.`);
@@ -740,6 +772,7 @@ function handleCheckboxChange(e) {
 
     renderTable(); // Re-render everything to move the row visually
     calculateAndRenderSummary();
+    saveWorkspaceState();
 }
 
 // Function for 'Homologación de Términos'
@@ -1183,60 +1216,73 @@ function getOpSymbol(op) {
     return '';
 }
 
+// Auto-Guardado en memoria del navegador (localStorage)
+function saveWorkspaceState() {
+    try {
+        const state = {
+            version: 4,
+            currentOTData,
+            providerDeductions,
+            providerFacturas,
+            providerExtras,
+            selectedProvider,
+            tablaOferta
+        };
+        localStorage.setItem('calcPago_workspaceState', JSON.stringify(state));
+    } catch (e) {
+        console.warn("No se pudo auto-guardar la sesión en localStorage:", e);
+    }
+}
+
 // -- Save / Load Progress --
 document.getElementById('btn-save-progress')?.addEventListener('click', async () => {
     if (currentOTData.length === 0) {
-        alert("No hay datos cargados para guardar.");
-        return;
-    }
-    
-    if (!selectedProvider || selectedProvider === 'ALL') {
-        alert("Selecciona un Proveedor específico para guardar su progreso. El progreso se guarda por proveedor.");
+        alert("No hay datos ni órdenes de trabajo cargadas para guardar.");
         return;
     }
 
     const saveState = {};
     let savedCount = 0;
     currentOTData.forEach(item => {
-        if (item.semana !== null && item.proveedor === selectedProvider) {
+        if (item.semana !== null) {
             const key = `${item.orden}_${item.mes}`;
             saveState[key] = item.semana;
             savedCount++;
         }
     });
 
-    if (savedCount === 0) {
-        alert(`No has marcado ninguna actividad como validada para el proveedor ${selectedProvider} aún.`);
-        return;
-    }
-
     const saveObj = {
-        version: 3,
+        version: 4,
+        appName: "CalcPago",
+        savedAt: new Date().toISOString(),
+        selectedProvider: selectedProvider,
         validations: saveState,
-        deductions: providerDeductions[selectedProvider] || { 1: [], 2: [], 3: [], 4: [] },
-        extras: providerExtras[selectedProvider] || {},
-        facturas: providerFacturas[selectedProvider] || {}
+        otData: currentOTData, // Arreglo completo de OTs (subidas por Excel + creadas manualmente)
+        deductions: providerDeductions,
+        extras: providerExtras,
+        facturas: providerFacturas,
+        tablaOferta: tablaOferta
     };
     
     const jsonString = JSON.stringify(saveObj, null, 2);
-    const defaultName = `Validacion_${selectedProvider.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('es-NI').replace(/\//g, '')}.json`;
+    const providerTag = selectedProvider && selectedProvider !== 'ALL' ? selectedProvider.replace(/\s+/g, '_') : 'General';
+    const defaultName = `CalcPago_Consolidado_${providerTag}_${new Date().toLocaleDateString('es-NI').replace(/\//g, '')}.json`;
 
     try {
         if ('showSaveFilePicker' in window) {
             const handle = await window.showSaveFilePicker({
                 suggestedName: defaultName,
                 types: [{
-                    description: 'Archivo JSON',
+                    description: 'Archivo JSON CalcPago',
                     accept: {'application/json': ['.json']},
                 }],
             });
             const writable = await handle.createWritable();
             await writable.write(jsonString);
             await writable.close();
-            // alert("Archivo guardado exitosamente.");
+            alert("¡Consolidado completo guardado exitosamente!");
         } else {
-            // Fallback para navegadores antiguos
-            const filename = prompt("Introduce un nombre para este archivo de guardado (sin la extensión .json):", defaultName.replace('.json', ''));
+            const filename = prompt("Introduce un nombre para este archivo de guardado:", defaultName.replace('.json', ''));
             if (!filename) return;
 
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonString);
@@ -1259,53 +1305,63 @@ document.getElementById('input-load-progress')?.addEventListener('change', (e) =
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!selectedProvider || selectedProvider === 'ALL') {
-        alert("Por favor selecciona primero el proveedor al que pertenece este archivo guardado antes de cargarlo.");
-        e.target.value = '';
-        return;
-    }
-
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
             const saveObj = JSON.parse(event.target.result);
-            let saveState = {};
             
-            if (saveObj.version >= 2) {
-                saveState = saveObj.validations;
-                if (!providerDeductions[selectedProvider]) providerDeductions[selectedProvider] = { 1: [], 2: [], 3: [], 4: [] };
-                providerDeductions[selectedProvider] = saveObj.deductions || { 1: [], 2: [], 3: [], 4: [] };
-                
-                if (saveObj.version >= 3) {
-                    providerExtras[selectedProvider] = saveObj.extras || {};
-                    providerFacturas[selectedProvider] = saveObj.facturas || {};
-                }
-            } else {
-                saveState = saveObj; // v1 format
+            // 1. Restaurar tabla de oferta si venía en el JSON
+            if (saveObj.tablaOferta && Object.keys(saveObj.tablaOferta).length > 0) {
+                tablaOferta = saveObj.tablaOferta;
+                localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
+                updateInitialProviderSelect();
+                updateManageProviderSelect();
             }
 
-            let restoredCount = 0;
-            currentOTData.forEach(item => {
-                // Solo restaurar de este proveedor para no mezclar
-                if (item.proveedor === selectedProvider) {
-                    const key = `${item.orden}_${item.mes}`;
-                    if (saveState[key] !== undefined) {
-                        item.semana = saveState[key];
-                        restoredCount++;
-                    } else if (saveState[item.orden] !== undefined) { // Backward compatibility
-                        item.semana = saveState[item.orden];
-                        restoredCount++;
+            // 2. Restaurar OTs (incluye importadas y manuales)
+            if (saveObj.version >= 4 && Array.isArray(saveObj.otData) && saveObj.otData.length > 0) {
+                currentOTData = saveObj.otData.map(d => ({
+                    ...d,
+                    fechaObj: d.fechaObj ? new Date(d.fechaObj) : new Date()
+                }));
+            }
+
+            // 3. Restaurar Deducciones, Extras y Facturas
+            if (saveObj.deductions) providerDeductions = saveObj.deductions;
+            if (saveObj.extras) providerExtras = saveObj.extras;
+            if (saveObj.facturas) providerFacturas = saveObj.facturas;
+
+            // 4. Restaurar proveedor seleccionado si venía en el JSON
+            if (saveObj.selectedProvider) {
+                selectedProvider = saveObj.selectedProvider;
+                const initialSelect = document.getElementById('initial-provider-select');
+                if (initialSelect && (selectedProvider === 'ALL' || tablaOferta[selectedProvider])) {
+                    initialSelect.value = selectedProvider;
+                }
+            }
+
+            // 5. Aplicar o fusionar validaciones si venían de versiones previas (v1-v3)
+            let saveState = saveObj.validations || saveObj;
+            if (saveObj.version < 4 && currentOTData.length > 0 && saveState) {
+                currentOTData.forEach(item => {
+                    if (selectedProvider === 'ALL' || item.proveedor === selectedProvider) {
+                        const key = `${item.orden}_${item.mes}`;
+                        if (saveState[key] !== undefined) {
+                            item.semana = saveState[key];
+                        } else if (saveState[item.orden] !== undefined) {
+                            item.semana = saveState[item.orden];
+                        }
                     }
-                }
-            });
-
-            if (restoredCount > 0) {
-                renderTable();
-                calculateAndRenderSummary();
-                alert(`¡Se restauraron ${restoredCount} validaciones con éxito!`);
-            } else {
-                alert("El archivo no contenía validaciones aplicables a las OT actuales.");
+                });
             }
+
+            updateMonthFilter();
+            renderTable();
+            calculateAndRenderSummary();
+            updateProviderPricesTable();
+            saveWorkspaceState();
+
+            alert(`¡Consolidado cargado exitosamente!\nSe restauraron ${currentOTData.length} órdenes de trabajo con todos sus consolidados, facturas y extras.`);
         } catch (err) {
             console.error(err);
             alert("Error al leer el archivo de guardado. Asegúrate de que sea el archivo .json correcto.");
@@ -1706,6 +1762,7 @@ document.getElementById('save-manual')?.addEventListener('click', () => {
         calculateAndRenderSummary();
     }
     
+    saveWorkspaceState();
     manualOverlay.classList.add('hidden');
     document.getElementById('manual-order').value = '';
 });
@@ -1716,7 +1773,10 @@ document.getElementById('btn-clear-validations')?.addEventListener('click', () =
             currentOTData.forEach(item => item.semana = null);
         }
         providerDeductions = {};
+        providerExtras = {};
+        providerFacturas = {};
         renderTable();
         calculateAndRenderSummary();
+        saveWorkspaceState();
     }
 });
