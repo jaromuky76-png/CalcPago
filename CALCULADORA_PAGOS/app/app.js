@@ -302,6 +302,7 @@ function setupDragAndDrop(dropZone, inputElement, handler) {
     inputElement.addEventListener('change', (e) => {
         if (e.target.files.length) {
             handler(e.target.files[0]);
+            e.target.value = ''; // Reset for re-uploading modified files with same name
         }
     });
 }
@@ -499,7 +500,8 @@ function handleOTUpload(file) {
                         actividad: row[9] ? row[9].toString().trim() : 'Sin Especificar',
                         proveedor: providerRaw,
                         semana: null,
-                        mes: fileMonth
+                        mes: fileMonth,
+                        fileName: file.name
                     });
                 }
             }
@@ -508,6 +510,19 @@ function handleOTUpload(file) {
                 alert("No se encontraron actividades en el archivo de OT.");
                 return;
             }
+
+            // Si se vuelve a subir un archivo del mismo mes o del mismo nombre,
+            // reemplazamos los registros automáticos anteriores de ese mes/archivo
+            const fileMonthDetected = extracted[0] ? extracted[0].mes : 'NO DEFINIDO';
+            let replacedCount = 0;
+            const beforeCount = currentOTData.length;
+
+            if (fileMonthDetected !== 'NO DEFINIDO') {
+                currentOTData = currentOTData.filter(item => item.isManual || item.mes !== fileMonthDetected);
+            } else {
+                currentOTData = currentOTData.filter(item => item.isManual || item.fileName !== file.name);
+            }
+            replacedCount = beforeCount - currentOTData.length;
 
             currentOTData = currentOTData.concat(extracted);
             currentOTData.sort((a, b) => a.fechaObj - b.fechaObj);
@@ -520,7 +535,13 @@ function handleOTUpload(file) {
             
             renderTable();
             calculateAndRenderSummary();
-            updateProviderPricesTable(); // Update prices table under calc
+            updateProviderPricesTable();
+
+            if (replacedCount > 0) {
+                alert(`¡Estado de OT actualizado con éxito!\nSe reemplazaron ${replacedCount} registros anteriores del mes (${fileMonthDetected}) con la versión más reciente del archivo.`);
+            } else {
+                alert(`¡Se cargaron ${extracted.length} órdenes de trabajo (${fileMonthDetected}) con éxito!`);
+            }
             
         } catch (err) {
             console.error(err);
@@ -529,6 +550,15 @@ function handleOTUpload(file) {
     };
     reader.readAsArrayBuffer(file);
 }
+
+// Botón de Refrescar Datos
+document.getElementById('btn-refresh-data')?.addEventListener('click', () => {
+    currentOTData.sort((a, b) => a.fechaObj - b.fechaObj);
+    renderTable();
+    calculateAndRenderSummary();
+    updateProviderPricesTable();
+    alert("¡Vista y datos refrescados con éxito!");
+});
 
 // 3. UI Renders
 function updateInitialProviderSelect() {
