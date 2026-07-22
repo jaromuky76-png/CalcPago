@@ -808,8 +808,10 @@ function calculateAndRenderSummary() {
     const searchTerm = (document.getElementById('table-search-ot')?.value || document.getElementById('search-ot')?.value || '').trim().toLowerCase();
     const selectedMonth = document.getElementById('month-filter')?.value || 'ALL';
 
-    const filteredData = currentOTData.filter(d => {
-        if (selectedMonth !== 'ALL' && d.mes !== selectedMonth) return false;
+    // Para el Consolidado de Pago por Semana NO filtramos por mes.
+    // Lo asignado a una semana de pago se mantiene en el consolidado general.
+    const consolidatedData = currentOTData.filter(d => {
+        if (!d.semana) return false;
         if (searchTerm !== '') {
             return d.orden.toLowerCase().includes(searchTerm);
         }
@@ -823,7 +825,7 @@ function calculateAndRenderSummary() {
         4: { data: {}, total: 0, hasData: false }
     };
 
-    filteredData.forEach(item => {
+    consolidatedData.forEach(item => {
         if (item.semana) {
             const providerPrices = tablaOferta[item.proveedor];
             const { price, mappedName } = findProviderPrice(item.actividad, providerPrices);
@@ -851,9 +853,14 @@ function calculateAndRenderSummary() {
             const week = consolidatedByWeek[w];
             
             // Inyectar Extras en la data de la semana antes de renderizar
-            if (!providerExtras[selectedProvider]) providerExtras[selectedProvider] = {};
-            if (!providerExtras[selectedProvider][selectedMonth]) providerExtras[selectedProvider][selectedMonth] = { 1: [], 2: [], 3: [], 4: [] };
-            const weekExtras = providerExtras[selectedProvider][selectedMonth][w];
+            if (!providerExtras[selectedProvider]) providerExtras[selectedProvider] = { 1: [], 2: [], 3: [], 4: [] };
+            
+            let weekExtras = [];
+            if (Array.isArray(providerExtras[selectedProvider][w])) {
+                weekExtras = providerExtras[selectedProvider][w];
+            } else if (providerExtras[selectedProvider][selectedMonth] && Array.isArray(providerExtras[selectedProvider][selectedMonth][w])) {
+                weekExtras = providerExtras[selectedProvider][selectedMonth][w];
+            }
             
             if (weekExtras && weekExtras.length > 0) {
                 week.hasData = true; // Forzar a que la semana se muestre si hay extras
@@ -897,14 +904,6 @@ function calculateAndRenderSummary() {
                 
                 if (weekDeds && weekDeds.length > 0) {
                     weekDeds.forEach((ded, idx) => {
-                        // Multi-month support for deductions
-                        if (ded.linkedId && selectedMonth !== 'ALL') {
-                            const linkedItem = currentOTData.find(d => d.id === ded.linkedId);
-                            if (linkedItem && linkedItem.mes !== selectedMonth) {
-                                return; // Skip if it belongs to another month
-                            }
-                        }
-
                         totalDeductions += ded.amount;
                         dedBodyHTML += `
                             <tr style="background-color: rgba(220, 38, 38, 0.05);">
@@ -944,9 +943,13 @@ function calculateAndRenderSummary() {
                     4: '#14B8A6'  // Teal
                 }[w];
 
-                if (!providerFacturas[selectedProvider]) providerFacturas[selectedProvider] = {};
-                if (!providerFacturas[selectedProvider][selectedMonth]) providerFacturas[selectedProvider][selectedMonth] = { 1: '', 2: '', 3: '', 4: '' };
-                const currentFactura = providerFacturas[selectedProvider][selectedMonth][w] || '';
+                if (!providerFacturas[selectedProvider]) providerFacturas[selectedProvider] = { 1: '', 2: '', 3: '', 4: '' };
+                let currentFactura = '';
+                if (typeof providerFacturas[selectedProvider][w] === 'string') {
+                    currentFactura = providerFacturas[selectedProvider][w];
+                } else if (providerFacturas[selectedProvider][selectedMonth] && providerFacturas[selectedProvider][selectedMonth][w]) {
+                    currentFactura = providerFacturas[selectedProvider][selectedMonth][w];
+                }
 
                 const tableHTML = `
                     <div style="margin-bottom: 2rem; border: 1px solid ${wColor}80; border-radius: 8px; overflow: hidden; background: var(--bg-panel); box-shadow: 0 4px 6px -1px ${wColor}22;">
@@ -959,7 +962,7 @@ function calculateAndRenderSummary() {
                         </div>
                         <div class="table-scroll" style="max-height: none;">
                             <table class="data-table">
-                                <thead>
+                               <thead>
                                     <tr>
                                         <th>Actividad</th>
                                         <th style="text-align:center;">Cantidad</th>
@@ -1048,9 +1051,9 @@ function calculateAndRenderSummary() {
                     const valor = parseFloat(amountInput.value);
                     
                     if (fecha && orden && actividad && !isNaN(valor) && valor > 0) {
-                        if (!providerExtras[selectedProvider]) providerExtras[selectedProvider] = {};
-                        if (!providerExtras[selectedProvider][selectedMonth]) providerExtras[selectedProvider][selectedMonth] = { 1: [], 2: [], 3: [], 4: [] };
-                        providerExtras[selectedProvider][selectedMonth][w].push({ fecha, orden, actividad, valor });
+                        if (!providerExtras[selectedProvider]) providerExtras[selectedProvider] = { 1: [], 2: [], 3: [], 4: [] };
+                        if (!Array.isArray(providerExtras[selectedProvider][w])) providerExtras[selectedProvider][w] = [];
+                        providerExtras[selectedProvider][w].push({ fecha, orden, actividad, valor });
                         calculateAndRenderSummary();
                     } else {
                         alert("Por favor complete Fecha, No. Orden, Actividad y un Valor mayor a 0.");
@@ -1062,7 +1065,11 @@ function calculateAndRenderSummary() {
                 btn.addEventListener('click', (e) => {
                     const w = parseInt(e.target.getAttribute('data-week'));
                     const idx = parseInt(e.target.getAttribute('data-idx'));
-                    providerExtras[selectedProvider][selectedMonth][w].splice(idx, 1);
+                    if (Array.isArray(providerExtras[selectedProvider][w])) {
+                        providerExtras[selectedProvider][w].splice(idx, 1);
+                    } else if (providerExtras[selectedProvider][selectedMonth] && Array.isArray(providerExtras[selectedProvider][selectedMonth][w])) {
+                        providerExtras[selectedProvider][selectedMonth][w].splice(idx, 1);
+                    }
                     calculateAndRenderSummary();
                 });
             });
@@ -1070,9 +1077,8 @@ function calculateAndRenderSummary() {
             document.querySelectorAll('.invoice-input').forEach(input => {
                 input.addEventListener('change', (e) => {
                     const w = parseInt(e.target.getAttribute('data-week'));
-                    if (!providerFacturas[selectedProvider]) providerFacturas[selectedProvider] = {};
-                    if (!providerFacturas[selectedProvider][selectedMonth]) providerFacturas[selectedProvider][selectedMonth] = { 1: '', 2: '', 3: '', 4: '' };
-                    providerFacturas[selectedProvider][selectedMonth][w] = e.target.value;
+                    if (!providerFacturas[selectedProvider]) providerFacturas[selectedProvider] = { 1: '', 2: '', 3: '', 4: '' };
+                    providerFacturas[selectedProvider][w] = e.target.value;
                 });
             });
         }
@@ -1349,8 +1355,12 @@ function handlePDFGeneration(e) {
     const selectedMonth = document.getElementById('month-filter')?.value || 'ALL';
     
     let invoiceNum = 'N/A';
-    if (providerFacturas[selectedProvider] && providerFacturas[selectedProvider][selectedMonth] && providerFacturas[selectedProvider][selectedMonth][targetWeek]) {
-        invoiceNum = providerFacturas[selectedProvider][selectedMonth][targetWeek];
+    if (providerFacturas[selectedProvider]) {
+        if (typeof providerFacturas[selectedProvider][targetWeek] === 'string' && providerFacturas[selectedProvider][targetWeek]) {
+            invoiceNum = providerFacturas[selectedProvider][targetWeek];
+        } else if (providerFacturas[selectedProvider][selectedMonth] && providerFacturas[selectedProvider][selectedMonth][targetWeek]) {
+            invoiceNum = providerFacturas[selectedProvider][selectedMonth][targetWeek];
+        }
     }
     
     doc.setFont("helvetica", "bold");
@@ -1379,9 +1389,17 @@ function handlePDFGeneration(e) {
     
     // Agregamos los extras al detalle también
     let totalExtras = 0;
-    if (providerExtras[selectedProvider] && providerExtras[selectedProvider][selectedMonth] && providerExtras[selectedProvider][selectedMonth][targetWeek]) {
-        const weekExtras = providerExtras[selectedProvider][selectedMonth][targetWeek];
-        weekExtras.forEach(extra => {
+    let weekExtrasForPDF = [];
+    if (providerExtras[selectedProvider]) {
+        if (Array.isArray(providerExtras[selectedProvider][targetWeek])) {
+            weekExtrasForPDF = providerExtras[selectedProvider][targetWeek];
+        } else if (providerExtras[selectedProvider][selectedMonth] && Array.isArray(providerExtras[selectedProvider][selectedMonth][targetWeek])) {
+            weekExtrasForPDF = providerExtras[selectedProvider][selectedMonth][targetWeek];
+        }
+    }
+    
+    if (weekExtrasForPDF && weekExtrasForPDF.length > 0) {
+        weekExtrasForPDF.forEach(extra => {
             detailData.push([
                 `[EXTRA] ${extra.orden}`,
                 extra.fecha || '-',
@@ -1422,9 +1440,8 @@ function handlePDFGeneration(e) {
     });
     
     // Agrupamos los extras directamente en el Consolidado para que se fusionen con las regulares
-    if (providerExtras[selectedProvider] && providerExtras[selectedProvider][selectedMonth] && providerExtras[selectedProvider][selectedMonth][targetWeek]) {
-        const weekExtras = providerExtras[selectedProvider][selectedMonth][targetWeek];
-        weekExtras.forEach(extra => {
+    if (weekExtrasForPDF && weekExtrasForPDF.length > 0) {
+        weekExtrasForPDF.forEach(extra => {
             const mappedName = extra.actividad.toUpperCase();
             if (!consolidatedData[mappedName]) {
                 consolidatedData[mappedName] = {
