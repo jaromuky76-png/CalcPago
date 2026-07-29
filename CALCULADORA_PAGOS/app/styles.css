@@ -891,5 +891,40 @@ body {
     animation: fadeIn 0.4s ease-out;
 }
 
+/* Insignias y botones para edición y homologación de actividades */
+.badge-zero-price {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #FEF2F2;
+    color: #DC2626;
+    border: 1px solid #FCA5A5;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-left: 6px;
+    transition: all 0.2s ease;
+}
+
+.badge-zero-price:hover {
+    background-color: #FEE2E2;
+    transform: scale(1.03);
+}
+
+.btn-edit-act {
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 4px;
+    transition: background 0.2s ease;
+}
+
+.btn-edit-act:hover {
+    background: rgba(0, 168, 89, 0.1);
+}
+
 
 

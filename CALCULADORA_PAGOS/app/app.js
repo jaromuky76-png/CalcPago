@@ -700,10 +700,36 @@ function renderTable() {
             tr.classList.add('row-validated');
         }
 
+        const provPrices = tablaOferta[item.proveedor];
+        const priceInfo = findProviderPrice(item.actividad, provPrices);
+        let activityHTML = '';
+
+        if (priceInfo.price === 0) {
+            activityHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; flex-wrap: wrap;">
+                    <span style="font-weight: 500;">${item.actividad}</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span class="badge-zero-price btn-trigger-edit-act" data-id="${item.id}" title="⚠️ C$0.00: No se encontró tarifa en la oferta. Haz clic para asociar o corregir la descripción.">⚠️ C$0.00 (Sin Tarifa)</span>
+                        <button class="btn-edit-act btn-trigger-edit-act" data-id="${item.id}" title="Editar o asociar descripción">✏️</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            activityHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+                    <span>${item.actividad}</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 0.75rem; color: #00A859; font-weight: 600; background: rgba(0, 168, 89, 0.08); padding: 1px 6px; border-radius: 6px;">C$${priceInfo.price.toFixed(2)}</span>
+                        <button class="btn-edit-act btn-trigger-edit-act" data-id="${item.id}" title="Editar o corregir descripción">✏️</button>
+                    </div>
+                </div>
+            `;
+        }
+
         tr.innerHTML = `
             <td>${item.orden}</td>
             <td>${item.fecha}</td>
-            <td>${item.actividad}</td>
+            <td>${activityHTML}</td>
             <td>${item.proveedor}</td>
             <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="1" ${item.semana === 1 ? 'checked' : ''}></td>
             <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="2" ${item.semana === 2 ? 'checked' : ''}></td>
@@ -716,6 +742,14 @@ function renderTable() {
     const checkboxes = document.querySelectorAll('.week-checkbox');
     checkboxes.forEach(cb => {
         cb.addEventListener('change', handleCheckboxChange);
+    });
+
+    const editBtns = document.querySelectorAll('.btn-trigger-edit-act');
+    editBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = parseInt(e.currentTarget.getAttribute('data-id'));
+            openEditActivityModal(id);
+        });
     });
 }
 
@@ -775,51 +809,98 @@ function handleCheckboxChange(e) {
     saveWorkspaceState();
 }
 
+// Normalización de Abreviaturas y Términos Frecuentes
+function normalizeActivityTerms(actStr) {
+    if (!actStr) return '';
+    let s = actStr.toUpperCase().trim();
+    // Reemplazo de abreviaturas habituales en OT
+    s = s.replace(/\bMANTO\.?\b/g, 'MANTENIMIENTO');
+    s = s.replace(/\bMANTE\.?\b/g, 'MANTENIMIENTO');
+    s = s.replace(/\bA\/A\b/g, 'AIRE ACONDICIONADO');
+    s = s.replace(/\bA\.A\.\b/g, 'AIRE ACONDICIONADO');
+    s = s.replace(/\bAA\b/g, 'AIRE ACONDICIONADO');
+    s = s.replace(/\bA\/C\b/g, 'AIRE ACONDICIONADO');
+    s = s.replace(/\bAC\b/g, 'AIRE ACONDICIONADO');
+    s = s.replace(/\bDIAG\.?\b/g, 'DIAGNOSTICO');
+    s = s.replace(/\bREP\.?\b/g, 'REPARACION');
+    s = s.replace(/\bREPAR\.?\b/g, 'REPARACION');
+    s = s.replace(/\bINST\.?\b/g, 'INSTALACION');
+    s = s.replace(/\bDESINST\.?\b/g, 'DESINSTALACION');
+    s = s.replace(/\bPREV\.?\b/g, 'PREVENTIVO');
+    s = s.replace(/\bCORRECT\.?\b/g, 'CORRECTIVO');
+    return s;
+}
+
 // Function for 'Homologación de Términos'
 function findProviderPrice(actividadStr, providerPrices) {
-    if (!providerPrices) return { price: 0, mappedName: actividadStr };
+    if (!providerPrices || !actividadStr) return { price: 0, mappedName: actividadStr || 'Sin Especificar' };
     
-    const actUpper = actividadStr.toUpperCase();
     const providerKeys = Object.keys(providerPrices);
-    
-    // 1. Exact match
+    if (providerKeys.length === 0) return { price: 0, mappedName: actividadStr };
+
+    // 1. Exact match on raw string
     if (providerPrices[actividadStr] !== undefined) {
         return { price: providerPrices[actividadStr], mappedName: actividadStr };
     }
+
+    const normAct = normalizeActivityTerms(actividadStr);
+
+    // 2. Exact match on normalized string vs provider offer keys
+    const exactNormKey = providerKeys.find(k => k.toUpperCase() === normAct || normalizeActivityTerms(k) === normAct);
+    if (exactNormKey) {
+        return { price: providerPrices[exactNormKey], mappedName: exactNormKey };
+    }
     
-    // 2. Custom Business Rules (Homologación de Términos)
+    // 3. Custom Business Rules (Homologación de Términos Avanzada)
     let bestKey = null;
 
-    if (actUpper.includes('VISITA')) {
-        if (actUpper.includes('WHATSAPP') || actUpper.includes('WHAT SAP')) {
+    if (normAct.includes('MANTENIMIENTO') && normAct.includes('AIRE ACONDICIONADO')) {
+        bestKey = providerKeys.find(k => {
+            const kn = normalizeActivityTerms(k);
+            return kn.includes('MANTENIMIENTO') && (kn.includes('AIRE ACONDICIONADO') || kn.includes('AA'));
+        }) || providerKeys.find(k => k.toUpperCase().includes('MANTENIMIENTO'));
+    }
+
+    if (!bestKey && normAct.includes('VISITA')) {
+        if (normAct.includes('WHATSAPP') || normAct.includes('WHAT SAP')) {
             bestKey = providerKeys.find(k => k.toUpperCase().includes('WHATSAPP') || k.toUpperCase().includes('WHAT SAP'));
         } else {
             bestKey = providerKeys.find(k => k.toUpperCase().includes('VISITA A DOMICILIO') || k.toUpperCase() === 'VISITA');
         }
     }
 
-    if (!bestKey && (actUpper.includes('DIAGNOSTICO') || actUpper.includes('DIAGNÓSTICO'))) {
-        bestKey = providerKeys.find(k => k.toUpperCase().includes('VISITA A DOMICILIO') || k.toUpperCase().includes('VISITA') || k.toUpperCase().includes('DIAGNOSTICO') || k.toUpperCase().includes('DIAGNÓSTICO'));
+    if (!bestKey && normAct.includes('DIAGNOSTICO')) {
+        bestKey = providerKeys.find(k => {
+            const ku = k.toUpperCase();
+            return ku.includes('VISITA A DOMICILIO') || ku.includes('VISITA') || ku.includes('DIAGNOSTICO');
+        });
     }
     
-    if (!bestKey && (actUpper.includes('DESINSTALACION') || actUpper.includes('DESINSTALACIÓN'))) {
-        bestKey = providerKeys.find(k => k.toUpperCase().includes('DESINSTALACION') || k.toUpperCase().includes('DESINSTALACIÓN'));
+    if (!bestKey && normAct.includes('DESINSTALACION')) {
+        bestKey = providerKeys.find(k => k.toUpperCase().includes('DESINSTALACION'));
     }
     
-    if (!bestKey && (actUpper.includes('INSTALACION') || actUpper.includes('INSTALACIÓN'))) {
-        bestKey = providerKeys.find(k => k.toUpperCase().includes('INSTALACION') || k.toUpperCase().includes('INSTALACIÓN'));
+    if (!bestKey && normAct.includes('INSTALACION')) {
+        bestKey = providerKeys.find(k => k.toUpperCase().includes('INSTALACION'));
     }
     
-    if (!bestKey && actUpper.includes('PUNTO ELECTRICO')) {
+    if (!bestKey && normAct.includes('PUNTO ELECTRICO')) {
         bestKey = providerKeys.find(k => k.toUpperCase().includes('PUNTO ELECTRICO'));
+    }
+
+    if (!bestKey && normAct.includes('REPARACION')) {
+        bestKey = providerKeys.find(k => k.toUpperCase().includes('REPARACION'));
     }
 
     if (bestKey) {
         return { price: providerPrices[bestKey], mappedName: bestKey };
     }
 
-    // 3. Fallback partial match
-    const keyMatch = providerKeys.find(k => actUpper.includes(k.toUpperCase()) || k.toUpperCase().includes(actUpper));
+    // 4. Fallback partial match (normalized strings)
+    const keyMatch = providerKeys.find(k => {
+        const kn = normalizeActivityTerms(k);
+        return normAct.includes(kn) || kn.includes(normAct);
+    });
     if (keyMatch) {
         return { price: providerPrices[keyMatch], mappedName: keyMatch };
     }
@@ -838,16 +919,12 @@ function calculateAndRenderSummary() {
         total: 0
     };
 
-    const searchTerm = (document.getElementById('table-search-ot')?.value || document.getElementById('search-ot')?.value || '').trim().toLowerCase();
     const selectedMonth = document.getElementById('month-filter')?.value || 'ALL';
 
-    // Para el Consolidado de Pago por Semana NO filtramos por mes.
-    // Lo asignado a una semana de pago se mantiene en el consolidado general.
+    // Para el Consolidado de Pago por Semana NO filtramos por mes NI por término de búsqueda.
+    // Lo asignado a una semana de pago se mantiene siempre visible en el consolidado general.
     const consolidatedData = currentOTData.filter(d => {
         if (!d.semana) return false;
-        if (searchTerm !== '') {
-            return d.orden.toLowerCase().includes(searchTerm);
-        }
         return selectedProvider === 'ALL' || d.proveedor === selectedProvider;
     });
 
@@ -917,14 +994,31 @@ function calculateAndRenderSummary() {
                 let tbodyHTML = '';
                 Object.keys(week.data).forEach(act => {
                     const row = week.data[act];
-                    tbodyHTML += `
-                        <tr>
-                            <td>${act}</td>
-                            <td style="text-align:center;">${row.cantidad}</td>
-                            <td style="text-align:right;">C$${row.precioUnitario.toFixed(2)}</td>
-                            <td style="text-align:right; font-weight:600; color:var(--accent);">C$${row.total.toFixed(2)}</td>
-                        </tr>
-                    `;
+                    const isZeroPrice = row.precioUnitario === 0;
+                    if (isZeroPrice) {
+                        tbodyHTML += `
+                            <tr style="background-color: rgba(220, 38, 38, 0.06);">
+                                <td style="color: var(--danger); font-weight: 600;">
+                                    ${act}
+                                    <span style="display: block; font-size: 0.72rem; font-weight: 700; color: #DC2626; margin-top: 2px;">
+                                        ⚠️ Tarifa C$0.00 (No encontrada en oferta). Haz clic en ✏️ en la tabla superior para asociarla
+                                    </span>
+                                </td>
+                                <td style="text-align:center; color: var(--danger); font-weight:bold;">${row.cantidad}</td>
+                                <td style="text-align:right; color: var(--danger); font-weight:bold;">C$0.00</td>
+                                <td style="text-align:right; font-weight:bold; color:var(--danger);">C$0.00</td>
+                            </tr>
+                        `;
+                    } else {
+                        tbodyHTML += `
+                            <tr>
+                                <td>${act}</td>
+                                <td style="text-align:center;">${row.cantidad}</td>
+                                <td style="text-align:right;">C$${row.precioUnitario.toFixed(2)}</td>
+                                <td style="text-align:right; font-weight:600; color:var(--accent);">C$${row.total.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    }
                 });
 
                 let dedBodyHTML = '';
@@ -1778,5 +1872,78 @@ document.getElementById('btn-clear-validations')?.addEventListener('click', () =
         renderTable();
         calculateAndRenderSummary();
         saveWorkspaceState();
+    }
+});
+
+// -- Overlay/Modal de Edición y Homologación de Actividades --
+let currentEditingOTId = null;
+
+function openEditActivityModal(otId) {
+    const item = currentOTData.find(d => d.id === otId);
+    if (!item) return;
+    currentEditingOTId = otId;
+
+    const modal = document.getElementById('edit-activity-overlay');
+    const orderInput = document.getElementById('edit-ot-order');
+    const selectOffer = document.getElementById('edit-ot-select-offer');
+    const textInput = document.getElementById('edit-ot-activity-text');
+
+    if (!modal || !orderInput || !selectOffer || !textInput) return;
+
+    orderInput.value = item.orden;
+    textInput.value = item.actividad;
+
+    // Poblar dropdown con actividades de la oferta del proveedor
+    selectOffer.innerHTML = '<option value="">-- Seleccionar de la oferta del proveedor --</option>';
+    const provPrices = tablaOferta[item.proveedor];
+    if (provPrices) {
+        Object.keys(provPrices).forEach(act => {
+            const opt = document.createElement('option');
+            opt.value = act;
+            opt.textContent = `${act} (C$${provPrices[act].toFixed(2)})`;
+            if (act.toUpperCase() === item.actividad.toUpperCase()) {
+                opt.selected = true;
+            }
+            selectOffer.appendChild(opt);
+        });
+    }
+
+    selectOffer.onchange = (e) => {
+        if (e.target.value) {
+            textInput.value = e.target.value;
+        }
+    };
+
+    modal.classList.remove('hidden');
+}
+
+document.getElementById('close-edit-activity')?.addEventListener('click', () => {
+    document.getElementById('edit-activity-overlay')?.classList.add('hidden');
+});
+
+document.getElementById('save-edit-activity')?.addEventListener('click', () => {
+    if (!currentEditingOTId) return;
+    const item = currentOTData.find(d => d.id === currentEditingOTId);
+    if (!item) return;
+
+    const newActivity = document.getElementById('edit-ot-activity-text').value.trim();
+    if (!newActivity) {
+        alert("Por favor ingresa o selecciona una descripción para la actividad.");
+        return;
+    }
+
+    item.actividad = newActivity;
+    document.getElementById('edit-activity-overlay')?.classList.add('hidden');
+
+    renderTable();
+    calculateAndRenderSummary();
+    updateProviderPricesTable();
+    saveWorkspaceState();
+
+    const priceInfo = findProviderPrice(newActivity, tablaOferta[item.proveedor]);
+    if (priceInfo.price > 0) {
+        alert(`¡Actividad actualizada a "${newActivity}"!\nAsociada con tarifa C$${priceInfo.price.toFixed(2)} (${priceInfo.mappedName}).`);
+    } else {
+        alert(`¡Actividad actualizada a "${newActivity}"!\nNota: Aún no se encontró una tarifa exacta en la oferta del proveedor (${item.proveedor}).`);
     }
 });
