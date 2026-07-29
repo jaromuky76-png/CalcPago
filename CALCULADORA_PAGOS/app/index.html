@@ -171,6 +171,10 @@
                     <!-- Right Column: Calculator -->
                     <aside class="dashboard-sidebar">
                         <div class="calculator" id="calculator">
+                            <div class="calc-header" id="calc-header">
+                                <span style="font-weight: 700; color: var(--primary); font-size: 0.9rem; display: flex; align-items: center; gap: 4px;">🧮 Calculadora</span>
+                                <button id="btn-pin-calc" class="btn-calc-pin" title="Activar/Desactivar Calculadora Flotante">📌 Flotante</button>
+                            </div>
                             <div class="calc-display">
                                 <div class="calc-history" id="calc-history"></div>
                                 <div class="calc-current" id="calc-current">0</div>
@@ -301,6 +305,12 @@
             </div>
         </div>
     </div>
+
+    <!-- Botón Flotante FAB de Calculadora -->
+    <button id="btn-toggle-float-calc" class="btn-float-calc" title="Abrir/Cerrar Calculadora Flotante">
+        <span>🧮</span>
+        <span>Calculadora</span>
+    </button>
 
     <script src="app.js"></script>
 </body>

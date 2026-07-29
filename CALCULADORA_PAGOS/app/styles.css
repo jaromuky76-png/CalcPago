@@ -926,5 +926,92 @@ body {
     background: rgba(0, 168, 89, 0.1);
 }
 
+/* Calculadora Flotante y FAB */
+.calc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed var(--glass-border);
+}
+
+.btn-calc-pin {
+    background: rgba(0, 168, 89, 0.08);
+    color: var(--primary);
+    border: 1px solid rgba(0, 168, 89, 0.3);
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-calc-pin:hover {
+    background: var(--primary);
+    color: white;
+}
+
+/* Modo Flotante de la Calculadora */
+.calculator.calculator-floating {
+    position: fixed;
+    bottom: 85px;
+    right: 24px;
+    z-index: 1000;
+    width: 320px;
+    box-shadow: 0 16px 40px rgba(0, 168, 89, 0.25), 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 2px solid var(--primary);
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: #FFFFFF;
+}
+
+[data-theme="dark"] .calculator.calculator-floating {
+    background: var(--bg-panel);
+    border-color: #059669;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+.calculator.calculator-floating .calc-header {
+    cursor: move; /* Permite arrastrar la calculadora */
+    user-select: none;
+}
+
+/* Botón Flotante FAB (Bottom Right) */
+.btn-float-calc {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1001;
+    background: var(--primary);
+    color: #FFFFFF;
+    border: none;
+    padding: 0.75rem 1.3rem;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    box-shadow: 0 8px 24px rgba(0, 168, 89, 0.4);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-float-calc:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 12px 28px rgba(0, 168, 89, 0.55);
+    background: #008F4C;
+}
+
+.btn-float-calc:active {
+    transform: translateY(0) scale(0.98);
+}
+
+@keyframes popIn {
+    0% { opacity: 0; transform: scale(0.85) translateY(20px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 
 

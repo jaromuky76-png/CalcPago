@@ -1300,6 +1300,72 @@ calcButtons.forEach(btn => {
     });
 });
 
+// -- Floating & Sticky Calculator Controls --
+const calcEl = document.getElementById('calculator');
+const btnPinCalc = document.getElementById('btn-pin-calc');
+const btnToggleFloatCalc = document.getElementById('btn-toggle-float-calc');
+const calcHeader = document.getElementById('calc-header');
+
+function setCalculatorFloatingMode(isFloating) {
+    if (!calcEl) return;
+    if (isFloating) {
+        calcEl.classList.add('calculator-floating');
+        if (btnPinCalc) btnPinCalc.textContent = '📍 Fijar';
+        if (btnToggleFloatCalc) btnToggleFloatCalc.style.background = '#047857';
+        localStorage.setItem('calcPago_calcFloating', 'true');
+    } else {
+        calcEl.classList.remove('calculator-floating');
+        calcEl.style.top = '';
+        calcEl.style.left = '';
+        calcEl.style.bottom = '';
+        calcEl.style.right = '';
+        if (btnPinCalc) btnPinCalc.textContent = '📌 Flotante';
+        if (btnToggleFloatCalc) btnToggleFloatCalc.style.background = '';
+        localStorage.setItem('calcPago_calcFloating', 'false');
+    }
+}
+
+btnPinCalc?.addEventListener('click', () => {
+    const isFloating = calcEl.classList.contains('calculator-floating');
+    setCalculatorFloatingMode(!isFloating);
+});
+
+btnToggleFloatCalc?.addEventListener('click', () => {
+    const isFloating = calcEl.classList.contains('calculator-floating');
+    setCalculatorFloatingMode(!isFloating);
+});
+
+// Restore preference if set
+if (localStorage.getItem('calcPago_calcFloating') === 'true') {
+    setCalculatorFloatingMode(true);
+}
+
+// Make floating calculator draggable by header
+if (calcHeader && calcEl) {
+    calcHeader.onmousedown = (e) => {
+        if (!calcEl.classList.contains('calculator-floating')) return;
+        if (e.target.tagName === 'BUTTON') return;
+        e.preventDefault();
+        let pos3 = e.clientX;
+        let pos4 = e.clientY;
+        document.onmouseup = () => {
+            document.onmouseup = null;
+            document.onmousemove = null;
+        };
+        document.onmousemove = (e) => {
+            e.preventDefault();
+            let pos1 = pos3 - e.clientX;
+            let pos2 = pos4 - e.clientY;
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            calcEl.style.top = (calcEl.offsetTop - pos2) + "px";
+            calcEl.style.left = (calcEl.offsetLeft - pos1) + "px";
+            calcEl.style.bottom = "auto";
+            calcEl.style.right = "auto";
+        };
+    };
+}
+
 function getOpSymbol(op) {
     switch(op) {
         case 'add': return '+';
