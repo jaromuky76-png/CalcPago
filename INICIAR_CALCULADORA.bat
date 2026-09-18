@@ -1,6 +1,6 @@
 @echo off
 title Calculadora de Pagos - Servidor Web
-cd /d "%~dp0"
+cd /d "%~dp0CALCULADORA_PAGOS\app"
 
 echo ===================================================
 echo   INICIANDO CALCULADORA DE PAGOS - SERVIDOR WEB

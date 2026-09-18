@@ -2,12 +2,107 @@ import http.server
 import socketserver
 import socket
 import os
+import json
+import urllib.parse
+from contract_generator import generate_contract_document
 
 # Definir un puerto inicial para esta aplicación
 PORT = 8546
+PROVIDERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "proveedores_registrados.json")
 
 class Handler(http.server.SimpleHTTPRequestHandler):
-    pass
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == '/api/providers':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            if os.path.exists(PROVIDERS_FILE):
+                with open(PROVIDERS_FILE, 'r', encoding='utf-8') as f:
+                    self.wfile.write(f.read().encode('utf-8'))
+            else:
+                self.wfile.write(b"[]")
+            return
+            
+        return super().do_GET()
+
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        content_len = int(self.headers.get('Content-Length', 0))
+        post_body = self.rfile.read(content_len) if content_len > 0 else b"{}"
+
+        if parsed.path == '/api/generate-contract':
+            try:
+                data = json.loads(post_body.decode('utf-8'))
+                docx_stream = generate_contract_document(data)
+                docx_bytes = docx_stream.getvalue()
+                prov_name = data.get('nombre_comercial', 'PROVEEDOR').replace(' ', '_')
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+                self.send_header('Content-Disposition', f'attachment; filename="CONTRATO_{prov_name}.docx"')
+                self.send_header('Content-Length', str(len(docx_bytes)))
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(docx_bytes)
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
+            return
+
+        elif parsed.path == '/api/save-provider':
+            try:
+                provider_data = json.loads(post_body.decode('utf-8'))
+                providers = []
+                if os.path.exists(PROVIDERS_FILE):
+                    try:
+                        with open(PROVIDERS_FILE, 'r', encoding='utf-8') as f:
+                            providers = json.load(f)
+                    except Exception:
+                        providers = []
+                
+                # Check if provider already exists and update, or append
+                prov_key = provider_data.get('nombre_comercial') or provider_data.get('nombre')
+                idx_found = -1
+                for i, p in enumerate(providers):
+                    k = p.get('nombre_comercial') or p.get('nombre')
+                    if k and k.strip().upper() == prov_key.strip().upper():
+                        idx_found = i
+                        break
+                
+                if idx_found >= 0:
+                    providers[idx_found] = provider_data
+                else:
+                    providers.append(provider_data)
+
+                with open(PROVIDERS_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(providers, f, ensure_ascii=False, indent=2)
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'ok', 'count': len(providers)}).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
+            return
+
+        return super().do_POST()
 
 # Corrección para Windows: forzar el MIME type correcto para CSS
 Handler.extensions_map['.css'] = 'text/css'

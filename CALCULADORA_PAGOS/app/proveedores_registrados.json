@@ -1,0 +1,282 @@
+[
+  {
+    "nombre_comercial": "GLOBAL AIR",
+    "nombre_representante": "Carlos Gutierrez Mendoza",
+    "cedula": "001-150680-0002F",
+    "ruc": "0011506800002F",
+    "regimen": "Régimen de Cuota Fija",
+    "banco": "BAC Credomatic",
+    "cuenta_bancaria": "359281048",
+    "titular_cuenta": "Carlos Gutierrez Mendoza",
+    "telefono": "8899-7766",
+    "correo": "globalair.nic@gmail.com",
+    "direccion": "Bo. San Judas, del ceibo 2c al sur, Managua",
+    "tarifa_combustible": 15.0,
+    "tarifas": [
+      {
+        "rms": "101026007",
+        "descripcion": "INSTALACION AIRE ACONDICIONADO DE 12-24 MIL BTU",
+        "tarifa": 2563.4
+      },
+      {
+        "rms": "101025389",
+        "descripcion": "VISITA A DOMICILIO EN CONCEPTO DE DIAGNOSTICO",
+        "tarifa": 256.34
+      },
+      {
+        "rms": "145518214",
+        "descripcion": "VISITA WHATSAPP PARA FUTURA INSTALACION DE AIRE ACONDICIONADO",
+        "tarifa": 200.0
+      },
+      {
+        "rms": "130196460",
+        "descripcion": "INSTALACION DE PUNTO ELECTRICO",
+        "tarifa": 700.0
+      },
+      {
+        "rms": "130196451",
+        "descripcion": "DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU",
+        "tarifa": 800.0
+      },
+      {
+        "rms": "137301040",
+        "descripcion": "DESINSTALACION DE AIRE 12-18-24 MIL BTU",
+        "tarifa": 400.0
+      },
+      {
+        "rms": "101026023",
+        "descripcion": "MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO",
+        "tarifa": 750.0
+      },
+      {
+        "rms": "101026031",
+        "descripcion": "MANTENIMIENTO GENERAL DE AIRE ACONDICIONADO",
+        "tarifa": 2000.0
+      }
+    ],
+    "documentos": {
+      "formato_alta": {
+        "fileName": "Formato_Alta_GlobalAir.pdf",
+        "validated": true
+      },
+      "cedula": {
+        "fileName": "Cedula_CarlosGutierrez.pdf",
+        "validated": true
+      },
+      "ruc": {
+        "fileName": "RUC_GlobalAir.pdf",
+        "validated": true
+      },
+      "matricula": {
+        "fileName": "Matricula_Alcaldia_2026.pdf",
+        "validated": true
+      },
+      "factura": {
+        "fileName": "Talonario_Facturas.pdf",
+        "validated": true
+      },
+      "solvencia": {
+        "fileName": "Solvencia_Fiscal_DGI.pdf",
+        "validated": true
+      },
+      "etica": {
+        "fileName": "Declaratoria_Etica_SINSA.pdf",
+        "validated": true
+      },
+      "inss": {
+        "fileName": "Constancia_INSS.pdf",
+        "validated": true
+      }
+    }
+  },
+  {
+    "nombre_comercial": "ENERGY",
+    "nombre_representante": "Roberto Blandón Sánchez",
+    "cedula": "001-200482-0001K",
+    "ruc": "J0310000847291",
+    "regimen": "Régimen General",
+    "banco": "Banco de la Producción (BANPRO)",
+    "cuenta_bancaria": "10023819402",
+    "titular_cuenta": "Energy Soluciones S.A.",
+    "telefono": "8455-2233",
+    "correo": "administracion@energy.com.ni",
+    "direccion": "Carretera Norte Km 5.5, Managua",
+    "tarifa_combustible": 12.0,
+    "tarifas": [
+      {
+        "rms": "101026007",
+        "descripcion": "INSTALACION AIRE ACONDICIONADO DE 12-24 MIL BTU",
+        "tarifa": 3110.0
+      },
+      {
+        "rms": "101025389",
+        "descripcion": "VISITA A DOMICILIO EN CONCEPTO DE DIAGNOSTICO",
+        "tarifa": 200.0
+      },
+      {
+        "rms": "145518214",
+        "descripcion": "VISITA WHATSAPP PARA FUTURA INSTALACION DE AIRE ACONDICIONADO",
+        "tarifa": 200.0
+      },
+      {
+        "rms": "130196460",
+        "descripcion": "INSTALACION DE PUNTO ELECTRICO",
+        "tarifa": 500.0
+      },
+      {
+        "rms": "130196451",
+        "descripcion": "DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU",
+        "tarifa": 800.0
+      },
+      {
+        "rms": "137301040",
+        "descripcion": "DESINSTALACION DE AIRE 12-18-24 MIL BTU",
+        "tarifa": 400.0
+      },
+      {
+        "rms": "101026023",
+        "descripcion": "MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO",
+        "tarifa": 750.0
+      },
+      {
+        "rms": "101026031",
+        "descripcion": "MANTENIMIENTO GENERAL DE AIRE ACONDICIONADO",
+        "tarifa": 2000.0
+      }
+    ],
+    "documentos": {
+      "formato_alta": {
+        "fileName": "Formato_Alta_Energy.pdf",
+        "validated": true
+      },
+      "cedula": {
+        "fileName": "Cedula_Representante_Energy.pdf",
+        "validated": true
+      },
+      "ruc": {
+        "fileName": "RUC_Energy.pdf",
+        "validated": true
+      },
+      "matricula": {
+        "fileName": "Matricula_Alcaldia_Energy.pdf",
+        "validated": true
+      },
+      "factura": {
+        "fileName": "Factura_Venta_Energy.pdf",
+        "validated": true
+      },
+      "constitucion": {
+        "fileName": "Constitucion_Energy_SA.pdf",
+        "validated": true
+      },
+      "poder": {
+        "fileName": "Poder_Representacion.pdf",
+        "validated": true
+      },
+      "constancia_dgi": {
+        "fileName": "Inscripcion_DGI.pdf",
+        "validated": true
+      },
+      "iva": {
+        "fileName": "Recaudador_IVA.pdf",
+        "validated": true
+      },
+      "solvencia": {
+        "fileName": "Solvencia_Fiscal.pdf",
+        "validated": true
+      },
+      "beneficiario": {
+        "fileName": "Beneficiario_Final.pdf",
+        "validated": true
+      },
+      "etica": {
+        "fileName": "Etica_SINSA.pdf",
+        "validated": true
+      },
+      "inss": {
+        "fileName": "Constancia_Patronal_INSS.pdf",
+        "validated": true
+      }
+    }
+  },
+  {
+    "nombre_comercial": "MULTISERVICIOS OROZCO",
+    "nombre_representante": "Eduin Jose Orozco Castro",
+    "cedula": "001-231085-0004W",
+    "ruc": "0012310850004W",
+    "regimen": "Régimen de Cuota Fija",
+    "banco": "BAC Credomatic",
+    "cuenta_bancaria": "3628491029",
+    "titular_cuenta": "Eduin Jose Orozco Castro",
+    "telefono": "8888-1234",
+    "correo": "multiserviciosorozco@gmail.com",
+    "direccion": "Colonia 15 mayo, de la aguja 1c al este 2c al sur, Managua",
+    "tarifa_combustible": 12.0,
+    "tarifas": [
+      {
+        "rms": "101026007",
+        "descripcion": "INSTALACION AIRE ACONDICIONADO DE 12-24 MIL BTU",
+        "tarifa": 2563.4
+      },
+      {
+        "rms": "130196460",
+        "descripcion": "INSTALACION DE PUNTO ELECTRICO",
+        "tarifa": 700.0
+      },
+      {
+        "rms": "130196451",
+        "descripcion": "DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU",
+        "tarifa": 800.0
+      },
+      {
+        "rms": "137301040",
+        "descripcion": "DESINSTALACION DE AIRE 12-18-24 MIL BTU",
+        "tarifa": 400.0
+      },
+      {
+        "rms": "101026023",
+        "descripcion": "MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO",
+        "tarifa": 750.0
+      },
+      {
+        "rms": "101026031",
+        "descripcion": "MANTENIMIENTO GENERAL DE AIRE ACONDICIONADO",
+        "tarifa": 1800.0
+      }
+    ],
+    "documentos": {
+      "formato_alta": {
+        "fileName": "Formato_Alta_Orozco.pdf",
+        "validated": true
+      },
+      "cedula": {
+        "fileName": "Cedula_Eduin_Orozco.pdf",
+        "validated": true
+      },
+      "ruc": {
+        "fileName": "RUC_Orozco.pdf",
+        "validated": true
+      },
+      "matricula": {
+        "fileName": "Matricula_Alcaldia_Orozco.pdf",
+        "validated": true
+      },
+      "factura": {
+        "fileName": "Talonario_Orozco.pdf",
+        "validated": true
+      },
+      "solvencia": {
+        "fileName": "Solvencia_Fiscal.pdf",
+        "validated": true
+      },
+      "etica": {
+        "fileName": "Declaracion_Etica.pdf",
+        "validated": true
+      },
+      "inss": {
+        "fileName": "Afiliacion_INSS.pdf",
+        "validated": true
+      }
+    }
+  }
+]

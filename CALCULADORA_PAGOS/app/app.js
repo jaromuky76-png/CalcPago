@@ -2013,3 +2013,1348 @@ document.getElementById('save-edit-activity')?.addEventListener('click', () => {
         alert(`¡Actividad actualizada a "${newActivity}"!\nNota: Aún no se encontró una tarifa exacta en la oferta del proveedor (${item.proveedor}).`);
     }
 });
+
+/* ==========================================================================
+   MÓDULO DE VINCULACIÓN DE PROVEEDORES & FORMALIZACIÓN DE CONTRATOS (SINSA)
+   ========================================================================== */
+
+let proveedoresRegistrados = [];
+let currentWizardStep = 1;
+let wizardDocuments = {};
+let wizardTarifas = [];
+
+const DOCS_BY_REGIMEN = {
+    "Régimen de Cuota Fija": [
+        { id: "formato_alta", name: "Formato de Solicitud de Alta", desc: "Firmado y sellado por el contratista (Procedimiento 10.P.S01.0001)" },
+        { id: "cedula", name: "Cédula de Identidad Vigente", desc: "Copia legible de cédula nicaragüense vigente del titular" },
+        { id: "ruc", name: "Cédula RUC Vigente", desc: "Constancia de RUC emitida por DGI en régimen de cuota fija" },
+        { id: "matricula", name: "Matrícula de Alcaldía Vigente", desc: "Matrícula municipal del año en curso del municipio correspondiente" },
+        { id: "factura", name: "Factura o Talonario en Blanco", desc: "Pie de imprenta autorizado por DGI con numeración y vigencia" },
+        { id: "solvencia", name: "Solvencia Fiscal Actualizada", desc: "Certificación de solvencia tributaria vigente emitida por DGI" },
+        { id: "etica", name: "Declaratoria de Ética y Conducta", desc: "Carta de aceptación firmada del Código de Ética de SINSA" },
+        { id: "inss", name: "Constancia de Afiliación al INSS", desc: "Respaldo de seguro social del contratista o de sus trabajadores" }
+    ],
+    "Régimen General": [
+        { id: "formato_alta", name: "Formato de Solicitud de Alta", desc: "Firmado y sellado por el Representante Legal" },
+        { id: "cedula", name: "Cédula del Representante Legal", desc: "Cédula vigente del apoderado o representante legal" },
+        { id: "ruc", name: "Cédula RUC Vigente", desc: "Cédula RUC vigente en Régimen General" },
+        { id: "matricula", name: "Matrícula de Alcaldía Vigente", desc: "Matrícula municipal vigente de la empresa" },
+        { id: "factura", name: "Factura de Venta en Blanco", desc: "Cumplimiento con requisitos de ventanilla (10.PO.S01.0006)" },
+        { id: "constitucion", name: "Acta de Constitución y Estatutos", desc: "Testimonio de Escritura Pública inscrita en Registro Mercantil" },
+        { id: "poder", name: "Poder Notarial del Representante", desc: "Poder General o Especial inscrito en el Registro Público" },
+        { id: "constancia_dgi", name: "Constancia de Inscripción DGI", desc: "Inscripción en la Dirección General de Ingresos" },
+        { id: "iva", name: "Constancia de Recaudador de IVA", desc: "Acreditación como responsable recaudador de IVA" },
+        { id: "solvencia", name: "Solvencia Fiscal Actualizada", desc: "Solvencia fiscal vigente emitida por la DGI" },
+        { id: "beneficiario", name: "Certificado de Beneficiario Final", desc: "Declaración y certificación de beneficiario final actualizada" },
+        { id: "etica", name: "Declaratoria de Ética SINSA", desc: "Carta de adhesión y cumplimiento de código de conducta" },
+        { id: "inss", name: "Constancia de Afiliación al INSS", desc: "Certificado patronal del INSS al día con sus contribuciones" }
+    ],
+    "Persona Natural No Inscrita en DGI": [
+        { id: "formato_alta", name: "Formato de Solicitud de Alta", desc: "Firmado y con huella dactilar del prestador del servicio" },
+        { id: "cedula", name: "Cédula de Identidad Vigente", desc: "Copia legible de cédula de identidad nacional" }
+    ]
+};
+
+// Carga inicial de proveedores registrados
+async function loadProveedoresRegistrados() {
+    // 1. Intentar cargar desde localStorage
+    const saved = localStorage.getItem('calcPago_proveedoresRegistrados');
+    if (saved) {
+        try {
+            proveedoresRegistrados = JSON.parse(saved);
+        } catch (e) {
+            proveedoresRegistrados = [];
+        }
+    }
+
+    // 2. Intentar sincronizar con el servidor local
+    try {
+        const res = await fetch('/api/providers');
+        if (res.ok) {
+            const serverList = await res.json();
+            if (Array.isArray(serverList) && serverList.length > 0) {
+                // Merge without duplicates
+                serverList.forEach(sp => {
+                    const k = (sp.nombre_comercial || sp.nombre || '').trim().toUpperCase();
+                    if (!proveedoresRegistrados.some(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === k)) {
+                        proveedoresRegistrados.push(sp);
+                    }
+                });
+            }
+        }
+    } catch (err) {
+        console.log("Modo offline o servidor local sin API de proveedores activa.");
+    }
+
+    // 3. Si tablaOferta tiene proveedores que no están en el directorio, agregarlos como base
+    Object.keys(tablaOferta).forEach(pName => {
+        const k = pName.trim().toUpperCase();
+        if (!proveedoresRegistrados.some(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === k)) {
+            const acts = tablaOferta[pName] || {};
+            const actList = Object.keys(acts).map(a => ({
+                rms: a.includes('101') || a.includes('130') || a.includes('145') || a.includes('137') ? a.substring(0, 9).trim() : '',
+                descripcion: a,
+                tarifa: acts[a]
+            }));
+            proveedoresRegistrados.push({
+                nombre_comercial: pName,
+                nombre_representante: pName,
+                cedula: 'En trámite',
+                ruc: '',
+                regimen: 'Régimen de Cuota Fija',
+                banco: 'BAC Credomatic',
+                cuenta_bancaria: '',
+                titular_cuenta: pName,
+                telefono: '8888-0000',
+                correo: 'contacto@proveedor.com',
+                direccion: 'Managua, Nicaragua',
+                tarifa_combustible: 12.0,
+                tarifas: actList,
+                documentos: {}
+            });
+        }
+    });
+
+    localStorage.setItem('calcPago_proveedoresRegistrados', JSON.stringify(proveedoresRegistrados));
+    renderDirectory();
+}
+
+// Inicialización de Eventos del Módulo
+document.addEventListener('DOMContentLoaded', () => {
+    initNavigationTabs();
+    initOnboardingWizard();
+    initDirectoryModule();
+    loadProveedoresRegistrados();
+});
+
+// Navegación entre Módulos
+function initNavigationTabs() {
+    const navTabs = document.querySelectorAll('#main-nav .nav-tab');
+    navTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetView = tab.getAttribute('data-view');
+            switchModuleView(targetView);
+        });
+    });
+}
+
+function switchModuleView(targetViewId) {
+    // Actualizar tabs
+    document.querySelectorAll('#main-nav .nav-tab').forEach(t => {
+        if (t.getAttribute('data-view') === targetViewId) {
+            t.classList.add('active');
+        } else {
+            t.classList.remove('active');
+        }
+    });
+
+    // Ocultar todas las vistas
+    const dashboardView = document.getElementById('dashboard');
+    const onboardingView = document.getElementById('view-onboarding');
+    const directoryView = document.getElementById('view-directory');
+
+    if (dashboardView) dashboardView.classList.add('hidden');
+    if (onboardingView) onboardingView.classList.add('hidden');
+    if (directoryView) directoryView.classList.add('hidden');
+
+    // Mostrar vista destino
+    if (targetViewId === 'dashboard' && dashboardView) {
+        dashboardView.classList.remove('hidden');
+        calculateAndRenderSummary();
+    } else if (targetViewId === 'view-onboarding' && onboardingView) {
+        onboardingView.classList.remove('hidden');
+    } else if (targetViewId === 'view-directory' && directoryView) {
+        directoryView.classList.remove('hidden');
+        renderDirectory();
+    }
+}
+
+// Inicialización del Asistente de Vinculación (Wizard)
+function initOnboardingWizard() {
+    // Stepper header clicks
+    document.querySelectorAll('.stepper-bar .step-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const stepNum = parseInt(item.getAttribute('data-step'), 10);
+            goToWizardStep(stepNum);
+        });
+    });
+
+    // Step navigation buttons
+    document.getElementById('btn-wiz-next-1')?.addEventListener('click', () => {
+        const nomComercial = document.getElementById('wiz-nombre-comercial')?.value.trim();
+        const nomRep = document.getElementById('wiz-nombre-rep')?.value.trim();
+        const cedula = document.getElementById('wiz-cedula')?.value.trim();
+        const cuenta = document.getElementById('wiz-cuenta')?.value.trim();
+
+        if (!nomComercial) {
+            alert("Por favor ingresa el Nombre Comercial o Razón Social del contratista.");
+            document.getElementById('wiz-nombre-comercial')?.focus();
+            return;
+        }
+        if (!nomRep) {
+            alert("Por favor ingresa el Nombre del Titular o Representante Legal.");
+            document.getElementById('wiz-nombre-rep')?.focus();
+            return;
+        }
+        if (!cedula) {
+            alert("Por favor ingresa la Cédula de Identidad.");
+            document.getElementById('wiz-cedula')?.focus();
+            return;
+        }
+
+        // Auto-asignar titular si está vacío
+        const titularInput = document.getElementById('wiz-titular');
+        if (titularInput && !titularInput.value.trim()) {
+            titularInput.value = nomRep;
+        }
+
+        goToWizardStep(2);
+    });
+
+    document.getElementById('btn-wiz-prev-2')?.addEventListener('click', () => goToWizardStep(1));
+    document.getElementById('btn-wiz-next-2')?.addEventListener('click', () => goToWizardStep(3));
+
+    document.getElementById('btn-wiz-prev-3')?.addEventListener('click', () => goToWizardStep(2));
+    document.getElementById('btn-wiz-next-3')?.addEventListener('click', () => {
+        if (wizardTarifas.length === 0) {
+            if (!confirm("Aún no has agregado tarifas para este contratista. ¿Deseas continuar y agregarlas después?")) {
+                return;
+            }
+        }
+        goToWizardStep(4);
+    });
+
+    document.getElementById('btn-wiz-prev-4')?.addEventListener('click', () => goToWizardStep(3));
+
+    // Evento de cambio de régimen en Paso 1
+    document.getElementById('wiz-regimen')?.addEventListener('change', () => {
+        renderWizardDocs();
+    });
+
+    // Reset wizard
+    document.getElementById('btn-reset-wizard')?.addEventListener('click', () => {
+        if (confirm("¿Deseas restablecer todos los campos del asistente?")) {
+            resetWizardForm();
+        }
+    });
+
+    // Excel upload en Paso 3
+    const dropZoneWiz = document.getElementById('drop-zone-wiz-oferta');
+    const inputWizOferta = document.getElementById('input-wiz-oferta');
+    if (dropZoneWiz && inputWizOferta) {
+        dropZoneWiz.addEventListener('click', () => inputWizOferta.click());
+        dropZoneWiz.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZoneWiz.style.borderColor = 'var(--accent)';
+            dropZoneWiz.style.background = 'rgba(5, 150, 105, 0.1)';
+        });
+        dropZoneWiz.addEventListener('dragleave', () => {
+            dropZoneWiz.style.borderColor = 'var(--primary)';
+            dropZoneWiz.style.background = 'rgba(0, 168, 89, 0.04)';
+        });
+        dropZoneWiz.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZoneWiz.style.borderColor = 'var(--primary)';
+            dropZoneWiz.style.background = 'rgba(0, 168, 89, 0.04)';
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleWizardExcelUpload(e.dataTransfer.files[0]);
+            }
+        });
+        inputWizOferta.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                handleWizardExcelUpload(e.target.files[0]);
+            }
+        });
+    }
+
+    // Botón descargar plantilla Excel
+    document.getElementById('btn-download-offer-template')?.addEventListener('click', downloadContractorExcelTemplate);
+
+    // Botón añadir fila de tarifa
+    document.getElementById('btn-add-wiz-tariff-row')?.addEventListener('click', () => {
+        wizardTarifas.push({
+            rms: '',
+            descripcion: 'NUEVA ACTIVIDAD',
+            tarifa: 0
+        });
+        renderWizardTariffTable();
+    });
+
+    // Botón actualizar vista de contrato
+    document.getElementById('btn-update-contract-preview')?.addEventListener('click', () => {
+        renderContractPreview();
+    });
+
+    // Descarga de Word .docx
+    document.getElementById('btn-download-contract-docx')?.addEventListener('click', downloadContractDocx);
+
+    // Imprimir / Guardar PDF
+    document.getElementById('btn-print-contract')?.addEventListener('click', () => {
+        window.print();
+    });
+
+    // Finalizar Vinculación
+    document.getElementById('btn-finish-onboarding')?.addEventListener('click', finishProviderOnboarding);
+
+    // Inicializar checklist documental
+    renderWizardDocs();
+}
+
+function goToWizardStep(stepNum) {
+    currentWizardStep = stepNum;
+
+    // Actualizar stepper visual
+    document.querySelectorAll('.stepper-bar .step-item').forEach(item => {
+        const s = parseInt(item.getAttribute('data-step'), 10);
+        if (s === stepNum) {
+            item.classList.add('active');
+            item.classList.remove('completed');
+        } else if (s < stepNum) {
+            item.classList.remove('active');
+            item.classList.add('completed');
+        } else {
+            item.classList.remove('active');
+            item.classList.remove('completed');
+        }
+    });
+
+    // Mostrar sección correspondiente
+    for (let i = 1; i <= 4; i++) {
+        const stepEl = document.getElementById(`wizard-step-${i}`);
+        if (stepEl) {
+            if (i === stepNum) {
+                stepEl.classList.remove('hidden');
+                stepEl.classList.add('active');
+            } else {
+                stepEl.classList.add('hidden');
+                stepEl.classList.remove('active');
+            }
+        }
+    }
+
+    if (stepNum === 2) {
+        renderWizardDocs();
+    } else if (stepNum === 3) {
+        // Si no hay tarifas cargadas, precargar los estándares de Maestros como sugerencia
+        if (wizardTarifas.length === 0) {
+            loadDefaultMaestrosTariffs();
+        }
+        renderWizardTariffTable();
+    } else if (stepNum === 4) {
+        renderContractPreview();
+    }
+
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+}
+
+function resetWizardForm() {
+    document.getElementById('wiz-nombre-comercial').value = '';
+    document.getElementById('wiz-nombre-rep').value = '';
+    document.getElementById('wiz-cedula').value = '';
+    document.getElementById('wiz-ruc').value = '';
+    document.getElementById('wiz-matricula').value = '';
+    document.getElementById('wiz-telefono').value = '';
+    document.getElementById('wiz-correo').value = '';
+    document.getElementById('wiz-direccion').value = '';
+    document.getElementById('wiz-cuenta').value = '';
+    document.getElementById('wiz-titular').value = '';
+    document.getElementById('wiz-inss').value = '';
+    wizardDocuments = {};
+    wizardTarifas = [];
+    goToWizardStep(1);
+}
+
+// Renderizar Checklist Documental del Paso 2
+function renderWizardDocs() {
+    const container = document.getElementById('docs-checklist-container');
+    if (!container) return;
+
+    const regimen = document.getElementById('wiz-regimen')?.value || "Régimen de Cuota Fija";
+    const reqDocs = DOCS_BY_REGIMEN[regimen] || DOCS_BY_REGIMEN["Régimen de Cuota Fija"];
+
+    container.innerHTML = '';
+    let completedCount = 0;
+
+    reqDocs.forEach(doc => {
+        const docState = wizardDocuments[doc.id] || { fileName: '', validated: false };
+        const isCompleted = docState.fileName && docState.validated;
+        if (isCompleted) completedCount++;
+
+        const card = document.createElement('div');
+        card.className = `doc-checklist-card ${isCompleted ? 'completed' : ''}`;
+        card.innerHTML = `
+            <div class="doc-card-top">
+                <div>
+                    <div class="doc-info-title">${doc.name}</div>
+                    <div class="doc-info-sub">${doc.desc}</div>
+                </div>
+                <span class="status-badge ${isCompleted ? 'uploaded' : 'pending'}">
+                    ${isCompleted ? '✓ Validado' : (docState.fileName ? 'Archivo Adjunto' : 'Pendiente')}
+                </span>
+            </div>
+
+            <div class="doc-card-body">
+                ${docState.fileName ? `
+                    <div class="doc-file-preview">
+                        <span title="${docState.fileName}">📄 ${docState.fileName}</span>
+                        <button class="btn-icon" data-del-doc="${doc.id}" style="color: var(--danger); font-size: 0.9rem;" title="Eliminar archivo">🗑️</button>
+                    </div>
+                ` : `
+                    <div class="doc-upload-zone" data-upload-doc="${doc.id}">
+                        <span style="font-size: 1.2rem; display: block; margin-bottom: 2px;">📎</span>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">Adjuntar Archivo Digital (PDF / Imagen)</span>
+                        <input type="file" data-file-input="${doc.id}" accept=".pdf, .png, .jpg, .jpeg" hidden>
+                    </div>
+                `}
+
+                <div style="margin-top: 0.8rem; border-top: 1px dashed var(--glass-border); padding-top: 0.6rem;">
+                    <label class="custom-checkbox-label" style="font-size: 0.82rem;">
+                        <input type="checkbox" data-validate-doc="${doc.id}" ${docState.validated ? 'checked' : ''}>
+                        <span>Documento verificado, vigente y sin tachaduras</span>
+                    </label>
+                </div>
+            </div>
+        `;
+
+        // Eventos de upload
+        const uploadZone = card.querySelector(`[data-upload-doc="${doc.id}"]`);
+        const fileInput = card.querySelector(`[data-file-input="${doc.id}"]`);
+        const delBtn = card.querySelector(`[data-del-doc="${doc.id}"]`);
+        const validateCheckbox = card.querySelector(`[data-validate-doc="${doc.id}"]`);
+
+        uploadZone?.addEventListener('click', () => fileInput?.click());
+        fileInput?.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                const file = e.target.files[0];
+                wizardDocuments[doc.id] = {
+                    fileName: file.name,
+                    size: file.size,
+                    validated: true
+                };
+                renderWizardDocs();
+            }
+        });
+
+        delBtn?.addEventListener('click', () => {
+            delete wizardDocuments[doc.id];
+            renderWizardDocs();
+        });
+
+        validateCheckbox?.addEventListener('change', (e) => {
+            if (!wizardDocuments[doc.id]) {
+                wizardDocuments[doc.id] = { fileName: 'Documento en Físico Validado', size: 0, validated: e.target.checked };
+            } else {
+                wizardDocuments[doc.id].validated = e.target.checked;
+            }
+            renderWizardDocs();
+        });
+
+        container.appendChild(card);
+    });
+
+    // Actualizar barra de progreso
+    const total = reqDocs.length;
+    const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+    const progressText = document.getElementById('doc-progress-text');
+    const progressFill = document.getElementById('doc-progress-fill');
+    if (progressText) progressText.textContent = `${completedCount} de ${total} Validados (${pct}%)`;
+    if (progressFill) progressFill.style.width = `${pct}%`;
+}
+
+// Tarifas sugeridas por defecto para Maestros SINSA
+function loadDefaultMaestrosTariffs() {
+    wizardTarifas = [
+        { rms: '101026007', descripcion: 'INSTALACION AIRE ACONDICIONADO DE 12-24 MIL BTU', tarifa: 2563.40 },
+        { rms: '101025389', descripcion: 'VISITA A DOMICILIO EN CONCEPTO DE DIAGNOSTICO', tarifa: 256.34 },
+        { rms: '145518214', descripcion: 'VISITA WHATSAPP PARA FUTURA INSTALACION DE AIRE ACONDICIONADO', tarifa: 200.00 },
+        { rms: '130196460', descripcion: 'INSTALACION DE PUNTO ELECTRICO', tarifa: 700.00 },
+        { rms: '130196451', descripcion: 'DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU', tarifa: 800.00 },
+        { rms: '137301040', descripcion: 'DESINSTALACION DE AIRE 12-18-24 MIL BTU', tarifa: 400.00 },
+        { rms: '101026023', descripcion: 'MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO', tarifa: 750.00 },
+        { rms: '101026031', descripcion: 'MANTENIMIENTO GENERAL DE AIRE ACONDICIONADO', tarifa: 1800.00 }
+    ];
+}
+
+// Procesar Excel de Tarifas en el Wizard
+function handleWizardExcelUpload(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+            let headerRowIndex = -1;
+            let rmsIndex = -1;
+            let descIndex = -1;
+            let tarifaIndex = -1;
+
+            // Detectar encabezados
+            for (let i = 0; i < Math.min(json.length, 10); i++) {
+                const row = json[i];
+                if (!row) continue;
+                for (let j = 0; j < row.length; j++) {
+                    const val = String(row[j] || '').toUpperCase().trim();
+                    if (val === 'RMS' || val === 'CODIGO' || val === 'CÓDIGO') rmsIndex = j;
+                    if (val.includes('DESCRIP') || val.includes('ACTIVIDAD')) descIndex = j;
+                    if (val.includes('TARIFA') || val.includes('PRECIO') || val.includes('VALOR')) tarifaIndex = j;
+                }
+                if (descIndex !== -1 && (tarifaIndex !== -1 || rmsIndex !== -1)) {
+                    headerRowIndex = i;
+                    break;
+                }
+            }
+
+            // Si no encontró tarifa explícita, buscar la columna numérica a la derecha de descripción
+            if (tarifaIndex === -1 && descIndex !== -1) {
+                tarifaIndex = descIndex + 1;
+            }
+
+            const extractedTarifas = [];
+            let fuelExtracted = null;
+
+            if (headerRowIndex !== -1 && descIndex !== -1) {
+                for (let r = headerRowIndex + 1; r < json.length; r++) {
+                    const row = json[r];
+                    if (!row) continue;
+
+                    const desc = String(row[descIndex] || '').trim();
+                    if (!desc) continue;
+
+                    const rms = rmsIndex !== -1 ? String(row[rmsIndex] || '').trim() : '';
+                    let rawVal = row[tarifaIndex];
+                    let price = 0;
+
+                    if (typeof rawVal === 'number') {
+                        price = rawVal;
+                    } else if (rawVal) {
+                        price = parseFloat(String(rawVal).replace(/,/g, '').replace(/[^0-9.-]+/g, '')) || 0;
+                    }
+
+                    // Verificar si es fila de combustible
+                    if (desc.toUpperCase().includes('COMBUSTIBLE') || desc.toUpperCase().includes('CUMBUSTIBLE')) {
+                        fuelExtracted = price || 12.0;
+                    } else {
+                        extractedTarifas.push({
+                            rms: rms,
+                            descripcion: desc,
+                            tarifa: price
+                        });
+                    }
+                }
+            }
+
+            if (extractedTarifas.length > 0) {
+                wizardTarifas = extractedTarifas;
+                if (fuelExtracted !== null) {
+                    const fuelInput = document.getElementById('wiz-fuel-rate');
+                    if (fuelInput) fuelInput.value = fuelExtracted.toFixed(2);
+                }
+                renderWizardTariffTable();
+                alert(`¡Éxito! Se cargaron ${extractedTarifas.length} actividades desde el archivo Excel.`);
+            } else {
+                alert("No se pudieron detectar columnas de actividades en el Excel. Se mantendrán las tarifas actuales.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error al procesar el archivo Excel: " + err.message);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// Renderizar Tabla de Tarifas en el Wizard
+function renderWizardTariffTable() {
+    const tbody = document.getElementById('wiz-tariff-body');
+    const countLabel = document.getElementById('tariff-count-label');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    if (countLabel) countLabel.textContent = `Actividades Pactadas (${wizardTarifas.length})`;
+
+    if (wizardTarifas.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No hay actividades registradas. Arrastra un Excel o pulsa "➕ Añadir Actividad".</td></tr>`;
+        return;
+    }
+
+    wizardTarifas.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="custom-input" data-t-rms="${idx}" value="${item.rms || ''}" placeholder="Ej. 101026007" style="font-size: 0.85rem; padding: 0.35rem 0.6rem; width: 100%;">
+            </td>
+            <td>
+                <input type="text" class="custom-input" data-t-desc="${idx}" value="${item.descripcion || ''}" placeholder="Descripción del servicio" style="font-size: 0.85rem; padding: 0.35rem 0.6rem; width: 100%;">
+            </td>
+            <td style="text-align: right;">
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.3rem;">
+                    <span style="font-weight: bold; color: var(--primary);">C$</span>
+                    <input type="number" class="custom-input" data-t-price="${idx}" value="${item.tarifa || 0}" step="10" style="font-size: 0.85rem; padding: 0.35rem 0.6rem; width: 120px; text-align: right; font-weight: 600;">
+                </div>
+            </td>
+            <td style="text-align: center;">
+                <button class="btn-icon" data-del-t="${idx}" style="color: var(--danger);" title="Eliminar fila">✖</button>
+            </td>
+        `;
+
+        // Inputs change handlers
+        tr.querySelector(`[data-t-rms="${idx}"]`)?.addEventListener('input', (e) => {
+            wizardTarifas[idx].rms = e.target.value.trim();
+        });
+        tr.querySelector(`[data-t-desc="${idx}"]`)?.addEventListener('input', (e) => {
+            wizardTarifas[idx].descripcion = e.target.value.trim();
+        });
+        tr.querySelector(`[data-t-price="${idx}"]`)?.addEventListener('input', (e) => {
+            wizardTarifas[idx].tarifa = parseFloat(e.target.value) || 0;
+        });
+        tr.querySelector(`[data-del-t="${idx}"]`)?.addEventListener('click', () => {
+            wizardTarifas.splice(idx, 1);
+            renderWizardTariffTable();
+        });
+
+        tbody.appendChild(tr);
+    });
+}
+
+// Descargar plantilla Excel de oferta
+function downloadContractorExcelTemplate() {
+    const wsData = [
+        ["TABLA DE OFERTA CONTRATISTA DE MAESTROS"],
+        ["RMS", "DESCRIPCION", "TARIFA"],
+        ["101026007", "INSTALACION AIRE ACONDICIONADO DE 12-24 MIL BTU", 2563.40],
+        ["101025389", "VISITA A DOMICILIO EN CONCEPTO DE DIAGNOSTICO", 256.34],
+        ["145518214", "VISITA WHATSAPP PARA FUTURA INSTALACION DE AIRE ACONDICIONADO", 200.00],
+        ["130196460", "INSTALACION DE PUNTO ELECTRICO", 700.00],
+        ["130196451", "DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU", 800.00],
+        ["137301040", "DESINSTALACION DE AIRE 12-18-24 MIL BTU", 400.00],
+        ["101026023", "MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO", 750.00],
+        ["101026031", "MANTENIMIENTO GENERAL DE AIRE ACONDICIONADO", 1800.00],
+        ["", "TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD", 12.00]
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Oferta");
+    XLSX.writeFile(wb, "PLANTILLA_OFERTA_MAESTROS_SINSA.xlsx");
+}
+
+// Obtener los datos actuales del formulario
+function getWizardData() {
+    return {
+        nombre_comercial: document.getElementById('wiz-nombre-comercial')?.value.trim() || 'MULTISERVICIOS OROZCO',
+        nombre_representante: document.getElementById('wiz-nombre-rep')?.value.trim() || 'Eduin Jose Orozco Castro',
+        cedula: document.getElementById('wiz-cedula')?.value.trim() || '001-231085-0004W',
+        ruc: document.getElementById('wiz-ruc')?.value.trim() || '0012310850004W',
+        matricula: document.getElementById('wiz-matricula')?.value.trim() || '',
+        regimen: document.getElementById('wiz-regimen')?.value || 'Régimen de Cuota Fija',
+        estado_civil: document.getElementById('wiz-estado-civil')?.value || 'casado',
+        profesion: document.getElementById('wiz-profesion')?.value.trim() || 'Técnico en Refrigeración',
+        domicilio: document.getElementById('wiz-domicilio')?.value.trim() || 'Managua',
+        telefono: document.getElementById('wiz-telefono')?.value.trim() || '8888-1234',
+        correo: document.getElementById('wiz-correo')?.value.trim() || 'contacto@proveedor.com',
+        direccion: document.getElementById('wiz-direccion')?.value.trim() || 'Managua, Nicaragua',
+        banco: document.getElementById('wiz-banco')?.value || 'BAC Credomatic',
+        cuenta_bancaria: document.getElementById('wiz-cuenta')?.value.trim() || '3628491029',
+        titular_cuenta: document.getElementById('wiz-titular')?.value.trim() || document.getElementById('wiz-nombre-rep')?.value.trim(),
+        inss: document.getElementById('wiz-inss')?.value.trim() || '',
+        dia: document.getElementById('contract-day')?.value || 23,
+        mes: document.getElementById('contract-month')?.value || 'octubre',
+        anio: 2026,
+        tarifa_combustible: parseFloat(document.getElementById('wiz-fuel-rate')?.value) || 12.0,
+        tarifas: wizardTarifas,
+        documentos: wizardDocuments
+    };
+}
+
+// Renderizar Vista Previa del Contrato Formal en Paso 4
+function renderContractPreview() {
+    const viewer = document.getElementById('contract-paper-viewer');
+    const summaryBox = document.getElementById('provider-onboarding-summary');
+    if (!viewer) return;
+
+    const data = getWizardData();
+
+    // Actualizar summary pill
+    if (summaryBox) {
+        summaryBox.innerHTML = `
+            <div>
+                <strong style="font-size: 1.05rem; color: var(--primary);">${data.nombre_comercial}</strong>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
+                    Titular: ${data.nombre_representante} | RUC: ${data.ruc || data.cedula} | ${data.regimen}
+                </div>
+            </div>
+            <div style="text-align: right; font-size: 0.85rem;">
+                <span style="font-weight: 700; color: var(--text-main);">${data.tarifas.length} Actividades Tarifadas</span>
+                <div style="color: var(--accent); font-weight: 600;">Combustible: C$${data.tarifa_combustible.toFixed(2)}/km</div>
+            </div>
+        `;
+    }
+
+    // Construcción de la tabla de tarifas Anexo I en HTML
+    let tableRowsHtml = '';
+    data.tarifas.forEach(t => {
+        tableRowsHtml += `
+            <tr>
+                <td style="text-align: center; font-weight: 600;">${t.rms || '-'}</td>
+                <td>${t.descripcion}</td>
+                <td style="text-align: right; font-weight: bold;">C$ ${Number(t.tarifa || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+            </tr>
+        `;
+    });
+
+    tableRowsHtml += `
+        <tr style="background: #F1F5F9; font-weight: bold;">
+            <td colspan="2">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD</td>
+            <td style="text-align: right; color: #00A859;">C$ ${Number(data.tarifa_combustible || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+        </tr>
+    `;
+
+    viewer.innerHTML = `
+        <div class="contract-header-title">
+            CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRES ACONDICIONADOS
+        </div>
+
+        <p>
+            Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)</strong>, legalmente establecida conforme las leyes de la República de Nicaragua, según Testimonio de Escritura Pública número doce (12) de Constitución de Sociedad y Poder Especial de Representación número ciento noventa y dos (192), y que en lo sucesivo se denominará <strong>EL CONTRATANTE</strong>, y por otra parte, <strong>${data.nombre_representante.toUpperCase()}</strong>, mayor de edad, ${data.estado_civil.toLowerCase()}, ${data.profesion.toLowerCase()}, con domicilio en ${data.domicilio}, titular de cédula de identidad nicaragüense número: <strong>${data.cedula}</strong>${data.ruc ? ` y cédula RUC: <strong>${data.ruc}</strong>` : ''}, quien actúa en nombre e interés de negocio bajo ${data.regimen} denominado <strong>${data.nombre_comercial.toUpperCase()}</strong>, quien en adelante se denominará <strong>EL CONTRATISTA</strong>, ambas partes de común acuerdo convenimos en celebrar el siguiente:
+        </p>
+
+        <p style="text-align: center; font-weight: bold; margin: 1.2rem 0;">
+            CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS
+        </p>
+
+        <div class="contract-clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
+        <p>El presente contrato tiene por objeto la prestación del servicio de instalación de equipos de aire acondicionado, incluyendo la colocación, conexión eléctrica, pruebas de funcionamiento y puesta en marcha de los sistemas, conforme a las especificaciones técnicas y condiciones establecidas por el CLIENTE. El CONTRATISTA se obliga a realizar dichos trabajos con personal calificado, utilizando materiales y herramientas adecuadas, garantizando la correcta instalación y funcionamiento.</p>
+
+        <div class="contract-clause-title">SEGUNDA [ALCANCES DEL CONTRATO]:</div>
+        <p>Los alcances de los trabajos a realizar por EL CONTRATISTA estarán sujetos a visitar el local previamente indicado, determinar la lista de insumos y materiales requeridos, y realizar la instalación y mantenimientos en residencias o comercios programados por EL CONTRATANTE.</p>
+
+        <div class="contract-clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
+        <p>Forman parte integral del presente contrato los siguientes documentos: Anexo de tarifas de instalación y combustible, Órdenes de Compra aprobadas, Órdenes de Trabajo de levantamiento de visita, Actas de Recepción final firmadas por el cliente receptor, y Facturas comerciales por cada prestación brindada.</p>
+
+        <div class="contract-clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
+        <p>Portar debidamente el uniforme de Maestros o Centro de Servicios, llevar a cabo las instalaciones con los más altos estándares de calidad, reportar incidencias inmediatas en ruta, y asumir los costos por reclamos atribuibles a mala instalación o fallas de mano de obra en garantía.</p>
+
+        <div class="contract-clause-title">QUINTA [RESPONSABILIDAD EN MATERIA DE HIGIENE Y SEGURIDAD OCUPACIONAL]:</div>
+        <p>EL CONTRATISTA se obliga a cumplir de manera estricta con todas las disposiciones de la Ley N.º 618 "Ley General de Higiene y Seguridad del Trabajo", garantizando que todo el personal involucrado cuente con certificaciones médicas ocupacionales vigentes, certificación para trabajos en altura mayores a 1.80 metros, acreditación técnica en seguridad eléctrica, y el uso permanente de Equipos de Protección Personal (EPP).</p>
+
+        <div class="contract-clause-title">SEXTA [PLAZO]:</div>
+        <p>El plazo de este contrato es de DOCE (12) meses contados a partir de su firma, prorrogable automáticamente por períodos iguales salvo notificación escrita en contrario con 30 días de anticipación.</p>
+
+        <div class="contract-clause-title">SÉPTIMA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
+        <p>Las partes acuerdan que el valor de los servicios estará regido por las tarifas detalladas en el Anexo I. Previa validación semanal de las órdenes de trabajo realizadas y facturación correspondiente con retenciones de ley aplicadas, los pagos serán realizados mediante transferencia bancaria a la cuenta de <strong>${data.banco.toUpperCase()}</strong> número: <strong>${data.cuenta_bancaria}</strong> en moneda córdobas a nombre de <strong>${data.titular_cuenta.toUpperCase()}</strong>.</p>
+
+        <div class="contract-clause-title">OCTAVA [MANTENIMIENTO DE VALOR]:</div>
+        <p>Se reconoce la cláusula de mantenimiento de valor en córdobas conforme al tipo de cambio oficial emitido por el Banco Central de Nicaragua al día del pago efectivo (Art. 38, Ley 732).</p>
+
+        <div class="contract-clause-title">NOVENA [NATURALEZA DE LA RELACIÓN Y SEGURIDAD SOCIAL]:</div>
+        <p>La relación es estrictamente civil y no genera vínculo laboral ni prestaciones sociales entre las partes. EL CONTRATISTA se compromete a mantener a su personal afiliado al Instituto Nicaragüense de Seguridad Social (INSS) y al día con sus contribuciones.</p>
+
+        <div class="contract-clause-title">DÉCIMA A DÉCIMA SEXTA [CONDICIONES TÉCNICAS, GARANTÍA Y CONFIDENCIALIDAD]:</div>
+        <p>El CONTRATISTA garantiza vicios ocultos de las instalaciones por el término de un (1) año tras la firma del acta de entrega final. En caso de atrasos injustificados, se establece una penalización del 1.25% diario hasta un máximo de 8 días. El contrato no podrá ser cedido sin autorización escrita.</p>
+
+        <div class="contract-clause-title">DÉCIMA SÉPTIMA [AVISOS Y NOTIFICACIONES]:</div>
+        <p>
+            <strong>CONTRATANTE:</strong> Oficinas Centro de Servicios SINSA, Centro de Distribución, Rotonda El Periodista 100m al este, Managua. Atención: Jose Raudes / Ángel Campos (Tel: 78862226 / 82672246 - jose.raudes@sinsa.com.ni).<br>
+            <strong>CONTRATISTA:</strong> ${data.nombre_comercial.toUpperCase()}, ${data.direccion}. Atención: ${data.nombre_representante} (Tel: ${data.telefono} - ${data.correo}).
+        </p>
+
+        <div class="contract-clause-title">DÉCIMA OCTAVA A VIGÉSIMA [SOLUCIÓN DE CONTROVERSIAS Y ACEPTACIÓN]:</div>
+        <p>En caso de controversias, las partes acudirán en primera instancia ante la Dirección de Resolución Alterna de Conflictos (DIRAC). Se prohíbe terminantemente la contratación o participación de menores de edad.</p>
+
+        <p style="margin-top: 1.5rem;">
+            En fe de lo cual firmamos el presente contrato, en dos tantos de un mismo tenor, en la ciudad de Managua, a los ${data.dia} días del mes de ${data.mes} del año ${data.anio}.
+        </p>
+
+        <div class="contract-signatures-grid">
+            <div>
+                <div class="contract-sig-line">EL CONTRATANTE</div>
+                <div>Oscar René Vargas Reyes</div>
+                <div style="font-size: 0.85rem; color: #4B5563;">SILVA INTERNACIONAL S.A. (SINSA)</div>
+            </div>
+            <div>
+                <div class="contract-sig-line">EL CONTRATISTA</div>
+                <div>${data.nombre_representante}</div>
+                <div style="font-size: 0.85rem; color: #4B5563;">${data.nombre_comercial}</div>
+            </div>
+        </div>
+
+        <div style="page-break-before: always; margin-top: 3rem; border-top: 2px dashed #94A3B8; padding-top: 2rem;">
+            <div style="text-align: center; font-weight: bold; font-size: 1.1rem; margin-bottom: 1rem;">
+                ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS
+            </div>
+            <table class="contract-annex-table">
+                <thead>
+                    <tr>
+                        <th style="width: 150px; text-align: center;">RMS</th>
+                        <th>DESCRIPCIÓN DE LA ACTIVIDAD</th>
+                        <th style="width: 170px; text-align: right;">TARIFA (C$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// Descargar el Contrato en Word (.docx con fallback client-side)
+async function downloadContractDocx() {
+    const data = getWizardData();
+    const btn = document.getElementById('btn-download-contract-docx');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) btn.innerHTML = '⏳ Generando archivo...';
+
+    try {
+        const response = await fetch('/api/generate-contract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const safeName = data.nombre_comercial.replace(/[^a-zA-Z0-9_-]/g, '_');
+            a.download = `CONTRATO_SERVICIOS_${safeName}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            return;
+        }
+    } catch (err) {
+        console.log("Servidor backend no disponible o en entorno estático. Generando documento en el navegador...");
+    } finally {
+        if (btn) btn.innerHTML = originalText;
+    }
+
+    // Fallback: Descarga directa generada en el navegador (funciona 100% en Render Web)
+    downloadClientSideContractDoc(data);
+}
+
+function downloadClientSideContractDoc(data) {
+    const safeName = (data.nombre_comercial || data.nombre || 'PROVEEDOR').replace(/[^a-zA-Z0-9_-]/g, '_');
+    
+    let tableRowsHtml = '';
+    (data.tarifas || []).forEach(t => {
+        tableRowsHtml += `
+            <tr>
+                <td style="text-align: center; border: 1pt solid #000000; padding: 4pt 6pt;">${t.rms || '-'}</td>
+                <td style="border: 1pt solid #000000; padding: 4pt 6pt;">${t.descripcion}</td>
+                <td style="text-align: right; font-weight: bold; border: 1pt solid #000000; padding: 4pt 6pt;">C$ ${Number(t.tarifa || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+            </tr>
+        `;
+    });
+
+    tableRowsHtml += `
+        <tr style="background-color: #F1F5F9; font-weight: bold;">
+            <td colspan="2" style="border: 1pt solid #000000; padding: 4pt 6pt;">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD</td>
+            <td style="text-align: right; border: 1pt solid #000000; padding: 4pt 6pt;">C$ ${Number(data.tarifa_combustible || 12.0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+        </tr>
+    `;
+
+    const wordContent = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+            <meta charset='utf-8'>
+            <title>CONTRATO DE SERVICIOS - ${data.nombre_comercial}</title>
+            <!--[if gte mso 9]>
+            <xml>
+                <w:WordDocument>
+                    <w:View>Print</w:View>
+                    <w:Zoom>100</w:Zoom>
+                    <w:DoNotOptimizeForBrowser/>
+                </w:WordDocument>
+            </xml>
+            <![endif]-->
+            <style>
+                @page { size: 8.5in 11in; margin: 1in; mso-header-margin: 0.5in; mso-footer-margin: 0.5in; }
+                body { font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.5; color: #000000; text-align: justify; }
+                h1 { text-align: center; font-size: 12pt; font-weight: bold; margin-bottom: 18pt; text-transform: uppercase; }
+                .clause-title { font-weight: bold; margin-top: 14pt; margin-bottom: 4pt; }
+                table { width: 100%; border-collapse: collapse; margin-top: 12pt; margin-bottom: 12pt; font-size: 9pt; }
+                th { background-color: #1E293B; color: #FFFFFF; font-weight: bold; border: 1pt solid #000000; padding: 5pt; }
+                .sig-table { width: 100%; border: none; margin-top: 40pt; }
+                .sig-table td { width: 50%; border: none; text-align: center; vertical-align: top; }
+                .sig-bar { border-top: 1pt solid #000000; width: 75%; margin: 0 auto; padding-top: 4pt; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <h1>CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRES ACONDICIONADOS</h1>
+            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)</strong>, legalmente establecida conforme las leyes de la República de Nicaragua, lo que demuestra con los siguientes documentos habilitantes: a) Testimonio de escritura pública número doce (12) de Constitución de Sociedad Anónima y Estatutos y b) Testimonio de escritura pública número ciento noventa y dos (192), denominada Poder Especial de Representación, y que en lo sucesivo se denominará <strong>EL CONTRATANTE</strong>, y por otra parte, <strong>${(data.nombre_representante || data.nombre || '').toUpperCase()}</strong>, mayor de edad, ${(data.estado_civil || 'casado').toLowerCase()}, ${(data.profesion || 'comerciante').toLowerCase()}, con domicilio en ${data.domicilio || 'Managua'}, titular de cédula de identidad nicaragüense número: <strong>${data.cedula || ''}</strong>${data.ruc ? ` y cédula RUC: <strong>${data.ruc}</strong>` : ''}, quien actúa en nombre e interés de negocio bajo ${data.regimen || 'Régimen de Cuota Fija'} denominado <strong>${(data.nombre_comercial || data.nombre || '').toUpperCase()}</strong>, quien en adelante se denominará <strong>EL CONTRATISTA</strong>, ambas partes de común acuerdo convenimos en celebrar el siguiente:</p>
+            
+            <p style="text-align: center; font-weight: bold; margin: 15pt 0;">CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS</p>
+
+            <div class="clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
+            <p>El presente contrato tiene por objeto la prestación del servicio de instalación de equipos de aire acondicionado, incluyendo la colocación, conexión eléctrica, pruebas de funcionamiento y puesta en marcha de los sistemas, conforme a las especificaciones técnicas y condiciones establecidas por el CLIENTE.</p>
+
+            <div class="clause-title">SEGUNDA [ALCANCES DEL CONTRATO]:</div>
+            <p>Los alcances de los trabajos a realizar por EL CONTRATISTA estarán sujeto a las siguientes: Visitar el local previamente indicado por EL CONTRATANTE, proporcionar la lista de materiales necesarios, y realizar la instalación de aires acondicionados en residencias o locales programados por EL CONTRATANTE.</p>
+
+            <div class="clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
+            <p>Forman parte integral del presente contrato los siguientes documentos: Anexo de tarifas de instalación y combustible, Órdenes de Compras aprobadas, Órdenes de Trabajo de levantamiento de visita, Actas de Recepción final firmadas por el cliente receptor, y Facturas por cada prestación de servicio brindada.</p>
+
+            <div class="clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
+            <p>Portar uniforme de Maestros o de Centro de Servicios garantizando la limpieza y cuidado de estos, llevar a cabo instalaciones de calidad respetando las normas de los fabricantes, reportar incidencias en ruta y asumir los costos por reclamos atribuibles a mala instalación.</p>
+
+            <div class="clause-title">QUINTA [RESPONSABILIDAD EN MATERIA DE HIGIENE Y SEGURIDAD OCUPACIONAL]:</div>
+            <p>EL CONTRATISTA se obliga a cumplir de manera estricta con todas las disposiciones de la Ley N.º 618 "Ley General de Higiene y Seguridad del Trabajo", garantizando certificaciones médicas ocupacionales vigentes, certificación para trabajos en altura superior a 1.80 metros, acreditación técnica en seguridad eléctrica, y el uso permanente de Equipos de Protección Personal (EPP).</p>
+
+            <div class="clause-title">SEXTA [PLAZO]:</div>
+            <p>El plazo de este contrato es de DOCE (12) meses contados a partir de la firma del contrato, prorrogable automáticamente por sucesivos períodos de igual vigencia salvo notificación contraria con 30 días de anticipación.</p>
+
+            <div class="clause-title">SÉPTIMA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
+            <p>Las partes acuerdan que el valor del presente contrato estará debidamente detallado de acuerdo a las actividades ampliamente descritas en el Anexo. Previa validación semanal de los servicios realizados y emisión de factura con las retenciones de ley, los pagos serán realizados mediante transferencia bancaria a la cuenta de <strong>${(data.banco || 'BANCO').toUpperCase()}</strong> número: <strong>${data.cuenta_bancaria || 'XXXXXXXXXXX'}</strong> en moneda córdobas a nombre de <strong>${(data.titular_cuenta || data.nombre_representante || '').toUpperCase()}</strong>.</p>
+
+            <div class="clause-title">OCTAVA [MANTENIMIENTO DE VALOR]:</div>
+            <p>Se reconoce la cláusula de mantenimiento de valor en córdobas conforme al tipo de cambio oficial del Banco Central de Nicaragua (Art. 38, Ley 732).</p>
+
+            <div class="clause-title">NOVENA [NATURALEZA DE LA RELACIÓN Y SEGURIDAD SOCIAL]:</div>
+            <p>La relación es estrictamente civil y no genera vínculo laboral ni prestaciones sociales. EL CONTRATISTA se compromete a que todo su personal esté afiliado al Instituto Nicaragüense de Seguridad Social (INSS) durante la vigencia del contrato.</p>
+
+            <div class="clause-title">DÉCIMA A DÉCIMA SEXTA [CONDICIONES TÉCNICAS, GARANTÍA Y CONFIDENCIALIDAD]:</div>
+            <p>El CONTRATISTA garantiza vicios ocultos por el término de un (1) año tras la firma del acta de recepción final. Se establece una multa del 1.25% por cada día de atraso hasta acumular un máximo de 8 días. El contrato no podrá ser cedido sin consentimiento previo por escrito.</p>
+
+            <div class="clause-title">DÉCIMA SÉPTIMA [AVISOS Y NOTIFICACIONES]:</div>
+            <p>
+                <strong>CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA ubicadas en edificio Centro de distribución, rotonda el periodista 100m al este, Managua. Con Atención a: Jose Raudes, Ángel Campos (Tel: 78862226 / 82672246 - jose.raudes@sinsa.com.ni).<br>
+                <strong>CONTRATISTA:</strong> ${(data.nombre_comercial || data.nombre || '').toUpperCase()}, ${data.direccion || 'Managua, Nicaragua'}. Con Atención a: ${data.nombre_representante || data.nombre || ''} (Tel: ${data.telefono || ''} - ${data.correo || ''}).
+            </p>
+
+            <div class="clause-title">DÉCIMA OCTAVA A VIGÉSIMA [SOLUCIÓN DE CONTROVERSIAS Y ACEPTACIÓN]:</div>
+            <p>En caso de controversias las partes acudirán ante mediador de la Dirección de Resolución Alterna de Conflictos (DIRAC) de Managua. Se prohíbe terminantemente la contratación o participación de menores de edad.</p>
+
+            <p style="margin-top: 15pt;">En fe de lo cual firmamos el presente contrato, en dos tantos de un mismo tenor, en la ciudad de Managua, a los ${data.dia || 23} días del mes de ${data.mes || 'octubre'} del año ${data.anio || 2026}.</p>
+
+            <table class="sig-table">
+                <tr>
+                    <td>
+                        <div class="sig-bar">EL CONTRATANTE</div>
+                        <div>Oscar René Vargas Reyes</div>
+                        <div style="font-size: 8pt; color: #555555;">SILVA INTERNACIONAL, S.A. (SINSA)</div>
+                    </td>
+                    <td>
+                        <div class="sig-bar">EL CONTRATISTA</div>
+                        <div>${data.nombre_representante || data.nombre || ''}</div>
+                        <div style="font-size: 8pt; color: #555555;">${data.nombre_comercial || data.nombre || ''}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <br style="page-break-before: always;">
+            <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 20pt; margin-bottom: 10pt;">
+                ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS - ${(data.nombre_comercial || data.nombre || '').toUpperCase()}
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 20%; text-align: center;">RMS</th>
+                        <th style="width: 55%; text-align: left;">DESCRIPCIÓN DE LA ACTIVIDAD</th>
+                        <th style="width: 25%; text-align: right;">TARIFA (C$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRowsHtml}
+                </tbody>
+            </table>
+        </body>
+        </html>
+    `;
+
+    const blob = new Blob(['\ufeff', wordContent], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CONTRATO_SERVICIOS_${safeName}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Finalizar la vinculación y activar en pagos
+async function finishProviderOnboarding() {
+    const data = getWizardData();
+    const provName = data.nombre_comercial.trim();
+
+    if (!provName) {
+        alert("El contratista debe tener un Nombre Comercial.");
+        return;
+    }
+
+    if (data.tarifas.length === 0) {
+        alert("Debes configurar al menos una actividad con su tarifa para este contratista.");
+        return;
+    }
+
+    // 1. Guardar en lista de proveedores registrados
+    const existingIdx = proveedoresRegistrados.findIndex(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === provName.toUpperCase());
+    if (existingIdx >= 0) {
+        proveedoresRegistrados[existingIdx] = data;
+    } else {
+        proveedoresRegistrados.push(data);
+    }
+
+    localStorage.setItem('calcPago_proveedoresRegistrados', JSON.stringify(proveedoresRegistrados));
+
+    // 2. Intentar guardar en backend
+    try {
+        await fetch('/api/save-provider', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    } catch (e) {
+        console.log("Guardado en almacenamiento local completado.");
+    }
+
+    // 3. SINCRONIZACIÓN INMEDIATA CON EL MOTOR DE PAGOS (tablaOferta)
+    if (!tablaOferta[provName]) {
+        tablaOferta[provName] = {};
+    }
+
+    data.tarifas.forEach(t => {
+        if (t.descripcion) {
+            tablaOferta[provName][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
+        }
+    });
+
+    // Guardar tablaOferta actualizada
+    saveAndRefresh();
+
+    // 4. Seleccionar este proveedor en el Resumen de Pagos
+    selectedProvider = provName;
+    const initialSelect = document.getElementById('initial-provider-select');
+    if (initialSelect) {
+        initialSelect.value = provName;
+    }
+    updateProviderPricesTable();
+
+    // 5. Notificación y cambio de pestaña
+    alert(`🎉 ¡Proveedor "${provName}" vinculado y formalizado con éxito!\n\nSe han registrado ${data.tarifas.length} actividades y sus tarifas ya están habilitadas en el módulo de pagos.`);
+    
+    // Cambiar a la vista de Liquidación de Pagos
+    switchModuleView('dashboard');
+}
+
+// ==========================================================================
+// MÓDULO DE DIRECTORIO DE PROVEEDORES
+// ==========================================================================
+
+function initDirectoryModule() {
+    document.getElementById('btn-go-to-onboarding')?.addEventListener('click', () => {
+        switchModuleView('view-onboarding');
+        resetWizardForm();
+    });
+
+    document.getElementById('directory-search')?.addEventListener('input', renderDirectory);
+    document.getElementById('directory-regimen-filter')?.addEventListener('change', renderDirectory);
+
+    // Modales de expediente y tarifas
+    document.getElementById('close-expediente')?.addEventListener('click', () => {
+        document.getElementById('expediente-modal-overlay')?.classList.add('hidden');
+    });
+    document.getElementById('btn-close-expediente-bottom')?.addEventListener('click', () => {
+        document.getElementById('expediente-modal-overlay')?.classList.add('hidden');
+    });
+    document.getElementById('close-edit-tarifas')?.addEventListener('click', () => {
+        document.getElementById('edit-tarifas-modal-overlay')?.classList.add('hidden');
+    });
+    document.getElementById('btn-cancel-tarifas')?.addEventListener('click', () => {
+        document.getElementById('edit-tarifas-modal-overlay')?.classList.add('hidden');
+    });
+}
+
+function renderDirectory() {
+    const grid = document.getElementById('directory-grid');
+    if (!grid) return;
+
+    const searchTerm = document.getElementById('directory-search')?.value.toLowerCase().trim() || '';
+    const regimenFilter = document.getElementById('directory-regimen-filter')?.value || 'ALL';
+
+    grid.innerHTML = '';
+
+    const filtered = proveedoresRegistrados.filter(p => {
+        const nom = (p.nombre_comercial || p.nombre || '').toLowerCase();
+        const rep = (p.nombre_representante || '').toLowerCase();
+        const ruc = (p.ruc || p.cedula || '').toLowerCase();
+        const reg = p.regimen || 'Régimen de Cuota Fija';
+
+        const matchesSearch = !searchTerm || nom.includes(searchTerm) || rep.includes(searchTerm) || ruc.includes(searchTerm);
+        const matchesRegimen = regimenFilter === 'ALL' || reg === regimenFilter;
+        return matchesSearch && matchesRegimen;
+    });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: var(--bg-panel); border: 1px dashed var(--glass-border); border-radius: 16px;">
+                <span style="font-size: 2.5rem; display: block; margin-bottom: 0.8rem;">👥</span>
+                <h4 style="color: var(--text-main);">No se encontraron proveedores</h4>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Utiliza el botón "➕ Vincular Nuevo Proveedor" para dar de alta al primer contratista.</p>
+            </div>
+        `;
+        return;
+    }
+
+    filtered.forEach(prov => {
+        const provName = prov.nombre_comercial || prov.nombre || 'Contratista';
+        const repName = prov.nombre_representante || provName;
+        const totalActs = (prov.tarifas && prov.tarifas.length) || (tablaOferta[provName] ? Object.keys(tablaOferta[provName]).length : 0);
+        const fuelRate = prov.tarifa_combustible !== undefined ? prov.tarifa_combustible : 12.0;
+
+        const card = document.createElement('div');
+        card.className = 'directory-card';
+        card.innerHTML = `
+            <div>
+                <div class="directory-card-header">
+                    <div>
+                        <div class="directory-prov-name">${provName}</div>
+                        <div class="directory-prov-rep">👤 ${repName}</div>
+                    </div>
+                    <span class="badge-tag" style="margin: 0; font-size: 0.7rem;">${prov.regimen || 'Cuota Fija'}</span>
+                </div>
+
+                <div class="directory-card-body">
+                    <div class="directory-data-row">
+                        <span class="directory-data-label">Cédula / RUC:</span>
+                        <span class="directory-data-value">${prov.ruc || prov.cedula || 'N/D'}</span>
+                    </div>
+                    <div class="directory-data-row">
+                        <span class="directory-data-label">Cuenta Bancaria:</span>
+                        <span class="directory-data-value">${prov.banco || 'BAC'} - ${prov.cuenta_bancaria || 'Registrada'}</span>
+                    </div>
+                    <div class="directory-data-row">
+                        <span class="directory-data-label">Tarifas Acordadas:</span>
+                        <span class="directory-data-value" style="color: var(--primary); font-weight: 700;">${totalActs} actividades</span>
+                    </div>
+                    <div class="directory-data-row">
+                        <span class="directory-data-label">Tarifa Combustible:</span>
+                        <span class="directory-data-value">C$ ${Number(fuelRate).toFixed(2)}/km</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="directory-card-actions">
+                <div class="directory-actions-row">
+                    <button class="btn btn-outline" data-dir-contract="${provName}" title="Descargar Contrato Word">📄 Contrato</button>
+                    <button class="btn btn-outline" data-dir-exp="${provName}" title="Ver Documentos">📁 Expediente</button>
+                    <button class="btn btn-outline" data-dir-tariffs="${provName}" title="Ver Tarifas">💲 Tarifas</button>
+                </div>
+                <button class="btn directory-btn-pay" data-dir-pay="${provName}" title="Liquidar Pagos de Facturas">
+                    <span>🧮</span> Liquidar Pagos
+                </button>
+            </div>
+        `;
+
+        // Eventos de botones
+        card.querySelector(`[data-dir-contract="${provName}"]`)?.addEventListener('click', () => {
+            downloadContractForProvider(prov);
+        });
+
+        card.querySelector(`[data-dir-exp="${provName}"]`)?.addEventListener('click', () => {
+            openExpedienteModal(prov);
+        });
+
+        card.querySelector(`[data-dir-tariffs="${provName}"]`)?.addEventListener('click', () => {
+            openTarifasModal(prov);
+        });
+
+        card.querySelector(`[data-dir-pay="${provName}"]`)?.addEventListener('click', () => {
+            selectedProvider = provName;
+            const selectEl = document.getElementById('initial-provider-select');
+            if (selectEl) selectEl.value = provName;
+            updateProviderPricesTable();
+            switchModuleView('dashboard');
+        });
+
+        grid.appendChild(card);
+    });
+}
+
+// Descargar contrato para proveedor del directorio
+async function downloadContractForProvider(prov) {
+    // Si no tiene tarifas completas en su objeto, leer de tablaOferta
+    let tarifas = prov.tarifas;
+    if (!tarifas || tarifas.length === 0) {
+        const acts = tablaOferta[prov.nombre_comercial || prov.nombre] || {};
+        tarifas = Object.keys(acts).map(a => ({ rms: '', descripcion: a, tarifa: acts[a] }));
+    }
+
+    const payload = {
+        ...prov,
+        tarifas: tarifas,
+        tarifa_combustible: prov.tarifa_combustible !== undefined ? prov.tarifa_combustible : 12.0
+    };
+
+    try {
+        const response = await fetch('/api/generate-contract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error("No se pudo generar el contrato Word.");
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeName = (prov.nombre_comercial || prov.nombre).replace(/[^a-zA-Z0-9_-]/g, '_');
+        a.download = `CONTRATO_SERVICIOS_${safeName}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    } catch (e) {
+        alert("Error al descargar contrato: " + e.message);
+    }
+}
+
+// Modal de Expediente Digital
+function openExpedienteModal(prov) {
+    const modal = document.getElementById('expediente-modal-overlay');
+    const title = document.getElementById('expediente-title');
+    const infoBar = document.getElementById('expediente-info-bar');
+    const docsList = document.getElementById('expediente-docs-list');
+    const dlBtn = document.getElementById('btn-expediente-download-contract');
+
+    if (!modal) return;
+
+    const provName = prov.nombre_comercial || prov.nombre;
+    if (title) title.textContent = `📁 Expediente Digital: ${provName}`;
+
+    if (infoBar) {
+        infoBar.innerHTML = `
+            <div><strong>Representante:</strong> ${prov.nombre_representante || provName}</div>
+            <div><strong>RUC/Cédula:</strong> ${prov.ruc || prov.cedula || 'N/D'}</div>
+            <div><strong>Régimen:</strong> ${prov.regimen || 'Cuota Fija'}</div>
+            <div><strong>Cuenta:</strong> ${prov.banco || 'BAC'} ${prov.cuenta_bancaria || ''}</div>
+        `;
+    }
+
+    const reqDocs = DOCS_BY_REGIMEN[prov.regimen] || DOCS_BY_REGIMEN["Régimen de Cuota Fija"];
+    if (docsList) {
+        docsList.innerHTML = '';
+        const provDocs = prov.documentos || {};
+
+        reqDocs.forEach(doc => {
+            const hasDoc = provDocs[doc.id] && provDocs[doc.id].validated;
+            const docItem = document.createElement('div');
+            docItem.className = `doc-checklist-card ${hasDoc ? 'completed' : ''}`;
+            docItem.innerHTML = `
+                <div class="doc-card-top">
+                    <div>
+                        <div class="doc-info-title">${doc.name}</div>
+                        <div class="doc-info-sub">${doc.desc}</div>
+                    </div>
+                    <span class="status-badge ${hasDoc ? 'uploaded' : 'pending'}">
+                        ${hasDoc ? '✓ En Expediente' : 'Pendiente'}
+                    </span>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem;">
+                    ${hasDoc ? `Archivo: ${provDocs[doc.id].fileName || 'Digitalizado'}` : 'Sin archivo adjunto'}
+                </div>
+            `;
+            docsList.appendChild(docItem);
+        });
+    }
+
+    if (dlBtn) {
+        dlBtn.onclick = () => downloadContractForProvider(prov);
+    }
+
+    modal.classList.remove('hidden');
+}
+
+// Modal de Tarifas del Proveedor
+let currentEditingTariffProvider = null;
+function openTarifasModal(prov) {
+    const modal = document.getElementById('edit-tarifas-modal-overlay');
+    const title = document.getElementById('edit-tarifas-title');
+    const tbody = document.getElementById('modal-tarifas-body');
+    const fuelInput = document.getElementById('modal-fuel-rate');
+    const countLabel = document.getElementById('edit-tarifas-count');
+
+    if (!modal) return;
+
+    currentEditingTariffProvider = prov;
+    const provName = prov.nombre_comercial || prov.nombre;
+    if (title) title.textContent = `💲 Tarifario: ${provName}`;
+
+    // Obtener actividades de tablaOferta o del proveedor
+    const acts = tablaOferta[provName] || {};
+    let tList = [];
+    if (prov.tarifas && prov.tarifas.length > 0) {
+        tList = JSON.parse(JSON.stringify(prov.tarifas));
+    } else {
+        tList = Object.keys(acts).map(a => ({ rms: '', descripcion: a, tarifa: acts[a] }));
+    }
+
+    if (fuelInput) {
+        fuelInput.value = (prov.tarifa_combustible !== undefined ? prov.tarifa_combustible : 12.0).toFixed(2);
+    }
+
+    function renderModalRows() {
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (countLabel) countLabel.textContent = `${tList.length} Actividades`;
+
+        tList.forEach((item, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" class="custom-input" value="${item.rms || ''}" style="width: 100%; font-size: 0.82rem;" data-m-rms="${i}"></td>
+                <td><input type="text" class="custom-input" value="${item.descripcion || ''}" style="width: 100%; font-size: 0.82rem;" data-m-desc="${i}"></td>
+                <td><input type="number" class="custom-input" value="${item.tarifa || 0}" style="width: 100%; text-align: right; font-size: 0.82rem;" data-m-price="${i}"></td>
+                <td style="text-align: center;"><button class="btn-icon" data-del-m="${i}" style="color: var(--danger);">✖</button></td>
+            `;
+
+            tr.querySelector(`[data-m-rms="${i}"]`)?.addEventListener('input', (e) => { tList[i].rms = e.target.value.trim(); });
+            tr.querySelector(`[data-m-desc="${i}"]`)?.addEventListener('input', (e) => { tList[i].descripcion = e.target.value.trim(); });
+            tr.querySelector(`[data-m-price="${i}"]`)?.addEventListener('input', (e) => { tList[i].tarifa = parseFloat(e.target.value) || 0; });
+            tr.querySelector(`[data-del-m="${i}"]`)?.addEventListener('click', () => {
+                tList.splice(i, 1);
+                renderModalRows();
+            });
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    renderModalRows();
+
+    document.getElementById('btn-add-modal-tariff')?.addEventListener('click', () => {
+        tList.push({ rms: '', descripcion: 'NUEVA ACTIVIDAD', tarifa: 0 });
+        renderModalRows();
+    });
+
+    const saveBtn = document.getElementById('btn-save-modal-tarifas');
+    if (saveBtn) {
+        saveBtn.onclick = () => {
+            prov.tarifas = tList;
+            prov.tarifa_combustible = parseFloat(fuelInput?.value) || 12.0;
+
+            // Actualizar tablaOferta
+            tablaOferta[provName] = {};
+            tList.forEach(t => {
+                if (t.descripcion) {
+                    tablaOferta[provName][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
+                }
+            });
+
+            saveAndRefresh();
+            localStorage.setItem('calcPago_proveedoresRegistrados', JSON.stringify(proveedoresRegistrados));
+            renderDirectory();
+            modal.classList.add('hidden');
+            alert(`¡Tarifario de "${provName}" actualizado con éxito!`);
+        };
+    }
+
+    modal.classList.remove('hidden');
+}
+

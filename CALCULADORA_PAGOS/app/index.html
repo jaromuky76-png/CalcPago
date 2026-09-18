@@ -16,8 +16,21 @@
     <div class="app-container">
         <!-- Sidebar / Header -->
         <header class="header">
-            <div class="logo">
-                <h1>Calc<span>Pago</span></h1>
+            <div class="logo-nav-group" style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+                <div class="logo">
+                    <h1>Calc<span>Pago</span></h1>
+                </div>
+                <nav class="main-nav" id="main-nav">
+                    <button class="nav-tab active" data-view="dashboard">
+                        <span>📊</span> Liquidación de Pagos
+                    </button>
+                    <button class="nav-tab" data-view="view-onboarding">
+                        <span>➕</span> Vincular Proveedor
+                    </button>
+                    <button class="nav-tab" data-view="view-directory">
+                        <span>👥</span> Directorio de Proveedores
+                    </button>
+                </nav>
             </div>
             <div class="actions" style="display: flex; gap: 0.5rem; align-items: center;">
                 <button id="btn-theme-toggle" class="btn btn-outline btn-icon-only" title="Cambiar Tema" style="font-size: 1.2rem;">🌓</button>
@@ -226,6 +239,415 @@
                     </aside>
                 </div>
             </section>
+
+            <!-- ========================================================================= -->
+            <!-- VISTA 2: VINCULACIÓN DE PROVEEDORES (ONBOARDING & CONTRATO)               -->
+            <!-- ========================================================================= -->
+            <section class="module-view hidden" id="view-onboarding">
+                <div class="onboarding-container">
+                    <div class="module-header-box">
+                        <div class="module-header-info">
+                            <span class="badge-tag">Módulo Legal & Operaciones</span>
+                            <h2>Vinculación y Formalización de Proveedores</h2>
+                            <p>Asistente guiado para la incorporación legal, documental y tarifaria de nuevos contratistas maestros de instalación según normativas SINSA (POL.GLE.001 / 10.P.S01.0001).</p>
+                        </div>
+                        <div class="module-header-actions">
+                            <button id="btn-reset-wizard" class="btn btn-outline" title="Reiniciar formulario">🔄 Limpiar Datos</button>
+                        </div>
+                    </div>
+
+                    <!-- Stepper Bar -->
+                    <div class="stepper-bar">
+                        <div class="step-item active" data-step="1">
+                            <div class="step-circle">1</div>
+                            <div class="step-text">
+                                <span class="step-num">Paso 1</span>
+                                <span class="step-name">Datos Generales</span>
+                            </div>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step-item" data-step="2">
+                            <div class="step-circle">2</div>
+                            <div class="step-text">
+                                <span class="step-num">Paso 2</span>
+                                <span class="step-name">Expediente Digital</span>
+                            </div>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step-item" data-step="3">
+                            <div class="step-circle">3</div>
+                            <div class="step-text">
+                                <span class="step-num">Paso 3</span>
+                                <span class="step-name">Tabla de Oferta</span>
+                            </div>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step-item" data-step="4">
+                            <div class="step-circle">4</div>
+                            <div class="step-text">
+                                <span class="step-num">Paso 4</span>
+                                <span class="step-name">Contrato & Activación</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WIZARD STEP 1: DATOS GENERALES -->
+                    <div class="wizard-step active" id="wizard-step-1">
+                        <div class="step-card">
+                            <div class="step-card-header">
+                                <h3>📋 1. Régimen Fiscal y Datos de Identificación</h3>
+                                <p class="step-card-desc">Selecciona la figura tributaria del contratista y completa sus datos legales y de contacto.</p>
+                            </div>
+                            
+                            <div class="form-grid">
+                                <div class="form-group span-2">
+                                    <label for="wiz-regimen"><strong>Régimen Fiscal / Tipo de Contratista *</strong></label>
+                                    <select id="wiz-regimen" class="custom-select">
+                                        <option value="Régimen de Cuota Fija" selected>Régimen de Cuota Fija (Persona Natural / Pequeño Contratista Independiente)</option>
+                                        <option value="Régimen General">Régimen General (Persona Jurídica / Sociedad Mercantil o Persona Natural)</option>
+                                        <option value="Persona Natural No Inscrita en DGI">Persona Natural No Inscrita en DGI (Aplica retención legal 20%)</option>
+                                    </select>
+                                    <small class="form-hint">La documentación del Paso 2 se ajustará automáticamente según el régimen que selecciones.</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-nombre-comercial"><strong>Nombre Comercial o Razón Social *</strong></label>
+                                    <input type="text" id="wiz-nombre-comercial" class="custom-input" placeholder="Ej. Multiservicios Orozco">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-nombre-rep"><strong>Nombre del Titular / Representante Legal *</strong></label>
+                                    <input type="text" id="wiz-nombre-rep" class="custom-input" placeholder="Ej. Eduin Jose Orozco Castro">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-cedula"><strong>Cédula de Identidad *</strong></label>
+                                    <input type="text" id="wiz-cedula" class="custom-input" placeholder="Ej. 001-231085-0004W">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-ruc"><strong>Cédula RUC</strong></label>
+                                    <input type="text" id="wiz-ruc" class="custom-input" placeholder="Ej. 0012310850004W">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-matricula"><strong>Nº Matrícula de Alcaldía</strong></label>
+                                    <input type="text" id="wiz-matricula" class="custom-input" placeholder="Ej. MAT-2026-9812">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-estado-civil"><strong>Estado Civil</strong></label>
+                                    <select id="wiz-estado-civil" class="custom-select">
+                                        <option value="casado" selected>Casado(a)</option>
+                                        <option value="soltero">Soltero(a)</option>
+                                        <option value="unión de hecho">Unión de Hecho</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-profesion"><strong>Profesión u Oficio</strong></label>
+                                    <input type="text" id="wiz-profesion" class="custom-input" placeholder="Ej. Técnico en Refrigeración y Electricidad" value="Técnico en Refrigeración">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-domicilio"><strong>Ciudad / Domicilio Legal</strong></label>
+                                    <input type="text" id="wiz-domicilio" class="custom-input" placeholder="Ej. Managua" value="Managua">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-telefono"><strong>Teléfono(s) de Contacto *</strong></label>
+                                    <input type="text" id="wiz-telefono" class="custom-input" placeholder="Ej. 8888-1234 / 8267-0000">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-correo"><strong>Correo Electrónico *</strong></label>
+                                    <input type="email" id="wiz-correo" class="custom-input" placeholder="Ej. multiserviciosorozco@gmail.com">
+                                </div>
+
+                                <div class="form-group span-2">
+                                    <label for="wiz-direccion"><strong>Dirección Exacta para Notificaciones *</strong></label>
+                                    <input type="text" id="wiz-direccion" class="custom-input" placeholder="Ej. Colonia 15 mayo, de la aguja 1c al este 2c al sur, Managua">
+                                </div>
+                            </div>
+
+                            <div class="step-card-header" style="margin-top: 1.5rem; border-top: 1px solid var(--glass-border); padding-top: 1.2rem;">
+                                <h3>🏦 Datos Bancarios para Transferencia (SINSA Ventanilla)</h3>
+                                <p class="step-card-desc">Datos oficiales de cuenta para dispersión de pagos semanales de facturas.</p>
+                            </div>
+
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="wiz-banco"><strong>Institución Bancaria *</strong></label>
+                                    <select id="wiz-banco" class="custom-select">
+                                        <option value="BAC Credomatic" selected>BAC Credomatic</option>
+                                        <option value="Banco de la Producción (BANPRO)">Banco de la Producción (BANPRO)</option>
+                                        <option value="Banco LAFISE Bancentro">Banco LAFISE Bancentro</option>
+                                        <option value="Banco Ficohsa">Banco Ficohsa</option>
+                                        <option value="Banco BDF">Banco BDF</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-cuenta"><strong>Número de Cuenta en Córdobas (C$) *</strong></label>
+                                    <input type="text" id="wiz-cuenta" class="custom-input" placeholder="Ej. 3628491029">
+                                </div>
+
+                                <div class="form-group span-2">
+                                    <label for="wiz-titular"><strong>Titular de la Cuenta Bancaria *</strong></label>
+                                    <input type="text" id="wiz-titular" class="custom-input" placeholder="Nombre completo del titular">
+                                </div>
+                            </div>
+
+                            <div class="step-card-header" style="margin-top: 1.5rem; border-top: 1px solid var(--glass-border); padding-top: 1.2rem;">
+                                <h3>🛡️ Requisitos Operativos y Seguridad Ocupacional</h3>
+                                <p class="step-card-desc">Conformidad con la Cláusula Quinta del Contrato y Ley 618.</p>
+                            </div>
+
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="wiz-inss"><strong>Nº Afiliación / Patronal INSS</strong></label>
+                                    <input type="text" id="wiz-inss" class="custom-input" placeholder="Ej. INSS-872631">
+                                </div>
+
+                                <div class="form-group">
+                                    <label><strong>Cumplimiento de Seguridad Ocupacional</strong></label>
+                                    <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem;">
+                                        <label class="custom-checkbox-label">
+                                            <input type="checkbox" id="wiz-check-alturas" checked>
+                                            <span>Certificación para trabajos en altura (> 1.80m)</span>
+                                        </label>
+                                        <label class="custom-checkbox-label">
+                                            <input type="checkbox" id="wiz-check-electricidad" checked>
+                                            <span>Certificación técnica en seguridad eléctrica</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="wizard-footer">
+                                <div></div>
+                                <button id="btn-wiz-next-1" class="btn btn-primary">
+                                    Siguiente: Expediente Digital ➔
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WIZARD STEP 2: EXPEDIENTE DIGITAL -->
+                    <div class="wizard-step hidden" id="wizard-step-2">
+                        <div class="step-card">
+                            <div class="step-card-header">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                                    <div>
+                                        <h3>📁 2. Expediente Documental Digital</h3>
+                                        <p class="step-card-desc">Adjunta los recaudos requeridos según la política oficial <strong>POL.GLE.001</strong> y <strong>10.P.S01.0001</strong>.</p>
+                                    </div>
+                                    <div class="doc-progress-box">
+                                        <span id="doc-progress-text">0 de 7 Completados</span>
+                                        <div class="doc-progress-bar">
+                                            <div id="doc-progress-fill" style="width: 0%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="docs-checklist-container" id="docs-checklist-container">
+                                <!-- Cards generadas dinámicamente según el régimen fiscal -->
+                            </div>
+
+                            <div class="wizard-footer">
+                                <button id="btn-wiz-prev-2" class="btn btn-outline">
+                                    ⬅ Anterior
+                                </button>
+                                <button id="btn-wiz-next-2" class="btn btn-primary">
+                                    Siguiente: Tabla de Oferta ➔
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WIZARD STEP 3: TABLA DE OFERTA / TARIFAS -->
+                    <div class="wizard-step hidden" id="wizard-step-3">
+                        <div class="step-card">
+                            <div class="step-card-header">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                                    <div>
+                                        <h3>📊 3. Tabla de Oferta de Tarifas del Contratista</h3>
+                                        <p class="step-card-desc">Carga el archivo Excel con las tarifas pactadas o edita y agrega actividades manualmente.</p>
+                                    </div>
+                                    <button id="btn-download-offer-template" class="btn btn-outline" style="font-size: 0.85rem;" title="Descargar archivo Excel modelo">
+                                        📥 Descargar Plantilla Excel
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Drop Zone for Individual Contractor Excel -->
+                            <div class="drop-zone-wizard" id="drop-zone-wiz-oferta">
+                                <div class="drop-icon">📑</div>
+                                <div class="drop-text">
+                                    <strong>Arrastra aquí el Excel de Tarifas del Proveedor</strong>
+                                    <p>Formato compatible con columnas: <code>RMS</code>, <code>DESCRIPCION</code>, <code>TARIFA</code> (o formato estándar de Maestros)</p>
+                                </div>
+                                <input type="file" id="input-wiz-oferta" accept=".xlsx, .xls" hidden>
+                            </div>
+
+                            <!-- Editable Tariff Table -->
+                            <div class="tariff-table-wrapper" style="margin-top: 1.5rem;">
+                                <div class="table-actions-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                                    <h4 id="tariff-count-label" style="color: var(--primary);">Actividades Pactadas (0)</h4>
+                                    <button id="btn-add-wiz-tariff-row" class="btn btn-outline" style="font-size: 0.85rem; color: var(--primary); border-color: var(--primary);">
+                                        ➕ Añadir Actividad
+                                    </button>
+                                </div>
+
+                                <div class="table-scroll" style="max-height: 45vh;">
+                                    <table class="data-table" id="wiz-tariff-table">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 140px;">Código RMS</th>
+                                                <th>Descripción de la Actividad</th>
+                                                <th style="width: 160px; text-align: right;">Tarifa (C$)</th>
+                                                <th style="width: 80px; text-align: center;">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="wiz-tariff-body">
+                                            <!-- Injected dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Fuel Rate Special Box -->
+                                <div class="fuel-rate-card" style="margin-top: 1.2rem; background: var(--bg-panel-hover); border: 1px solid var(--glass-border); padding: 1rem 1.2rem; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.8rem;">
+                                        <span style="font-size: 1.6rem;">⛽</span>
+                                        <div>
+                                            <strong style="font-size: 0.95rem; color: var(--text-main);">Tarifa de Combustible por KM Fuera del Radio Urbano</strong>
+                                            <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">Aplica para visitas e instalaciones fuera del radio de 14 km de Managua según contrato.</p>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <span style="font-weight: bold; color: var(--primary);">C$</span>
+                                        <input type="number" id="wiz-fuel-rate" class="custom-input" value="12.00" step="0.50" style="width: 110px; text-align: right; font-weight: bold;">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="wizard-footer">
+                                <button id="btn-wiz-prev-3" class="btn btn-outline">
+                                    ⬅ Anterior
+                                </button>
+                                <button id="btn-wiz-next-3" class="btn btn-primary">
+                                    Siguiente: Formalizar Contrato ➔
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WIZARD STEP 4: FORMALIZACIÓN Y GENERACIÓN DEL CONTRATO -->
+                    <div class="wizard-step hidden" id="wizard-step-4">
+                        <div class="step-card">
+                            <div class="step-card-header">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                                    <div>
+                                        <h3>📜 4. Formalización y Generación del Contrato</h3>
+                                        <p class="step-card-desc">Revisa el borrador oficial ajustado a la medida del contratista, descárgalo en Word (.docx) o imprímelo para firma autógrafa.</p>
+                                    </div>
+                                    <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+                                        <button id="btn-download-contract-docx" class="btn btn-outline" style="color: #2563EB; border-color: #2563EB; font-weight: 600;">
+                                            📥 Descargar Word (.docx)
+                                        </button>
+                                        <button id="btn-print-contract" class="btn btn-outline" style="font-weight: 600;">
+                                            🖨️ Imprimir / PDF
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Provider Summary Pill -->
+                            <div class="provider-onboarding-summary" id="provider-onboarding-summary" style="margin-bottom: 1.5rem; padding: 1rem 1.2rem; background: var(--primary-pastel); border-radius: 12px; border-left: 5px solid var(--primary); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                                <!-- Injected dynamically -->
+                            </div>
+
+                            <!-- Date Configuration for Contract -->
+                            <div class="contract-date-row" style="margin-bottom: 1.2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; background: var(--bg-panel-hover); padding: 0.8rem 1.2rem; border-radius: 10px; border: 1px solid var(--glass-border);">
+                                <label style="font-size: 0.88rem; font-weight: 600;">📅 Fecha de Celebración del Contrato:</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" id="contract-day" class="custom-input" min="1" max="31" value="23" style="width: 70px; text-align: center;">
+                                    <span>de</span>
+                                    <select id="contract-month" class="custom-select" style="width: 140px;">
+                                        <option value="enero">enero</option>
+                                        <option value="febrero">febrero</option>
+                                        <option value="marzo">marzo</option>
+                                        <option value="abril">abril</option>
+                                        <option value="mayo">mayo</option>
+                                        <option value="junio">junio</option>
+                                        <option value="julio">julio</option>
+                                        <option value="agosto">agosto</option>
+                                        <option value="septiembre">septiembre</option>
+                                        <option value="octubre" selected>octubre</option>
+                                        <option value="noviembre">noviembre</option>
+                                        <option value="diciembre">diciembre</option>
+                                    </select>
+                                    <span>del año 2026</span>
+                                    <button id="btn-update-contract-preview" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.7rem;">Actualizar Vista</button>
+                                </div>
+                            </div>
+
+                            <!-- Live Contract Document Viewer -->
+                            <div class="contract-paper-viewer" id="contract-paper-viewer">
+                                <!-- Contract content rendered live -->
+                            </div>
+
+                            <div class="wizard-footer" style="margin-top: 2rem;">
+                                <button id="btn-wiz-prev-4" class="btn btn-outline">
+                                    ⬅ Anterior
+                                </button>
+                                <button id="btn-finish-onboarding" class="btn btn-primary" style="font-size: 1rem; padding: 0.8rem 1.8rem; background: var(--primary); color: white; border: none; font-weight: 700; box-shadow: 0 4px 14px var(--primary-glow);">
+                                    ✅ Finalizar Vinculación y Activar en Pagos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- VISTA 3: DIRECTORIO DE PROVEEDORES VINCULADOS                             -->
+            <!-- ========================================================================= -->
+            <section class="module-view hidden" id="view-directory">
+                <div class="directory-container">
+                    <div class="module-header-box">
+                        <div class="module-header-info">
+                            <span class="badge-tag">Catálogo de Contratistas</span>
+                            <h2>Directorio de Proveedores Vinculados</h2>
+                            <p>Gestión integral de contratistas formalizados, revisión de expedientes digitales, descarga de contratos vigentes y enlace directo a liquidación de pagos.</p>
+                        </div>
+                        <div class="module-header-actions" style="display: flex; gap: 0.6rem;">
+                            <button id="btn-go-to-onboarding" class="btn btn-primary">➕ Vincular Nuevo Proveedor</button>
+                        </div>
+                    </div>
+
+                    <!-- Directory Filters & Search -->
+                    <div class="directory-filter-bar">
+                        <div style="display: flex; align-items: center; gap: 0.6rem; flex: 1; max-width: 400px;">
+                            <input type="text" id="directory-search" class="custom-input" placeholder="🔍 Buscar por nombre, RUC o representante...">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <label style="font-size: 0.85rem; color: var(--text-muted);">Filtrar por Régimen:</label>
+                            <select id="directory-regimen-filter" class="custom-select" style="width: 200px;">
+                                <option value="ALL">Todos los Regímenes</option>
+                                <option value="Régimen de Cuota Fija">Cuota Fija</option>
+                                <option value="Régimen General">Régimen General</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Directory Grid -->
+                    <div class="directory-grid" id="directory-grid">
+                        <!-- Cards generadas dinámicamente -->
+                    </div>
+                </div>
+            </section>
         </main>
 
         <!-- Overlay for Manual OT -->
@@ -301,6 +723,80 @@
                 <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 0.5rem;">
                     <button id="close-edit-activity" class="btn btn-outline" style="font-size: 0.85rem;">Cancelar</button>
                     <button id="save-edit-activity" class="btn btn-primary" style="font-size: 0.85rem; background: var(--primary); color: white; border: none;">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay for Expediente Digital -->
+        <div id="expediente-modal-overlay" class="overlay hidden">
+            <div class="modal large-modal" style="max-width: 750px;">
+                <div class="modal-header">
+                    <div>
+                        <h3 id="expediente-title" style="color: var(--primary);">📁 Expediente Digital del Proveedor</h3>
+                        <p id="expediente-subtitle" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">Documentos legales y de cumplimiento bajo normativas SINSA.</p>
+                    </div>
+                    <button id="close-expediente" class="btn-icon">✖</button>
+                </div>
+                <div class="modal-body" style="padding: 1rem 0;">
+                    <div id="expediente-info-bar" style="background: var(--bg-panel-hover); padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.88rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                        <!-- Injected dynamically -->
+                    </div>
+                    <div class="docs-checklist-container" id="expediente-docs-list">
+                        <!-- Injected dynamically -->
+                    </div>
+                </div>
+                <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 1rem;">
+                    <button id="btn-expediente-download-contract" class="btn btn-outline" style="color: #2563EB; border-color: #2563EB;">
+                        📥 Descargar Contrato (.docx)
+                    </button>
+                    <button id="btn-close-expediente-bottom" class="btn btn-primary" style="background: var(--primary); color: white; border: none;">
+                        Cerrar Expediente
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay for Managing / Editing Existing Provider Tariffs -->
+        <div id="edit-tarifas-modal-overlay" class="overlay hidden">
+            <div class="modal large-modal" style="max-width: 750px;">
+                <div class="modal-header">
+                    <div>
+                        <h3 id="edit-tarifas-title" style="color: var(--primary);">💲 Tarifario de Servicios del Proveedor</h3>
+                        <p id="edit-tarifas-subtitle" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">Modifica o añade actividades y precios acordados.</p>
+                    </div>
+                    <button id="close-edit-tarifas" class="btn-icon">✖</button>
+                </div>
+                <div class="modal-body" style="padding: 1rem 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                        <span id="edit-tarifas-count" style="font-weight: 600; color: var(--text-main);">0 Actividades</span>
+                        <button id="btn-add-modal-tariff" class="btn btn-outline" style="font-size: 0.85rem; color: var(--primary); border-color: var(--primary);">+ Añadir Actividad</button>
+                    </div>
+                    <div class="table-scroll" style="max-height: 45vh;">
+                        <table class="data-table" id="modal-tarifas-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 140px;">RMS</th>
+                                    <th>Descripción de la Actividad</th>
+                                    <th style="width: 150px; text-align: right;">Tarifa (C$)</th>
+                                    <th style="width: 70px; text-align: center;">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modal-tarifas-body">
+                                <!-- Injected dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 1rem; background: var(--bg-panel-hover); padding: 0.8rem 1rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <span><strong>Tarifa de Combustible por KM:</strong></span>
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <span>C$</span>
+                            <input type="number" id="modal-fuel-rate" class="custom-input" style="width: 110px; text-align: right;" step="0.5">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 0.6rem; border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 1rem;">
+                    <button id="btn-cancel-tarifas" class="btn btn-outline">Cancelar</button>
+                    <button id="btn-save-modal-tarifas" class="btn btn-primary" style="background: var(--primary); color: white; border: none;">Guardar Cambios</button>
                 </div>
             </div>
         </div>
