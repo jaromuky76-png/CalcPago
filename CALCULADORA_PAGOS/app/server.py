@@ -102,6 +102,36 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
             return
 
+        elif parsed.path == '/api/delete-provider':
+            try:
+                data = json.loads(post_body.decode('utf-8'))
+                prov_key = (data.get('nombre_comercial') or data.get('nombre') or '').strip().upper()
+                providers = []
+                if os.path.exists(PROVIDERS_FILE):
+                    try:
+                        with open(PROVIDERS_FILE, 'r', encoding='utf-8') as f:
+                            providers = json.load(f)
+                    except Exception:
+                        providers = []
+
+                providers = [p for p in providers if ((p.get('nombre_comercial') or p.get('nombre') or '').strip().upper() != prov_key)]
+
+                with open(PROVIDERS_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(providers, f, ensure_ascii=False, indent=2)
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'ok', 'count': len(providers)}).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
+            return
+
         return super().do_POST()
 
 # Corrección para Windows: forzar el MIME type correcto para CSS

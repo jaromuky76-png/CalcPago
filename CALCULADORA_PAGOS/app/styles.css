@@ -1605,6 +1605,158 @@ body {
     background: var(--primary-hover);
 }
 
+/* ==========================================================================
+   ESTILOS PARA BORRADORES, AUTOGUARDADO Y PROGRESO DE VINCULACIÓN
+   ========================================================================== */
+
+.autosave-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-panel-hover);
+    border: 1px solid var(--glass-border);
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    transition: all 0.3s ease;
+}
+
+.autosave-indicator.saved {
+    color: #059669;
+    border-color: rgba(5, 150, 105, 0.3);
+    background: rgba(5, 150, 105, 0.08);
+}
+
+.autosave-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #10B981;
+    display: inline-block;
+}
+
+.draft-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.9rem 1.2rem;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04));
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-left: 5px solid #F59E0B;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.draft-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.draft-banner-icon {
+    font-size: 1.6rem;
+}
+
+.draft-banner-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.draft-banner-desc {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.draft-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.badge-draft {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #D97706 !important;
+    border: 1px solid rgba(245, 158, 11, 0.4) !important;
+    font-weight: 700 !important;
+}
+
+.badge-active {
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: #059669 !important;
+    border: 1px solid rgba(16, 185, 129, 0.4) !important;
+    font-weight: 700 !important;
+}
+
+.progress-bar-mini {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-panel-hover);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 6px;
+    border: 1px solid var(--glass-border);
+}
+
+.progress-bar-fill-mini {
+    height: 100%;
+    background: linear-gradient(90deg, #F59E0B, #10B981);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.directory-btn-resume {
+    background: linear-gradient(135deg, #F59E0B, #D97706) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    font-weight: 700 !important;
+    padding: 0.65rem !important;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.directory-btn-resume:hover {
+    background: linear-gradient(135deg, #D97706, #B45309) !important;
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+}
+
+.btn-save-draft {
+    background: var(--bg-panel);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.btn-save-draft:hover {
+    border-color: #F59E0B;
+    color: #D97706;
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.missing-field-highlight {
+    background-color: rgba(239, 68, 68, 0.12);
+    color: #DC2626;
+    border-bottom: 2px dashed #DC2626;
+    padding: 0 4px;
+    font-weight: 600;
+    border-radius: 2px;
+}
+
 @media print {
     body * {
         visibility: hidden;

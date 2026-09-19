@@ -251,8 +251,29 @@
                             <h2>Vinculación y Formalización de Proveedores</h2>
                             <p>Asistente guiado para la incorporación legal, documental y tarifaria de nuevos contratistas maestros de instalación según normativas SINSA (POL.GLE.001 / 10.P.S01.0001).</p>
                         </div>
-                        <div class="module-header-actions">
+                        <div class="module-header-actions" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                            <div class="autosave-indicator" id="wizard-autosave-indicator">
+                                <span class="autosave-dot"></span>
+                                <span id="wizard-autosave-text">Autoguardado activo</span>
+                            </div>
+                            <button id="btn-save-wizard-draft-top" class="btn btn-save-draft" title="Guardar como borrador en el directorio para continuar luego">💾 Guardar Borrador</button>
                             <button id="btn-reset-wizard" class="btn btn-outline" title="Reiniciar formulario">🔄 Limpiar Datos</button>
+                        </div>
+                    </div>
+
+                    <!-- Banner de Borrador Activo (si existe progreso previo) -->
+                    <div id="wizard-draft-banner" class="draft-banner hidden">
+                        <div class="draft-banner-content">
+                            <span class="draft-banner-icon">📝</span>
+                            <div>
+                                <div class="draft-banner-title" id="draft-banner-title">Tienes un registro en curso</div>
+                                <div class="draft-banner-desc" id="draft-banner-desc">Puedes continuar llenando los datos pendientes o guardar este borrador.</div>
+                            </div>
+                        </div>
+                        <div class="draft-banner-actions">
+                            <button id="btn-draft-resume" class="btn btn-primary" style="font-size: 0.82rem; padding: 0.4rem 0.8rem;">▶️ Continuar Llenando</button>
+                            <button id="btn-draft-save-dir" class="btn btn-outline" style="font-size: 0.82rem; padding: 0.4rem 0.8rem;">💾 Guardar en Directorio</button>
+                            <button id="btn-draft-discard" class="btn btn-outline" style="font-size: 0.82rem; padding: 0.4rem 0.8rem; color: var(--danger); border-color: var(--danger);">🗑️ Descartar</button>
                         </div>
                     </div>
 
@@ -425,7 +446,9 @@
                             </div>
 
                             <div class="wizard-footer">
-                                <div></div>
+                                <button id="btn-wiz-draft-1" class="btn btn-save-draft">
+                                    💾 Guardar Borrador
+                                </button>
                                 <button id="btn-wiz-next-1" class="btn btn-primary">
                                     Siguiente: Expediente Digital ➔
                                 </button>
@@ -459,9 +482,14 @@
                                 <button id="btn-wiz-prev-2" class="btn btn-outline">
                                     ⬅ Anterior
                                 </button>
-                                <button id="btn-wiz-next-2" class="btn btn-primary">
-                                    Siguiente: Tabla de Oferta ➔
-                                </button>
+                                <div style="display: flex; gap: 0.6rem;">
+                                    <button id="btn-wiz-draft-2" class="btn btn-save-draft">
+                                        💾 Guardar Borrador
+                                    </button>
+                                    <button id="btn-wiz-next-2" class="btn btn-primary">
+                                        Siguiente: Tabla de Oferta ➔
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -536,9 +564,14 @@
                                 <button id="btn-wiz-prev-3" class="btn btn-outline">
                                     ⬅ Anterior
                                 </button>
-                                <button id="btn-wiz-next-3" class="btn btn-primary">
-                                    Siguiente: Formalizar Contrato ➔
-                                </button>
+                                <div style="display: flex; gap: 0.6rem;">
+                                    <button id="btn-wiz-draft-3" class="btn btn-save-draft">
+                                        💾 Guardar Borrador
+                                    </button>
+                                    <button id="btn-wiz-next-3" class="btn btn-primary">
+                                        Siguiente: Formalizar Contrato ➔
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -602,9 +635,14 @@
                                 <button id="btn-wiz-prev-4" class="btn btn-outline">
                                     ⬅ Anterior
                                 </button>
-                                <button id="btn-finish-onboarding" class="btn btn-primary" style="font-size: 1rem; padding: 0.8rem 1.8rem; background: var(--primary); color: white; border: none; font-weight: 700; box-shadow: 0 4px 14px var(--primary-glow);">
-                                    ✅ Finalizar Vinculación y Activar en Pagos
-                                </button>
+                                <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                                    <button id="btn-wiz-draft-4" class="btn btn-save-draft">
+                                        💾 Guardar Borrador
+                                    </button>
+                                    <button id="btn-finish-onboarding" class="btn btn-primary" style="font-size: 1rem; padding: 0.8rem 1.8rem; background: var(--primary); color: white; border: none; font-weight: 700; box-shadow: 0 4px 14px var(--primary-glow);">
+                                        ✅ Finalizar Vinculación y Activar en Pagos
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -632,12 +670,20 @@
                         <div style="display: flex; align-items: center; gap: 0.6rem; flex: 1; max-width: 400px;">
                             <input type="text" id="directory-search" class="custom-input" placeholder="🔍 Buscar por nombre, RUC o representante...">
                         </div>
-                        <div style="display: flex; align-items: center; gap: 0.6rem;">
-                            <label style="font-size: 0.85rem; color: var(--text-muted);">Filtrar por Régimen:</label>
-                            <select id="directory-regimen-filter" class="custom-select" style="width: 200px;">
+                        <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                            <label style="font-size: 0.85rem; color: var(--text-muted);">Régimen:</label>
+                            <select id="directory-regimen-filter" class="custom-select" style="width: 170px;">
                                 <option value="ALL">Todos los Regímenes</option>
                                 <option value="Régimen de Cuota Fija">Cuota Fija</option>
                                 <option value="Régimen General">Régimen General</option>
+                                <option value="Persona Natural No Inscrita en DGI">No Inscrito DGI</option>
+                            </select>
+
+                            <label style="font-size: 0.85rem; color: var(--text-muted); margin-left: 0.5rem;">Estado:</label>
+                            <select id="directory-status-filter" class="custom-select" style="width: 170px;">
+                                <option value="ALL">Todos los Estados</option>
+                                <option value="ACTIVO">Solo Activos (Vinculados)</option>
+                                <option value="BORRADOR">Solo Borradores / En Proceso</option>
                             </select>
                         </div>
                     </div>

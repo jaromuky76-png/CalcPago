@@ -65,22 +65,22 @@ def generate_contract_document(provider_data, template_path=None):
     doc = docx.Document(template_path)
     
     # Provider data unpacking
-    nombre_rep = provider_data.get('nombre_representante', '').strip() or provider_data.get('nombre', '').strip()
-    nombre_comercial = provider_data.get('nombre_comercial', '').strip() or provider_data.get('nombre', '').strip()
-    cedula = provider_data.get('cedula', '').strip()
+    nombre_rep = provider_data.get('nombre_representante', '').strip() or provider_data.get('nombre', '').strip() or '[PENDIENTE: REPRESENTANTE]'
+    nombre_comercial = provider_data.get('nombre_comercial', '').strip() or provider_data.get('nombre', '').strip() or '[PENDIENTE: NOMBRE COMERCIAL]'
+    cedula = provider_data.get('cedula', '').strip() or '[PENDIENTE: CÉDULA]'
     ruc = provider_data.get('ruc', '').strip()
     estado_civil = provider_data.get('estado_civil', 'mayor de edad').strip()
-    profesion = provider_data.get('profesion', 'comerciante').strip()
+    profesion = provider_data.get('profesion', 'técnico').strip() or '[PENDIENTE: PROFESIÓN]'
     domicilio = provider_data.get('domicilio', 'Managua').strip()
     regimen = provider_data.get('regimen', 'Régimen de Cuota Fija').strip()
     
-    banco = provider_data.get('banco', 'BANCO').strip()
-    cuenta_bancaria = provider_data.get('cuenta_bancaria', 'XXXXXXXXXXX').strip()
-    titular_cuenta = provider_data.get('titular_cuenta', nombre_rep).strip()
+    banco = provider_data.get('banco', 'BAC Credomatic').strip()
+    cuenta_bancaria = provider_data.get('cuenta_bancaria', '').strip() or '[PENDIENTE: CUENTA BANCARIA]'
+    titular_cuenta = provider_data.get('titular_cuenta', '').strip() or nombre_rep
     
-    direccion = provider_data.get('direccion', 'Managua, Nicaragua').strip()
-    telefono = provider_data.get('telefono', '').strip()
-    correo = provider_data.get('correo', '').strip()
+    direccion = provider_data.get('direccion', '').strip() or '[PENDIENTE: DIRECCIÓN]'
+    telefono = provider_data.get('telefono', '').strip() or '[PENDIENTE: TELÉFONO]'
+    correo = provider_data.get('correo', '').strip() or '[PENDIENTE: CORREO]'
     
     # Date formatting
     dia = provider_data.get('dia', 23)

@@ -2022,6 +2022,322 @@ let proveedoresRegistrados = [];
 let currentWizardStep = 1;
 let wizardDocuments = {};
 let wizardTarifas = [];
+let isRestoringDraft = false;
+let autosaveTimer = null;
+const STORAGE_KEY_WIZARD_DRAFT = 'calcPago_activeWizardDraft';
+const STORAGE_KEY_PROVIDERS = 'calcPago_proveedoresRegistrados';
+
+// Calcular Porcentaje de Avance del Proveedor (0 - 100%)
+function calculateOnboardingProgress(data) {
+    if (!data) return 0;
+    let score = 0;
+
+    // 1. Datos Generales (Máximo 40%)
+    if (data.nombre_comercial && data.nombre_comercial.trim()) score += 8;
+    if (data.nombre_representante && data.nombre_representante.trim()) score += 6;
+    if (data.cedula && data.cedula.trim()) score += 6;
+    if (data.ruc && data.ruc.trim()) score += 4;
+    if ((data.telefono && data.telefono.trim()) || (data.correo && data.correo.trim())) score += 4;
+    if (data.direccion && data.direccion.trim()) score += 4;
+    if (data.cuenta_bancaria && data.cuenta_bancaria.trim()) score += 8;
+
+    // 2. Expediente Documental (Máximo 35%)
+    const reg = data.regimen || "Régimen de Cuota Fija";
+    const reqDocs = DOCS_BY_REGIMEN[reg] || DOCS_BY_REGIMEN["Régimen de Cuota Fija"];
+    const totalReq = reqDocs ? reqDocs.length : 8;
+    const docs = data.documentos || {};
+    let validatedDocs = 0;
+    if (reqDocs) {
+        reqDocs.forEach(d => {
+            if (docs[d.id] && docs[d.id].validated) {
+                validatedDocs++;
+            }
+        });
+    }
+    if (totalReq > 0) {
+        score += Math.round((validatedDocs / totalReq) * 35);
+    }
+
+    // 3. Tarifario (Máximo 25%)
+    const tarifas = data.tarifas || [];
+    if (tarifas.length >= 5) {
+        score += 25;
+    } else if (tarifas.length > 0) {
+        score += Math.round((tarifas.length / 5) * 25);
+    }
+
+    return Math.min(100, Math.max(0, score));
+}
+
+// Disparar autoguardado en segundo plano con debounce
+function triggerWizardAutosave() {
+    if (isRestoringDraft) return;
+
+    const ind = document.getElementById('wizard-autosave-indicator');
+    const txt = document.getElementById('wizard-autosave-text');
+    if (ind && txt) {
+        ind.classList.remove('saved');
+        txt.textContent = 'Guardando borrador...';
+    }
+
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+        saveActiveDraftToStorage();
+    }, 350);
+}
+
+// Guardar borrador activo en localStorage
+function saveActiveDraftToStorage() {
+    const data = getWizardData();
+    const hasAnyData = (data.nombre_comercial && data.nombre_comercial.trim()) ||
+                       (data.nombre_representante && data.nombre_representante.trim()) ||
+                       (data.cedula && data.cedula.trim()) ||
+                       (data.telefono && data.telefono.trim()) ||
+                       (data.cuenta_bancaria && data.cuenta_bancaria.trim()) ||
+                       (data.tarifas && data.tarifas.length > 0) ||
+                       (data.documentos && Object.keys(data.documentos).length > 0);
+
+    const ind = document.getElementById('wizard-autosave-indicator');
+    const txt = document.getElementById('wizard-autosave-text');
+
+    if (!hasAnyData) {
+        if (ind && txt) {
+            ind.classList.remove('saved');
+            txt.textContent = 'Formulario limpio';
+        }
+        return;
+    }
+
+    const prog = calculateOnboardingProgress(data);
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const draft = {
+        ...data,
+        estado: 'BORRADOR',
+        paso_actual: currentWizardStep,
+        progreso: prog,
+        updatedAt: now.toISOString(),
+        updatedTimeStr: timeStr
+    };
+
+    localStorage.setItem(STORAGE_KEY_WIZARD_DRAFT, JSON.stringify(draft));
+
+    if (ind && txt) {
+        ind.classList.add('saved');
+        txt.textContent = `Borrador autoguardado (${timeStr})`;
+    }
+
+    // Actualizar banner si existe
+    const banner = document.getElementById('wizard-draft-banner');
+    const title = document.getElementById('draft-banner-title');
+    const desc = document.getElementById('draft-banner-desc');
+    if (banner && title && desc) {
+        const provName = draft.nombre_comercial || draft.nombre_representante || 'Contratista en proceso';
+        title.textContent = `📝 Registro en curso: "${provName}" (${prog}% completado)`;
+        desc.textContent = `Última edición: Hoy a las ${timeStr}. Los campos llenados se conservan automáticamente.`;
+        banner.classList.remove('hidden');
+    }
+}
+
+// Verificar y mostrar borrador activo si existe
+function checkActiveWizardDraft() {
+    const banner = document.getElementById('wizard-draft-banner');
+    const title = document.getElementById('draft-banner-title');
+    const desc = document.getElementById('draft-banner-desc');
+
+    const draftJson = localStorage.getItem(STORAGE_KEY_WIZARD_DRAFT);
+    if (!draftJson) {
+        if (banner) banner.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const draft = JSON.parse(draftJson);
+        const name = draft.nombre_comercial || draft.nombre_representante || 'Contratista en proceso';
+        const prog = draft.progreso !== undefined ? draft.progreso : calculateOnboardingProgress(draft);
+
+        if (banner && title && desc) {
+            title.textContent = `📝 Tienes un registro en curso: "${name}" (${prog}% completado)`;
+            desc.textContent = `Última edición: ${draft.updatedTimeStr || 'Reciente'}. Puedes continuar llenando los datos pendientes o guardar este borrador.`;
+            banner.classList.remove('hidden');
+        }
+
+        // Si el formulario actual está vacío pero hay un borrador activo, restaurarlo automáticamente
+        const currentName = document.getElementById('wiz-nombre-comercial')?.value.trim();
+        if (!currentName && (draft.nombre_comercial || draft.nombre_representante || (draft.tarifas && draft.tarifas.length > 0))) {
+            loadDraftIntoForm(draft, draft.paso_actual || 1);
+        }
+    } catch (e) {
+        console.error("Error al restaurar borrador activo:", e);
+    }
+}
+
+// Cargar un borrador en el formulario del asistente
+function loadDraftIntoForm(draft, targetStep = null) {
+    if (!draft) return;
+    isRestoringDraft = true;
+
+    if (draft.regimen) {
+        const regEl = document.getElementById('wiz-regimen');
+        if (regEl) regEl.value = draft.regimen;
+    }
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && val !== undefined && val !== null) el.value = val;
+    };
+
+    setVal('wiz-nombre-comercial', draft.nombre_comercial || '');
+    setVal('wiz-nombre-rep', draft.nombre_representante || '');
+    setVal('wiz-cedula', draft.cedula || '');
+    setVal('wiz-ruc', draft.ruc || '');
+    setVal('wiz-matricula', draft.matricula || '');
+    setVal('wiz-estado-civil', draft.estado_civil || 'casado');
+    setVal('wiz-profesion', draft.profesion || '');
+    setVal('wiz-domicilio', draft.domicilio || 'Managua');
+    setVal('wiz-telefono', draft.telefono || '');
+    setVal('wiz-correo', draft.correo || '');
+    setVal('wiz-direccion', draft.direccion || '');
+    setVal('wiz-banco', draft.banco || 'BAC Credomatic');
+    setVal('wiz-cuenta', draft.cuenta_bancaria || '');
+    setVal('wiz-titular', draft.titular_cuenta || '');
+    setVal('wiz-inss', draft.inss || '');
+    setVal('wiz-fuel-rate', draft.tarifa_combustible !== undefined ? draft.tarifa_combustible : 12.0);
+    setVal('contract-day', draft.dia !== undefined ? draft.dia : 23);
+    setVal('contract-month', draft.mes || 'octubre');
+
+    wizardDocuments = draft.documentos ? JSON.parse(JSON.stringify(draft.documentos)) : {};
+    wizardTarifas = draft.tarifas ? JSON.parse(JSON.stringify(draft.tarifas)) : [];
+
+    renderWizardDocs();
+    renderWizardTariffTable();
+
+    isRestoringDraft = false;
+
+    const stepToGo = targetStep || draft.paso_actual || 1;
+    goToWizardStep(stepToGo);
+
+    const ind = document.getElementById('wizard-autosave-indicator');
+    const txt = document.getElementById('wizard-autosave-text');
+    if (ind && txt) {
+        ind.classList.add('saved');
+        txt.textContent = `Borrador cargado (${draft.updatedTimeStr || 'OK'})`;
+    }
+}
+
+// Guardar explícitamente el asistente como borrador en el directorio
+async function saveCurrentWizardAsDraft(goToDirectory = true) {
+    const data = getWizardData();
+    let name = data.nombre_comercial.trim();
+
+    if (!name) {
+        name = prompt("Para guardar este borrador, por favor ingresa un Nombre Comercial o Alias para identificar al contratista:", data.nombre_representante || "Contratista Pendiente");
+        if (!name || !name.trim()) {
+            alert("⚠️ No se puede guardar el borrador sin un nombre o alias identificador.");
+            return;
+        }
+        document.getElementById('wiz-nombre-comercial').value = name.trim();
+        data.nombre_comercial = name.trim();
+    }
+
+    const prog = calculateOnboardingProgress(data);
+    const draftRecord = {
+        ...data,
+        estado: 'BORRADOR',
+        progreso: prog,
+        paso_actual: currentWizardStep,
+        fecha_modificacion: new Date().toLocaleString()
+    };
+
+    // Guardar o actualizar en proveedoresRegistrados
+    const idx = proveedoresRegistrados.findIndex(p => 
+        (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === name.toUpperCase()
+    );
+    if (idx >= 0) {
+        proveedoresRegistrados[idx] = draftRecord;
+    } else {
+        proveedoresRegistrados.push(draftRecord);
+    }
+
+    localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(proveedoresRegistrados));
+
+    // Intentar sincronizar con backend
+    try {
+        await fetch('/api/save-provider', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(draftRecord)
+        });
+    } catch (e) {
+        console.log("Guardado local completado.");
+    }
+
+    // Actualizar también el borrador activo en curso
+    localStorage.setItem(STORAGE_KEY_WIZARD_DRAFT, JSON.stringify({
+        ...draftRecord,
+        updatedAt: new Date().toISOString(),
+        updatedTimeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }));
+
+    alert(`💾 ¡Borrador de "${name}" guardado exitosamente!\n\nAvance: ${prog}% completado.\nTodos los campos llenados, tarifas y documentos se encuentran resguardados. Podrás continuar el registro en cualquier momento desde el "Directorio de Proveedores".`);
+
+    if (goToDirectory) {
+        switchModuleView('view-directory');
+        renderDirectory();
+    } else {
+        checkActiveWizardDraft();
+    }
+}
+
+// Retomar un borrador desde el directorio de proveedores
+function resumeProviderOnboarding(prov) {
+    switchModuleView('view-onboarding');
+    loadDraftIntoForm(prov, prov.paso_actual || 1);
+
+    // Actualizar active draft
+    localStorage.setItem(STORAGE_KEY_WIZARD_DRAFT, JSON.stringify({
+        ...prov,
+        updatedAt: new Date().toISOString(),
+        updatedTimeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }));
+
+    checkActiveWizardDraft();
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+}
+
+// Eliminar o descartar un borrador
+async function deleteProviderDraft(provName) {
+    if (!confirm(`¿Estás seguro de eliminar el borrador de "${provName}"?`)) {
+        return;
+    }
+
+    proveedoresRegistrados = proveedoresRegistrados.filter(p => 
+        (p.nombre_comercial || p.nombre || '').trim().toUpperCase() !== provName.trim().toUpperCase()
+    );
+    localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(proveedoresRegistrados));
+
+    // Si coincide con el borrador activo, limpiarlo
+    const activeDraftJson = localStorage.getItem(STORAGE_KEY_WIZARD_DRAFT);
+    if (activeDraftJson) {
+        try {
+            const activeDraft = JSON.parse(activeDraftJson);
+            if ((activeDraft.nombre_comercial || activeDraft.nombre || '').trim().toUpperCase() === provName.trim().toUpperCase()) {
+                resetWizardForm();
+            }
+        } catch(e){}
+    }
+
+    // Sincronizar borrado con backend
+    try {
+        await fetch('/api/delete-provider', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre_comercial: provName })
+        });
+    } catch(e){}
+
+    renderDirectory();
+}
 
 const DOCS_BY_REGIMEN = {
     "Régimen de Cuota Fija": [
@@ -2125,6 +2441,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initOnboardingWizard();
     initDirectoryModule();
     loadProveedoresRegistrados();
+    checkActiveWizardDraft();
 });
 
 // Navegación entre Módulos
@@ -2163,6 +2480,7 @@ function switchModuleView(targetViewId) {
         calculateAndRenderSummary();
     } else if (targetViewId === 'view-onboarding' && onboardingView) {
         onboardingView.classList.remove('hidden');
+        checkActiveWizardDraft();
     } else if (targetViewId === 'view-directory' && directoryView) {
         directoryView.classList.remove('hidden');
         renderDirectory();
@@ -2171,69 +2489,76 @@ function switchModuleView(targetViewId) {
 
 // Inicialización del Asistente de Vinculación (Wizard)
 function initOnboardingWizard() {
-    // Stepper header clicks
+    // Stepper header clicks: permite navegar libremente entre pasos sin perder datos
     document.querySelectorAll('.stepper-bar .step-item').forEach(item => {
         item.addEventListener('click', () => {
             const stepNum = parseInt(item.getAttribute('data-step'), 10);
+            triggerWizardAutosave();
             goToWizardStep(stepNum);
         });
     });
 
     // Step navigation buttons
     document.getElementById('btn-wiz-next-1')?.addEventListener('click', () => {
-        const nomComercial = document.getElementById('wiz-nombre-comercial')?.value.trim();
+        let nomComercial = document.getElementById('wiz-nombre-comercial')?.value.trim();
         const nomRep = document.getElementById('wiz-nombre-rep')?.value.trim();
-        const cedula = document.getElementById('wiz-cedula')?.value.trim();
-        const cuenta = document.getElementById('wiz-cuenta')?.value.trim();
-
-        if (!nomComercial) {
-            alert("Por favor ingresa el Nombre Comercial o Razón Social del contratista.");
-            document.getElementById('wiz-nombre-comercial')?.focus();
-            return;
-        }
-        if (!nomRep) {
-            alert("Por favor ingresa el Nombre del Titular o Representante Legal.");
-            document.getElementById('wiz-nombre-rep')?.focus();
-            return;
-        }
-        if (!cedula) {
-            alert("Por favor ingresa la Cédula de Identidad.");
-            document.getElementById('wiz-cedula')?.focus();
-            return;
-        }
-
-        // Auto-asignar titular si está vacío
         const titularInput = document.getElementById('wiz-titular');
-        if (titularInput && !titularInput.value.trim()) {
-            titularInput.value = nomRep;
-        }
 
-        goToWizardStep(2);
-    });
-
-    document.getElementById('btn-wiz-prev-2')?.addEventListener('click', () => goToWizardStep(1));
-    document.getElementById('btn-wiz-next-2')?.addEventListener('click', () => goToWizardStep(3));
-
-    document.getElementById('btn-wiz-prev-3')?.addEventListener('click', () => goToWizardStep(2));
-    document.getElementById('btn-wiz-next-3')?.addEventListener('click', () => {
-        if (wizardTarifas.length === 0) {
-            if (!confirm("Aún no has agregado tarifas para este contratista. ¿Deseas continuar y agregarlas después?")) {
+        // Si falta el nombre comercial, solicitar al menos un alias para identificar el contratista
+        if (!nomComercial) {
+            nomComercial = prompt("Para identificar este registro, por favor ingresa el Nombre Comercial o un Alias para el contratista:", nomRep || "");
+            if (nomComercial && nomComercial.trim()) {
+                document.getElementById('wiz-nombre-comercial').value = nomComercial.trim();
+            } else {
+                alert("Por favor ingresa al menos un nombre o alias para continuar.");
+                document.getElementById('wiz-nombre-comercial')?.focus();
                 return;
             }
         }
+
+        // Auto-asignar titular de cuenta si está vacío
+        if (titularInput && !titularInput.value.trim() && nomRep) {
+            titularInput.value = nomRep;
+        }
+
+        triggerWizardAutosave();
+        goToWizardStep(2);
+    });
+
+    document.getElementById('btn-wiz-prev-2')?.addEventListener('click', () => {
+        triggerWizardAutosave();
+        goToWizardStep(1);
+    });
+
+    document.getElementById('btn-wiz-next-2')?.addEventListener('click', () => {
+        triggerWizardAutosave();
+        goToWizardStep(3);
+    });
+
+    document.getElementById('btn-wiz-prev-3')?.addEventListener('click', () => {
+        triggerWizardAutosave();
+        goToWizardStep(2);
+    });
+
+    document.getElementById('btn-wiz-next-3')?.addEventListener('click', () => {
+        triggerWizardAutosave();
         goToWizardStep(4);
     });
 
-    document.getElementById('btn-wiz-prev-4')?.addEventListener('click', () => goToWizardStep(3));
+    document.getElementById('btn-wiz-prev-4')?.addEventListener('click', () => {
+        triggerWizardAutosave();
+        goToWizardStep(3);
+    });
 
     // Evento de cambio de régimen en Paso 1
     document.getElementById('wiz-regimen')?.addEventListener('change', () => {
         renderWizardDocs();
+        triggerWizardAutosave();
     });
 
     // Reset wizard
     document.getElementById('btn-reset-wizard')?.addEventListener('click', () => {
-        if (confirm("¿Deseas restablecer todos los campos del asistente?")) {
+        if (confirm("¿Deseas restablecer todos los campos del asistente y descartar el borrador actual?")) {
             resetWizardForm();
         }
     });
@@ -2278,6 +2603,7 @@ function initOnboardingWizard() {
             tarifa: 0
         });
         renderWizardTariffTable();
+        triggerWizardAutosave();
     });
 
     // Botón actualizar vista de contrato
@@ -2296,8 +2622,46 @@ function initOnboardingWizard() {
     // Finalizar Vinculación
     document.getElementById('btn-finish-onboarding')?.addEventListener('click', finishProviderOnboarding);
 
+    // Configurar listeners de autoguardado en todos los inputs y botones de borrador
+    setupWizardAutosaveListeners();
+
     // Inicializar checklist documental
     renderWizardDocs();
+}
+
+function setupWizardAutosaveListeners() {
+    const container = document.getElementById('view-onboarding');
+    if (!container) return;
+
+    // Escuchar cambios en todos los inputs/selects del asistente
+    const formElements = container.querySelectorAll('input, select, textarea');
+    formElements.forEach(el => {
+        if (el.type === 'file') return;
+        el.addEventListener('input', triggerWizardAutosave);
+        el.addEventListener('change', triggerWizardAutosave);
+    });
+
+    // Botones explícitos de "Guardar Borrador"
+    document.getElementById('btn-save-wizard-draft-top')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
+    document.getElementById('btn-wiz-draft-1')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
+    document.getElementById('btn-wiz-draft-2')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
+    document.getElementById('btn-wiz-draft-3')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
+    document.getElementById('btn-wiz-draft-4')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
+
+    // Botones del Banner de Borrador Activo
+    document.getElementById('btn-draft-resume')?.addEventListener('click', () => {
+        const draftJson = localStorage.getItem(STORAGE_KEY_WIZARD_DRAFT);
+        if (draftJson) {
+            const draft = JSON.parse(draftJson);
+            loadDraftIntoForm(draft, draft.paso_actual || 1);
+        }
+    });
+    document.getElementById('btn-draft-save-dir')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
+    document.getElementById('btn-draft-discard')?.addEventListener('click', () => {
+        if (confirm("¿Deseas descartar este borrador y limpiar el formulario?")) {
+            resetWizardForm();
+        }
+    });
 }
 
 function goToWizardStep(stepNum) {
@@ -2348,19 +2712,31 @@ function goToWizardStep(stepNum) {
 }
 
 function resetWizardForm() {
-    document.getElementById('wiz-nombre-comercial').value = '';
-    document.getElementById('wiz-nombre-rep').value = '';
-    document.getElementById('wiz-cedula').value = '';
-    document.getElementById('wiz-ruc').value = '';
-    document.getElementById('wiz-matricula').value = '';
-    document.getElementById('wiz-telefono').value = '';
-    document.getElementById('wiz-correo').value = '';
-    document.getElementById('wiz-direccion').value = '';
-    document.getElementById('wiz-cuenta').value = '';
-    document.getElementById('wiz-titular').value = '';
-    document.getElementById('wiz-inss').value = '';
+    isRestoringDraft = true;
+    const ids = [
+        'wiz-nombre-comercial', 'wiz-nombre-rep', 'wiz-cedula', 'wiz-ruc',
+        'wiz-matricula', 'wiz-telefono', 'wiz-correo', 'wiz-direccion',
+        'wiz-cuenta', 'wiz-titular', 'wiz-inss', 'wiz-profesion'
+    ];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
     wizardDocuments = {};
     wizardTarifas = [];
+    localStorage.removeItem(STORAGE_KEY_WIZARD_DRAFT);
+    isRestoringDraft = false;
+
+    const banner = document.getElementById('wizard-draft-banner');
+    if (banner) banner.classList.add('hidden');
+
+    const ind = document.getElementById('wizard-autosave-indicator');
+    const txt = document.getElementById('wizard-autosave-text');
+    if (ind && txt) {
+        ind.classList.remove('saved');
+        txt.textContent = 'Formulario limpio';
+    }
+
     goToWizardStep(1);
 }
 
@@ -2432,12 +2808,14 @@ function renderWizardDocs() {
                     validated: true
                 };
                 renderWizardDocs();
+                triggerWizardAutosave();
             }
         });
 
         delBtn?.addEventListener('click', () => {
             delete wizardDocuments[doc.id];
             renderWizardDocs();
+            triggerWizardAutosave();
         });
 
         validateCheckbox?.addEventListener('change', (e) => {
@@ -2447,6 +2825,7 @@ function renderWizardDocs() {
                 wizardDocuments[doc.id].validated = e.target.checked;
             }
             renderWizardDocs();
+            triggerWizardAutosave();
         });
 
         container.appendChild(card);
@@ -2640,31 +3019,31 @@ function downloadContractorExcelTemplate() {
     XLSX.writeFile(wb, "PLANTILLA_OFERTA_MAESTROS_SINSA.xlsx");
 }
 
-// Obtener los datos actuales del formulario
+// Obtener los datos actuales del formulario sin inventar valores por defecto si están vacíos
 function getWizardData() {
     return {
-        nombre_comercial: document.getElementById('wiz-nombre-comercial')?.value.trim() || 'MULTISERVICIOS OROZCO',
-        nombre_representante: document.getElementById('wiz-nombre-rep')?.value.trim() || 'Eduin Jose Orozco Castro',
-        cedula: document.getElementById('wiz-cedula')?.value.trim() || '001-231085-0004W',
-        ruc: document.getElementById('wiz-ruc')?.value.trim() || '0012310850004W',
+        nombre_comercial: document.getElementById('wiz-nombre-comercial')?.value.trim() || '',
+        nombre_representante: document.getElementById('wiz-nombre-rep')?.value.trim() || '',
+        cedula: document.getElementById('wiz-cedula')?.value.trim() || '',
+        ruc: document.getElementById('wiz-ruc')?.value.trim() || '',
         matricula: document.getElementById('wiz-matricula')?.value.trim() || '',
         regimen: document.getElementById('wiz-regimen')?.value || 'Régimen de Cuota Fija',
         estado_civil: document.getElementById('wiz-estado-civil')?.value || 'casado',
-        profesion: document.getElementById('wiz-profesion')?.value.trim() || 'Técnico en Refrigeración',
+        profesion: document.getElementById('wiz-profesion')?.value.trim() || 'técnico',
         domicilio: document.getElementById('wiz-domicilio')?.value.trim() || 'Managua',
-        telefono: document.getElementById('wiz-telefono')?.value.trim() || '8888-1234',
-        correo: document.getElementById('wiz-correo')?.value.trim() || 'contacto@proveedor.com',
-        direccion: document.getElementById('wiz-direccion')?.value.trim() || 'Managua, Nicaragua',
+        telefono: document.getElementById('wiz-telefono')?.value.trim() || '',
+        correo: document.getElementById('wiz-correo')?.value.trim() || '',
+        direccion: document.getElementById('wiz-direccion')?.value.trim() || '',
         banco: document.getElementById('wiz-banco')?.value || 'BAC Credomatic',
-        cuenta_bancaria: document.getElementById('wiz-cuenta')?.value.trim() || '3628491029',
-        titular_cuenta: document.getElementById('wiz-titular')?.value.trim() || document.getElementById('wiz-nombre-rep')?.value.trim(),
+        cuenta_bancaria: document.getElementById('wiz-cuenta')?.value.trim() || '',
+        titular_cuenta: document.getElementById('wiz-titular')?.value.trim() || document.getElementById('wiz-nombre-rep')?.value.trim() || '',
         inss: document.getElementById('wiz-inss')?.value.trim() || '',
-        dia: document.getElementById('contract-day')?.value || 23,
+        dia: parseInt(document.getElementById('contract-day')?.value, 10) || 23,
         mes: document.getElementById('contract-month')?.value || 'octubre',
         anio: 2026,
         tarifa_combustible: parseFloat(document.getElementById('wiz-fuel-rate')?.value) || 12.0,
-        tarifas: wizardTarifas,
-        documentos: wizardDocuments
+        tarifas: wizardTarifas ? [...wizardTarifas] : [],
+        documentos: wizardDocuments ? { ...wizardDocuments } : {}
     };
 }
 
@@ -2676,18 +3055,29 @@ function renderContractPreview() {
 
     const data = getWizardData();
 
+    const provNameDisplay = data.nombre_comercial || 'CONTRATISTA EN PROCESO';
+    const repNameDisplay = data.nombre_representante || '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>';
+    const cedulaDisplay = data.cedula || '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>';
+    const cuentaDisplay = data.cuenta_bancaria || '<span class="missing-field-highlight">[PENDIENTE: CUENTA BANCARIA]</span>';
+    const titularDisplay = data.titular_cuenta || repNameDisplay;
+    const direccionDisplay = data.direccion || '<span class="missing-field-highlight">[PENDIENTE: DIRECCIÓN]</span>';
+    const telefonoDisplay = data.telefono || '<span class="missing-field-highlight">[PENDIENTE: TELÉFONO]</span>';
+    const correoDisplay = data.correo || '<span class="missing-field-highlight">[PENDIENTE: CORREO]</span>';
+    const isPending = !data.cedula || !data.cuenta_bancaria || !data.nombre_representante;
+
     // Actualizar summary pill
     if (summaryBox) {
         summaryBox.innerHTML = `
             <div>
-                <strong style="font-size: 1.05rem; color: var(--primary);">${data.nombre_comercial}</strong>
+                <strong style="font-size: 1.05rem; color: var(--primary);">${provNameDisplay}</strong>
                 <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
-                    Titular: ${data.nombre_representante} | RUC: ${data.ruc || data.cedula} | ${data.regimen}
+                    Titular: ${data.nombre_representante || 'Pendiente'} | Cédula: ${data.cedula || 'Pendiente'} | ${data.regimen}
+                    ${isPending ? '<span class="badge-tag badge-draft" style="margin-left: 8px; font-size: 0.72rem;">⚠️ Faltan datos requeridos para firma</span>' : ''}
                 </div>
             </div>
             <div style="text-align: right; font-size: 0.85rem;">
                 <span style="font-weight: 700; color: var(--text-main);">${data.tarifas.length} Actividades Tarifadas</span>
-                <div style="color: var(--accent); font-weight: 600;">Combustible: C$${data.tarifa_combustible.toFixed(2)}/km</div>
+                <div style="color: var(--accent); font-weight: 600;">Combustible: C$${Number(data.tarifa_combustible).toFixed(2)}/km</div>
             </div>
         `;
     }
@@ -2717,7 +3107,7 @@ function renderContractPreview() {
         </div>
 
         <p>
-            Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)</strong>, legalmente establecida conforme las leyes de la República de Nicaragua, según Testimonio de Escritura Pública número doce (12) de Constitución de Sociedad y Poder Especial de Representación número ciento noventa y dos (192), y que en lo sucesivo se denominará <strong>EL CONTRATANTE</strong>, y por otra parte, <strong>${data.nombre_representante.toUpperCase()}</strong>, mayor de edad, ${data.estado_civil.toLowerCase()}, ${data.profesion.toLowerCase()}, con domicilio en ${data.domicilio}, titular de cédula de identidad nicaragüense número: <strong>${data.cedula}</strong>${data.ruc ? ` y cédula RUC: <strong>${data.ruc}</strong>` : ''}, quien actúa en nombre e interés de negocio bajo ${data.regimen} denominado <strong>${data.nombre_comercial.toUpperCase()}</strong>, quien en adelante se denominará <strong>EL CONTRATISTA</strong>, ambas partes de común acuerdo convenimos en celebrar el siguiente:
+            Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)</strong>, legalmente establecida conforme las leyes de la República de Nicaragua, según Testimonio de Escritura Pública número doce (12) de Constitución de Sociedad y Poder Especial de Representación número ciento noventa y dos (192), y que en lo sucesivo se denominará <strong>EL CONTRATANTE</strong>, y por otra parte, <strong>${data.nombre_representante ? data.nombre_representante.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>'}</strong>, mayor de edad, ${(data.estado_civil || 'casado').toLowerCase()}, ${(data.profesion || 'técnico').toLowerCase()}, con domicilio en ${data.domicilio || 'Managua'}, titular de cédula de identidad nicaragüense número: ${data.cedula ? `<strong>${data.cedula}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>'}${data.ruc ? ` y cédula RUC: <strong>${data.ruc}</strong>` : ''}, quien actúa en nombre e interés de negocio bajo ${data.regimen} denominado <strong>${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</strong>, quien en adelante se denominará <strong>EL CONTRATISTA</strong>, ambas partes de común acuerdo convenimos en celebrar el siguiente:
         </p>
 
         <p style="text-align: center; font-weight: bold; margin: 1.2rem 0;">
@@ -2743,7 +3133,7 @@ function renderContractPreview() {
         <p>El plazo de este contrato es de DOCE (12) meses contados a partir de su firma, prorrogable automáticamente por períodos iguales salvo notificación escrita en contrario con 30 días de anticipación.</p>
 
         <div class="contract-clause-title">SÉPTIMA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
-        <p>Las partes acuerdan que el valor de los servicios estará regido por las tarifas detalladas en el Anexo I. Previa validación semanal de las órdenes de trabajo realizadas y facturación correspondiente con retenciones de ley aplicadas, los pagos serán realizados mediante transferencia bancaria a la cuenta de <strong>${data.banco.toUpperCase()}</strong> número: <strong>${data.cuenta_bancaria}</strong> en moneda córdobas a nombre de <strong>${data.titular_cuenta.toUpperCase()}</strong>.</p>
+        <p>Las partes acuerdan que el valor de los servicios estará regido por las tarifas detalladas en el Anexo I. Previa validación semanal de las órdenes de trabajo realizadas y facturación correspondiente con retenciones de ley aplicadas, los pagos serán realizados mediante transferencia bancaria a la cuenta de <strong>${(data.banco || 'BAC Credomatic').toUpperCase()}</strong> número: ${data.cuenta_bancaria ? `<strong>${data.cuenta_bancaria}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CUENTA BANCARIA]</span>'} en moneda córdobas a nombre de ${titularDisplay}.</p>
 
         <div class="contract-clause-title">OCTAVA [MANTENIMIENTO DE VALOR]:</div>
         <p>Se reconoce la cláusula de mantenimiento de valor en córdobas conforme al tipo de cambio oficial emitido por el Banco Central de Nicaragua al día del pago efectivo (Art. 38, Ley 732).</p>
@@ -2757,7 +3147,7 @@ function renderContractPreview() {
         <div class="contract-clause-title">DÉCIMA SÉPTIMA [AVISOS Y NOTIFICACIONES]:</div>
         <p>
             <strong>CONTRATANTE:</strong> Oficinas Centro de Servicios SINSA, Centro de Distribución, Rotonda El Periodista 100m al este, Managua. Atención: Jose Raudes / Ángel Campos (Tel: 78862226 / 82672246 - jose.raudes@sinsa.com.ni).<br>
-            <strong>CONTRATISTA:</strong> ${data.nombre_comercial.toUpperCase()}, ${data.direccion}. Atención: ${data.nombre_representante} (Tel: ${data.telefono} - ${data.correo}).
+            <strong>CONTRATISTA:</strong> ${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}, ${direccionDisplay}. Atención: ${repNameDisplay} (Tel: ${telefonoDisplay} - ${correoDisplay}).
         </p>
 
         <div class="contract-clause-title">DÉCIMA OCTAVA A VIGÉSIMA [SOLUCIÓN DE CONTROVERSIAS Y ACEPTACIÓN]:</div>
@@ -2775,8 +3165,8 @@ function renderContractPreview() {
             </div>
             <div>
                 <div class="contract-sig-line">EL CONTRATISTA</div>
-                <div>${data.nombre_representante}</div>
-                <div style="font-size: 0.85rem; color: #4B5563;">${data.nombre_comercial}</div>
+                <div>${data.nombre_representante || '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE]</span>'}</div>
+                <div style="font-size: 0.85rem; color: #4B5563;">${data.nombre_comercial || '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</div>
             </div>
         </div>
 
@@ -2984,7 +3374,7 @@ async function finishProviderOnboarding() {
     const provName = data.nombre_comercial.trim();
 
     if (!provName) {
-        alert("El contratista debe tener un Nombre Comercial.");
+        alert("El contratista debe tener al menos un Nombre Comercial o Razón Social.");
         return;
     }
 
@@ -2992,6 +3382,10 @@ async function finishProviderOnboarding() {
         alert("Debes configurar al menos una actividad con su tarifa para este contratista.");
         return;
     }
+
+    data.estado = 'ACTIVO';
+    data.progreso = 100;
+    data.fecha_formalizacion = new Date().toLocaleDateString();
 
     // 1. Guardar en lista de proveedores registrados
     const existingIdx = proveedoresRegistrados.findIndex(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === provName.toUpperCase());
@@ -3001,9 +3395,14 @@ async function finishProviderOnboarding() {
         proveedoresRegistrados.push(data);
     }
 
-    localStorage.setItem('calcPago_proveedoresRegistrados', JSON.stringify(proveedoresRegistrados));
+    localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(proveedoresRegistrados));
 
-    // 2. Intentar guardar en backend
+    // 2. Limpiar borrador temporal activo
+    localStorage.removeItem(STORAGE_KEY_WIZARD_DRAFT);
+    const banner = document.getElementById('wizard-draft-banner');
+    if (banner) banner.classList.add('hidden');
+
+    // 3. Intentar guardar en backend
     try {
         await fetch('/api/save-provider', {
             method: 'POST',
@@ -3014,7 +3413,7 @@ async function finishProviderOnboarding() {
         console.log("Guardado en almacenamiento local completado.");
     }
 
-    // 3. SINCRONIZACIÓN INMEDIATA CON EL MOTOR DE PAGOS (tablaOferta)
+    // 4. SINCRONIZACIÓN INMEDIATA CON EL MOTOR DE PAGOS (tablaOferta)
     if (!tablaOferta[provName]) {
         tablaOferta[provName] = {};
     }
@@ -3028,7 +3427,7 @@ async function finishProviderOnboarding() {
     // Guardar tablaOferta actualizada
     saveAndRefresh();
 
-    // 4. Seleccionar este proveedor en el Resumen de Pagos
+    // 5. Seleccionar este proveedor en el Resumen de Pagos
     selectedProvider = provName;
     const initialSelect = document.getElementById('initial-provider-select');
     if (initialSelect) {
@@ -3036,8 +3435,8 @@ async function finishProviderOnboarding() {
     }
     updateProviderPricesTable();
 
-    // 5. Notificación y cambio de pestaña
-    alert(`🎉 ¡Proveedor "${provName}" vinculado y formalizado con éxito!\n\nSe han registrado ${data.tarifas.length} actividades y sus tarifas ya están habilitadas en el módulo de pagos.`);
+    // 6. Notificación y cambio de pestaña
+    alert(`🎉 ¡Proveedor "${provName}" formalizado y activado con éxito!\n\nSe han registrado ${data.tarifas.length} actividades y sus tarifas ya están habilitadas en el módulo de pagos.`);
     
     // Cambiar a la vista de Liquidación de Pagos
     switchModuleView('dashboard');
@@ -3049,12 +3448,13 @@ async function finishProviderOnboarding() {
 
 function initDirectoryModule() {
     document.getElementById('btn-go-to-onboarding')?.addEventListener('click', () => {
-        switchModuleView('view-onboarding');
         resetWizardForm();
+        switchModuleView('view-onboarding');
     });
 
     document.getElementById('directory-search')?.addEventListener('input', renderDirectory);
     document.getElementById('directory-regimen-filter')?.addEventListener('change', renderDirectory);
+    document.getElementById('directory-status-filter')?.addEventListener('change', renderDirectory);
 
     // Modales de expediente y tarifas
     document.getElementById('close-expediente')?.addEventListener('click', () => {
@@ -3077,6 +3477,7 @@ function renderDirectory() {
 
     const searchTerm = document.getElementById('directory-search')?.value.toLowerCase().trim() || '';
     const regimenFilter = document.getElementById('directory-regimen-filter')?.value || 'ALL';
+    const statusFilter = document.getElementById('directory-status-filter')?.value || 'ALL';
 
     grid.innerHTML = '';
 
@@ -3085,10 +3486,14 @@ function renderDirectory() {
         const rep = (p.nombre_representante || '').toLowerCase();
         const ruc = (p.ruc || p.cedula || '').toLowerCase();
         const reg = p.regimen || 'Régimen de Cuota Fija';
+        const isDraft = p.estado === 'BORRADOR';
+        const matchesStatus = statusFilter === 'ALL' || 
+                              (statusFilter === 'BORRADOR' && isDraft) || 
+                              (statusFilter === 'ACTIVO' && !isDraft);
 
         const matchesSearch = !searchTerm || nom.includes(searchTerm) || rep.includes(searchTerm) || ruc.includes(searchTerm);
         const matchesRegimen = regimenFilter === 'ALL' || reg === regimenFilter;
-        return matchesSearch && matchesRegimen;
+        return matchesSearch && matchesRegimen && matchesStatus;
     });
 
     if (filtered.length === 0) {
@@ -3096,7 +3501,7 @@ function renderDirectory() {
             <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: var(--bg-panel); border: 1px dashed var(--glass-border); border-radius: 16px;">
                 <span style="font-size: 2.5rem; display: block; margin-bottom: 0.8rem;">👥</span>
                 <h4 style="color: var(--text-main);">No se encontraron proveedores</h4>
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Utiliza el botón "➕ Vincular Nuevo Proveedor" para dar de alta al primer contratista.</p>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Utiliza el botón "➕ Vincular Nuevo Proveedor" para dar de alta a un contratista o continuar un borrador.</p>
             </div>
         `;
         return;
@@ -3107,9 +3512,16 @@ function renderDirectory() {
         const repName = prov.nombre_representante || provName;
         const totalActs = (prov.tarifas && prov.tarifas.length) || (tablaOferta[provName] ? Object.keys(tablaOferta[provName]).length : 0);
         const fuelRate = prov.tarifa_combustible !== undefined ? prov.tarifa_combustible : 12.0;
+        const isDraft = prov.estado === 'BORRADOR';
+        const prog = prov.progreso !== undefined ? prov.progreso : (isDraft ? calculateOnboardingProgress(prov) : 100);
 
         const card = document.createElement('div');
         card.className = 'directory-card';
+        if (isDraft) {
+            card.style.borderColor = 'rgba(245, 158, 11, 0.45)';
+            card.style.background = 'linear-gradient(180deg, rgba(245, 158, 11, 0.04), var(--bg-panel))';
+        }
+
         card.innerHTML = `
             <div>
                 <div class="directory-card-header">
@@ -3117,17 +3529,34 @@ function renderDirectory() {
                         <div class="directory-prov-name">${provName}</div>
                         <div class="directory-prov-rep">👤 ${repName}</div>
                     </div>
-                    <span class="badge-tag" style="margin: 0; font-size: 0.7rem;">${prov.regimen || 'Cuota Fija'}</span>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                        <span class="badge-tag" style="margin: 0; font-size: 0.7rem;">${prov.regimen || 'Cuota Fija'}</span>
+                        <span class="badge-tag ${isDraft ? 'badge-draft' : 'badge-active'}" style="margin: 0; font-size: 0.7rem;">
+                            ${isDraft ? `🟡 Borrador (${prog}%)` : '🟢 Activo'}
+                        </span>
+                    </div>
                 </div>
+
+                ${isDraft ? `
+                    <div style="margin: 0.6rem 0 0.8rem 0;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">
+                            <span>Progreso de Documentación y Datos</span>
+                            <span>${prog}%</span>
+                        </div>
+                        <div class="progress-bar-mini">
+                            <div class="progress-bar-fill-mini" style="width: ${prog}%;"></div>
+                        </div>
+                    </div>
+                ` : ''}
 
                 <div class="directory-card-body">
                     <div class="directory-data-row">
                         <span class="directory-data-label">Cédula / RUC:</span>
-                        <span class="directory-data-value">${prov.ruc || prov.cedula || 'N/D'}</span>
+                        <span class="directory-data-value">${prov.ruc || prov.cedula || '<em style="color:#DC2626;">Pendiente</em>'}</span>
                     </div>
                     <div class="directory-data-row">
                         <span class="directory-data-label">Cuenta Bancaria:</span>
-                        <span class="directory-data-value">${prov.banco || 'BAC'} - ${prov.cuenta_bancaria || 'Registrada'}</span>
+                        <span class="directory-data-value">${prov.cuenta_bancaria ? `${prov.banco || 'BAC'} - ${prov.cuenta_bancaria}` : '<em style="color:#DC2626;">Pendiente</em>'}</span>
                     </div>
                     <div class="directory-data-row">
                         <span class="directory-data-label">Tarifas Acordadas:</span>
@@ -3145,10 +3574,17 @@ function renderDirectory() {
                     <button class="btn btn-outline" data-dir-contract="${provName}" title="Descargar Contrato Word">📄 Contrato</button>
                     <button class="btn btn-outline" data-dir-exp="${provName}" title="Ver Documentos">📁 Expediente</button>
                     <button class="btn btn-outline" data-dir-tariffs="${provName}" title="Ver Tarifas">💲 Tarifas</button>
+                    ${isDraft ? `<button class="btn btn-outline" data-dir-del="${provName}" title="Eliminar Borrador" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4); flex: 0.5;">🗑️</button>` : ''}
                 </div>
-                <button class="btn directory-btn-pay" data-dir-pay="${provName}" title="Liquidar Pagos de Facturas">
-                    <span>🧮</span> Liquidar Pagos
-                </button>
+                ${isDraft ? `
+                    <button class="btn directory-btn-resume" data-dir-resume="${provName}" title="Continuar llenando campos y recaudos pendientes">
+                        <span>✏️</span> Continuar Registro (${prog}%)
+                    </button>
+                ` : `
+                    <button class="btn directory-btn-pay" data-dir-pay="${provName}" title="Liquidar Pagos de Facturas">
+                        <span>🧮</span> Liquidar Pagos
+                    </button>
+                `}
             </div>
         `;
 
@@ -3163,6 +3599,14 @@ function renderDirectory() {
 
         card.querySelector(`[data-dir-tariffs="${provName}"]`)?.addEventListener('click', () => {
             openTarifasModal(prov);
+        });
+
+        card.querySelector(`[data-dir-resume="${provName}"]`)?.addEventListener('click', () => {
+            resumeProviderOnboarding(prov);
+        });
+
+        card.querySelector(`[data-dir-del="${provName}"]`)?.addEventListener('click', () => {
+            deleteProviderDraft(provName);
         });
 
         card.querySelector(`[data-dir-pay="${provName}"]`)?.addEventListener('click', () => {
