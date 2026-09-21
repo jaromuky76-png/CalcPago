@@ -463,12 +463,17 @@
                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
                                     <div>
                                         <h3>📁 2. Expediente Documental Digital</h3>
-                                        <p class="step-card-desc">Adjunta los recaudos requeridos según la política oficial <strong>POL.GLE.001</strong> y <strong>10.P.S01.0001</strong>.</p>
+                                        <p class="step-card-desc">Adjunta los recaudos requeridos según la política oficial <strong>POL.GLE.001</strong> y <strong>10.P.S01.0001</strong>. Puedes marcar como <em>"No necesario"</em> cualquier documento que no aplique para completar el expediente sin pendientes.</p>
                                     </div>
-                                    <div class="doc-progress-box">
-                                        <span id="doc-progress-text">0 de 7 Completados</span>
-                                        <div class="doc-progress-bar">
-                                            <div id="doc-progress-fill" style="width: 0%;"></div>
+                                    <div style="display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
+                                        <button id="btn-exempt-remaining-docs" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; border-color: rgba(100, 116, 139, 0.4); color: #475569;" title="Marcar todos los recaudos pendientes como no requeridos / no necesarios">
+                                            ⚡ Exonerar Pendientes
+                                        </button>
+                                        <div class="doc-progress-box">
+                                            <span id="doc-progress-text">0 de 8 Completados</span>
+                                            <div class="doc-progress-bar">
+                                                <div id="doc-progress-fill" style="width: 0%;"></div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

@@ -1348,6 +1348,25 @@ body {
     color: var(--accent);
 }
 
+.status-badge.not-required-badge {
+    background: rgba(148, 163, 184, 0.18);
+    color: #475569;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.doc-checklist-card.not-required {
+    border-color: rgba(148, 163, 184, 0.45);
+    background: rgba(241, 245, 249, 0.55);
+}
+
+.doc-not-required-box {
+    background: rgba(148, 163, 184, 0.12);
+    border: 1px dashed rgba(148, 163, 184, 0.45);
+    border-radius: 8px;
+    padding: 0.8rem;
+    animation: fadeIn 0.25s ease;
+}
+
 .doc-upload-zone {
     border: 1.5px dashed var(--glass-border);
     border-radius: 8px;

@@ -2049,7 +2049,7 @@ function calculateOnboardingProgress(data) {
     let validatedDocs = 0;
     if (reqDocs) {
         reqDocs.forEach(d => {
-            if (docs[d.id] && docs[d.id].validated) {
+            if (docs[d.id] && (docs[d.id].validated || docs[d.id].notRequired)) {
                 validatedDocs++;
             }
         });
@@ -2556,6 +2556,32 @@ function initOnboardingWizard() {
         triggerWizardAutosave();
     });
 
+    // Botón para exonerar todos los recaudos pendientes en Paso 2
+    document.getElementById('btn-exempt-remaining-docs')?.addEventListener('click', () => {
+        const regimen = document.getElementById('wiz-regimen')?.value || "Régimen de Cuota Fija";
+        const reqDocs = DOCS_BY_REGIMEN[regimen] || DOCS_BY_REGIMEN["Régimen de Cuota Fija"];
+        if (!reqDocs) return;
+
+        let modified = 0;
+        reqDocs.forEach(doc => {
+            const cur = wizardDocuments[doc.id];
+            const isAlreadyValid = cur && cur.validated && cur.fileName;
+            if (!isAlreadyValid) {
+                wizardDocuments[doc.id] = {
+                    ...(cur || {}),
+                    notRequired: true,
+                    justification: (cur && cur.justification) ? cur.justification : 'Exonerado / No aplica'
+                };
+                modified++;
+            }
+        });
+
+        if (modified > 0) {
+            renderWizardDocs();
+            triggerWizardAutosave();
+        }
+    });
+
     // Reset wizard
     document.getElementById('btn-reset-wizard')?.addEventListener('click', () => {
         if (confirm("¿Deseas restablecer todos los campos del asistente y descartar el borrador actual?")) {
@@ -2752,60 +2778,113 @@ function renderWizardDocs() {
     let completedCount = 0;
 
     reqDocs.forEach(doc => {
-        const docState = wizardDocuments[doc.id] || { fileName: '', validated: false };
-        const isCompleted = docState.fileName && docState.validated;
-        if (isCompleted) completedCount++;
+        const docState = wizardDocuments[doc.id] || { fileName: '', validated: false, notRequired: false, justification: '' };
+        const isNotRequired = !!docState.notRequired;
+        const isValidated = !isNotRequired && (docState.fileName && docState.validated);
+        const isResolved = isNotRequired || isValidated;
+        if (isResolved) completedCount++;
+
+        let badgeHtml = '';
+        if (isNotRequired) {
+            badgeHtml = `<span class="status-badge not-required-badge">⚪ No Requerido</span>`;
+        } else if (isValidated) {
+            badgeHtml = `<span class="status-badge uploaded">✓ Validado</span>`;
+        } else if (docState.fileName) {
+            badgeHtml = `<span class="status-badge uploaded">Archivo Adjunto</span>`;
+        } else {
+            badgeHtml = `<span class="status-badge pending">Pendiente</span>`;
+        }
 
         const card = document.createElement('div');
-        card.className = `doc-checklist-card ${isCompleted ? 'completed' : ''}`;
+        card.className = `doc-checklist-card ${isValidated ? 'completed' : ''} ${isNotRequired ? 'not-required' : ''}`;
         card.innerHTML = `
             <div class="doc-card-top">
-                <div>
+                <div style="flex: 1; padding-right: 0.5rem;">
                     <div class="doc-info-title">${doc.name}</div>
                     <div class="doc-info-sub">${doc.desc}</div>
                 </div>
-                <span class="status-badge ${isCompleted ? 'uploaded' : 'pending'}">
-                    ${isCompleted ? '✓ Validado' : (docState.fileName ? 'Archivo Adjunto' : 'Pendiente')}
-                </span>
-            </div>
-
-            <div class="doc-card-body">
-                ${docState.fileName ? `
-                    <div class="doc-file-preview">
-                        <span title="${docState.fileName}">📄 ${docState.fileName}</span>
-                        <button class="btn-icon" data-del-doc="${doc.id}" style="color: var(--danger); font-size: 0.9rem;" title="Eliminar archivo">🗑️</button>
-                    </div>
-                ` : `
-                    <div class="doc-upload-zone" data-upload-doc="${doc.id}">
-                        <span style="font-size: 1.2rem; display: block; margin-bottom: 2px;">📎</span>
-                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">Adjuntar Archivo Digital (PDF / Imagen)</span>
-                        <input type="file" data-file-input="${doc.id}" accept=".pdf, .png, .jpg, .jpeg" hidden>
-                    </div>
-                `}
-
-                <div style="margin-top: 0.8rem; border-top: 1px dashed var(--glass-border); padding-top: 0.6rem;">
-                    <label class="custom-checkbox-label" style="font-size: 0.82rem;">
-                        <input type="checkbox" data-validate-doc="${doc.id}" ${docState.validated ? 'checked' : ''}>
-                        <span>Documento verificado, vigente y sin tachaduras</span>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem;">
+                    ${badgeHtml}
+                    <label class="custom-checkbox-label" style="font-size: 0.78rem; color: #64748b; cursor: pointer; white-space: nowrap;" title="Marcar si este recaudo no aplica o está exonerado">
+                        <input type="checkbox" data-toggle-not-req="${doc.id}" ${isNotRequired ? 'checked' : ''}>
+                        <span>No es necesario</span>
                     </label>
                 </div>
             </div>
+
+            <div class="doc-card-body">
+                ${isNotRequired ? `
+                    <div class="doc-not-required-box">
+                        <div style="font-size: 0.8rem; color: #475569; font-weight: 500; margin-bottom: 0.4rem;">
+                            ⚪ Documento marcado como no necesario para este proveedor.
+                        </div>
+                        <input type="text" class="form-control" data-justification-doc="${doc.id}" 
+                               placeholder="Motivo o justificación opcional (ej: No aplica, Exonerado por gerencia)" 
+                               value="${(docState.justification || '').replace(/"/g, '&quot;')}" 
+                               style="font-size: 0.8rem; padding: 0.35rem 0.6rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%;">
+                    </div>
+                ` : `
+                    ${docState.fileName ? `
+                        <div class="doc-file-preview">
+                            <span title="${docState.fileName}">📄 ${docState.fileName}</span>
+                            <button class="btn-icon" data-del-doc="${doc.id}" style="color: var(--danger); font-size: 0.9rem;" title="Eliminar archivo">🗑️</button>
+                        </div>
+                    ` : `
+                        <div class="doc-upload-zone" data-upload-doc="${doc.id}">
+                            <span style="font-size: 1.2rem; display: block; margin-bottom: 2px;">📎</span>
+                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">Adjuntar Archivo Digital (PDF / Imagen)</span>
+                            <input type="file" data-file-input="${doc.id}" accept=".pdf, .png, .jpg, .jpeg" hidden>
+                        </div>
+                    `}
+
+                    <div style="margin-top: 0.8rem; border-top: 1px dashed var(--glass-border); padding-top: 0.6rem;">
+                        <label class="custom-checkbox-label" style="font-size: 0.82rem;">
+                            <input type="checkbox" data-validate-doc="${doc.id}" ${docState.validated ? 'checked' : ''}>
+                            <span>Documento verificado, vigente y sin tachaduras</span>
+                        </label>
+                    </div>
+                `}
+            </div>
         `;
 
-        // Eventos de upload
+        // Event listeners
+        const toggleNotReq = card.querySelector(`[data-toggle-not-req="${doc.id}"]`);
+        const justInput = card.querySelector(`[data-justification-doc="${doc.id}"]`);
         const uploadZone = card.querySelector(`[data-upload-doc="${doc.id}"]`);
         const fileInput = card.querySelector(`[data-file-input="${doc.id}"]`);
         const delBtn = card.querySelector(`[data-del-doc="${doc.id}"]`);
         const validateCheckbox = card.querySelector(`[data-validate-doc="${doc.id}"]`);
+
+        toggleNotReq?.addEventListener('change', (e) => {
+            if (!wizardDocuments[doc.id]) {
+                wizardDocuments[doc.id] = { fileName: '', validated: false };
+            }
+            wizardDocuments[doc.id].notRequired = e.target.checked;
+            if (e.target.checked && !wizardDocuments[doc.id].justification) {
+                wizardDocuments[doc.id].justification = 'No aplica / Exonerado';
+            }
+            renderWizardDocs();
+            triggerWizardAutosave();
+        });
+
+        justInput?.addEventListener('input', (e) => {
+            if (!wizardDocuments[doc.id]) {
+                wizardDocuments[doc.id] = { fileName: '', validated: false, notRequired: true };
+            }
+            wizardDocuments[doc.id].justification = e.target.value;
+            triggerWizardAutosave();
+        });
 
         uploadZone?.addEventListener('click', () => fileInput?.click());
         fileInput?.addEventListener('change', (e) => {
             if (e.target.files && e.target.files[0]) {
                 const file = e.target.files[0];
                 wizardDocuments[doc.id] = {
+                    ...(wizardDocuments[doc.id] || {}),
                     fileName: file.name,
                     size: file.size,
-                    validated: true
+                    validated: true,
+                    notRequired: false
                 };
                 renderWizardDocs();
                 triggerWizardAutosave();
@@ -2813,7 +2892,11 @@ function renderWizardDocs() {
         });
 
         delBtn?.addEventListener('click', () => {
-            delete wizardDocuments[doc.id];
+            if (wizardDocuments[doc.id]) {
+                delete wizardDocuments[doc.id].fileName;
+                delete wizardDocuments[doc.id].size;
+                wizardDocuments[doc.id].validated = false;
+            }
             renderWizardDocs();
             triggerWizardAutosave();
         });
@@ -2836,7 +2919,7 @@ function renderWizardDocs() {
     const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
     const progressText = document.getElementById('doc-progress-text');
     const progressFill = document.getElementById('doc-progress-fill');
-    if (progressText) progressText.textContent = `${completedCount} de ${total} Validados (${pct}%)`;
+    if (progressText) progressText.textContent = `${completedCount} de ${total} Resueltos (${pct}%)`;
     if (progressFill) progressFill.style.width = `${pct}%`;
 }
 
@@ -3688,21 +3771,41 @@ function openExpedienteModal(prov) {
         const provDocs = prov.documentos || {};
 
         reqDocs.forEach(doc => {
-            const hasDoc = provDocs[doc.id] && provDocs[doc.id].validated;
+            const docData = provDocs[doc.id] || {};
+            const isNotReq = !!docData.notRequired;
+            const hasDoc = !isNotReq && docData.validated;
+            const isResolved = isNotReq || hasDoc;
+
+            let badgeHtml = '';
+            if (isNotReq) {
+                badgeHtml = `<span class="status-badge not-required-badge">⚪ No Requerido</span>`;
+            } else if (hasDoc) {
+                badgeHtml = `<span class="status-badge uploaded">✓ En Expediente</span>`;
+            } else {
+                badgeHtml = `<span class="status-badge pending">Pendiente</span>`;
+            }
+
+            let detailHtml = '';
+            if (isNotReq) {
+                detailHtml = `⚪ Exonerado / No necesario${docData.justification ? ` — <em>${docData.justification}</em>` : ''}`;
+            } else if (hasDoc) {
+                detailHtml = `Archivo: ${docData.fileName || 'Digitalizado'}`;
+            } else {
+                detailHtml = 'Sin archivo adjunto';
+            }
+
             const docItem = document.createElement('div');
-            docItem.className = `doc-checklist-card ${hasDoc ? 'completed' : ''}`;
+            docItem.className = `doc-checklist-card ${hasDoc ? 'completed' : ''} ${isNotReq ? 'not-required' : ''}`;
             docItem.innerHTML = `
                 <div class="doc-card-top">
                     <div>
                         <div class="doc-info-title">${doc.name}</div>
                         <div class="doc-info-sub">${doc.desc}</div>
                     </div>
-                    <span class="status-badge ${hasDoc ? 'uploaded' : 'pending'}">
-                        ${hasDoc ? '✓ En Expediente' : 'Pendiente'}
-                    </span>
+                    ${badgeHtml}
                 </div>
                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem;">
-                    ${hasDoc ? `Archivo: ${provDocs[doc.id].fileName || 'Digitalizado'}` : 'Sin archivo adjunto'}
+                    ${detailHtml}
                 </div>
             `;
             docsList.appendChild(docItem);
