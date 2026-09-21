@@ -3273,13 +3273,337 @@ function renderContractPreview() {
     `;
 }
 
-// Descargar el Contrato en Word (.docx con fallback client-side)
-async function downloadContractDocx() {
-    const data = getWizardData();
-    const btn = document.getElementById('btn-download-contract-docx');
-    const originalText = btn ? btn.innerHTML : '';
-    if (btn) btn.innerHTML = '⏳ Generando archivo...';
+// ==========================================================================
+// GENERADOR NATIVO DE CONTRATO WORD (.DOCX) FIEL A LA PREVISUALIZACIÓN
+// ==========================================================================
 
+async function buildDocxFromContractData(data) {
+    if (!window.docx) throw new Error("Librería docx.js no cargada.");
+
+    const { Document, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle } = window.docx;
+
+    const nomRep = (data.nombre_representante || data.nombre || 'REPRESENTANTE LEGAL').toUpperCase();
+    const nomCom = (data.nombre_comercial || data.nombre || 'CONTRATISTA').toUpperCase();
+    const cedula = data.cedula ? data.cedula.trim() : '[PENDIENTE: CÉDULA]';
+    const ruc = data.ruc && data.ruc.trim() ? ' y cédula RUC: ' + data.ruc.trim() : '';
+    const estCivil = (data.estado_civil || 'mayor de edad').toLowerCase();
+    const prof = (data.profesion || 'técnico').toLowerCase();
+    const dom = data.domicilio || 'Managua';
+    const reg = data.regimen || 'Régimen de Cuota Fija';
+    const banco = (data.banco || 'BAC Credomatic').toUpperCase();
+    const cta = data.cuenta_bancaria ? data.cuenta_bancaria.trim() : '[PENDIENTE: CUENTA BANCARIA]';
+    const titular = (data.titular_cuenta || nomRep).toUpperCase();
+    const dir = data.direccion || 'Managua, Nicaragua';
+    const tel = data.telefono || 'Pendiente';
+    const correo = data.correo || 'Pendiente';
+
+    const now = new Date();
+    const dia = data.dia || now.getDate();
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const mes = data.mes || meses[now.getMonth()];
+    const anio = data.anio || now.getFullYear();
+
+    const combustible = Number(data.tarifa_combustible !== undefined ? data.tarifa_combustible : 12.0);
+
+    // Obtener tarifas si están en data o en tablaOferta
+    let tarifas = data.tarifas;
+    if (!tarifas || tarifas.length === 0) {
+        const provKey = data.nombre_comercial || data.nombre;
+        const acts = (typeof tablaOferta !== 'undefined' && tablaOferta[provKey]) ? tablaOferta[provKey] : {};
+        tarifas = Object.keys(acts).map(a => ({ rms: '', descripcion: a, tarifa: acts[a] }));
+    }
+
+    const font = 'Arial';
+    const sizeBody = 20; // 10pt (docx usa medios puntos: 20 = 10pt)
+    const sizeTitle = 24; // 12pt
+    const paragraphSpacing = { after: 160 };
+
+    const sectionsChildren = [];
+
+    // Título Principal
+    sectionsChildren.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 240 },
+        children: [
+            new TextRun({ text: 'CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRES ACONDICIONADOS', bold: true, size: sizeTitle, font })
+        ]
+    }));
+
+    // Comparecencia / Preámbulo (Idéntico a la previsualización en pantalla)
+    sectionsChildren.push(new Paragraph({
+        alignment: AlignmentType.JUSTIFY,
+        spacing: paragraphSpacing,
+        children: [
+            new TextRun({ text: 'Nosotros, ', font, size: sizeBody }),
+            new TextRun({ text: 'OSCAR RENÉ VARGAS REYES', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada ', font, size: sizeBody }),
+            new TextRun({ text: 'SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', legalmente establecida conforme las leyes de la República de Nicaragua, según Testimonio de Escritura Pública número doce (12) de Constitución de Sociedad y Poder Especial de Representación número ciento noventa y dos (192), y que en lo sucesivo se denominará ', font, size: sizeBody }),
+            new TextRun({ text: 'EL CONTRATANTE', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', y por otra parte, ', font, size: sizeBody }),
+            new TextRun({ text: nomRep, bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', mayor de edad, ' + estCivil + ', ' + prof + ', con domicilio en ' + dom + ', titular de cédula de identidad nicaragüense número: ', font, size: sizeBody }),
+            new TextRun({ text: cedula, bold: true, font, size: sizeBody }),
+            new TextRun({ text: ruc + ', quien actúa en nombre e interés de negocio bajo ' + reg + ' denominado ', font, size: sizeBody }),
+            new TextRun({ text: nomCom, bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', quien en adelante se denominará ', font, size: sizeBody }),
+            new TextRun({ text: 'EL CONTRATISTA', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', ambas partes de común acuerdo convenimos en celebrar el siguiente:', font, size: sizeBody })
+        ]
+    }));
+
+    // Subtítulo
+    sectionsChildren.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 200, after: 200 },
+        children: [
+            new TextRun({ text: 'CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS', bold: true, size: 21, font })
+        ]
+    }));
+
+    // Cláusulas Primera a Vigésima
+    const clauses = [
+        { num: 'PRIMERA [OBJETO DEL CONTRATO]:', text: 'El presente contrato tiene por objeto la prestación del servicio de instalación de equipos de aire acondicionado, incluyendo la colocación, conexión eléctrica, pruebas de funcionamiento y puesta en marcha de los sistemas, conforme a las especificaciones técnicas y condiciones establecidas por el CLIENTE. El CONTRATISTA se obliga a realizar dichos trabajos con personal calificado, utilizando materiales y herramientas adecuadas, garantizando la correcta instalación y funcionamiento.' },
+        { num: 'SEGUNDA [ALCANCES DEL CONTRATO]:', text: 'Los alcances de los trabajos a realizar por EL CONTRATISTA estarán sujetos a visitar el local previamente indicado, determinar la lista de insumos y materiales requeridos, y realizar la instalación y mantenimientos en residencias o comercios programados por EL CONTRATANTE.' },
+        { num: 'TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:', text: 'Forman parte integral del presente contrato los siguientes documentos: Anexo de tarifas de instalación y combustible, Órdenes de Compra aprobadas, Órdenes de Trabajo de levantamiento de visita, Actas de Recepción final firmadas por el cliente receptor, y Facturas comerciales por cada prestación brindada.' },
+        { num: 'CUARTA [OBLIGACIONES DEL CONTRATISTA]:', text: 'Portar debidamente el uniforme de Maestros o Centro de Servicios, llevar a cabo las instalaciones con los más altos estándares de calidad, reportar incidencias inmediatas en ruta, y asumir los costos por reclamos atribuibles a mala instalación o fallas de mano de obra en garantía.' },
+        { num: 'QUINTA [RESPONSABILIDAD EN MATERIA DE HIGIENE Y SEGURIDAD OCUPACIONAL]:', text: 'EL CONTRATISTA se obliga a cumplir de manera estricta con todas las disposiciones de la Ley N.º 618 "Ley General de Higiene y Seguridad del Trabajo", garantizando que todo el personal involucrado cuente con certificaciones médicas ocupacionales vigentes, certificación para trabajos en altura mayores a 1.80 metros, acreditación técnica en seguridad eléctrica, y el uso permanente de Equipos de Protección Personal (EPP).' },
+        { num: 'SEXTA [PLAZO]:', text: 'El plazo de este contrato es de DOCE (12) meses contados a partir de su firma, prorrogable automáticamente por períodos iguales salvo notificación escrita en contrario con 30 días de anticipación.' },
+        { num: 'SÉPTIMA [VALOR DEL CONTRATO Y FORMA DE PAGO]:', text: 'Las partes acuerdan que el valor de los servicios estará regido por las tarifas detalladas en el Anexo I. Previa validación semanal de las órdenes de trabajo realizadas y facturación correspondiente con retenciones de ley aplicadas, los pagos serán realizados mediante transferencia bancaria a la cuenta de ' + banco + ' número: ' + cta + ' en moneda córdobas a nombre de ' + titular + '.' },
+        { num: 'OCTAVA [MANTENIMIENTO DE VALOR]:', text: 'Se reconoce la cláusula de mantenimiento de valor en córdobas conforme al tipo de cambio oficial emitido por el Banco Central de Nicaragua al día del pago efectivo (Art. 38, Ley 732).' },
+        { num: 'NOVENA [NATURALEZA DE LA RELACIÓN Y SEGURIDAD SOCIAL]:', text: 'La relación es estrictamente civil y no genera vínculo laboral ni prestaciones sociales entre las partes. EL CONTRATISTA se compromete a mantener a su personal afiliado al Instituto Nicaragüense de Seguridad Social (INSS) y al día con sus contribuciones.' },
+        { num: 'DÉCIMA A DÉCIMA SEXTA [CONDICIONES TÉCNICAS, GARANTÍA Y CONFIDENCIALIDAD]:', text: 'El CONTRATISTA garantiza vicios ocultos de las instalaciones por el término de un (1) año tras la firma del acta de entrega final. En caso de atrasos injustificados, se establece una penalización del 1.25% diario hasta un máximo de 8 días. El contrato no podrá ser cedido sin autorización escrita.' },
+        { num: 'DÉCIMA SÉPTIMA [AVISOS Y NOTIFICACIONES]:', text: 'CONTRATANTE: Oficinas Centro de Servicios SINSA, Centro de Distribución, Rotonda El Periodista 100m al este, Managua. Atención: Jose Raudes / Ángel Campos (Tel: 78862226 / 82672246 - jose.raudes@sinsa.com.ni).\nCONTRATISTA: ' + nomCom + ', ' + dir + '. Atención: ' + nomRep + ' (Tel: ' + tel + ' - ' + correo + ').' },
+        { num: 'DÉCIMA OCTAVA A VIGÉSIMA [SOLUCIÓN DE CONTROVERSIAS Y ACEPTACIÓN]:', text: 'En caso de controversias, las partes acudirán en primera instancia ante la Dirección de Resolución Alterna de Conflictos (DIRAC). Se prohíbe terminantemente la contratación o participación de menores de edad.' }
+    ];
+
+    clauses.forEach(cl => {
+        sectionsChildren.push(new Paragraph({
+            spacing: { before: 140, after: 60 },
+            children: [
+                new TextRun({ text: cl.num, bold: true, font, size: sizeBody })
+            ]
+        }));
+        sectionsChildren.push(new Paragraph({
+            alignment: AlignmentType.JUSTIFY,
+            spacing: paragraphSpacing,
+            children: [
+                new TextRun({ text: cl.text, font, size: sizeBody })
+            ]
+        }));
+    });
+
+    // Fecha
+    sectionsChildren.push(new Paragraph({
+        alignment: AlignmentType.JUSTIFY,
+        spacing: { before: 200, after: 400 },
+        children: [
+            new TextRun({ text: 'En fe de lo cual firmamos el presente contrato, en dos tantos de un mismo tenor, en la ciudad de Managua, a los ' + dia + ' días del mes de ' + mes + ' del año ' + anio + '.', font, size: sizeBody })
+        ]
+    }));
+
+    // Tabla de Firmas
+    const sigBorderNone = {
+        top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        right: { style: BorderStyle.NONE, size: 0, color: 'auto' }
+    };
+    const sigBorderTop = {
+        top: { style: BorderStyle.SINGLE, size: 8, color: '000000' },
+        bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        right: { style: BorderStyle.NONE, size: 0, color: 'auto' }
+    };
+
+    const sigTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+            new TableRow({
+                children: [
+                    new TableCell({
+                        width: { size: 48, type: WidthType.PERCENTAGE },
+                        borders: sigBorderTop,
+                        margins: { top: 120, bottom: 80, left: 100, right: 100 },
+                        children: [
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'EL CONTRATANTE', bold: true, font, size: sizeBody })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Oscar René Vargas Reyes', font, size: sizeBody })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A. (SINSA)', font, size: 18, color: '555555' })] })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 4, type: WidthType.PERCENTAGE },
+                        borders: sigBorderNone,
+                        children: [new Paragraph({})]
+                    }),
+                    new TableCell({
+                        width: { size: 48, type: WidthType.PERCENTAGE },
+                        borders: sigBorderTop,
+                        margins: { top: 120, bottom: 80, left: 100, right: 100 },
+                        children: [
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'EL CONTRATISTA', bold: true, font, size: sizeBody })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: nomRep, font, size: sizeBody })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: nomCom, font, size: 18, color: '555555' })] })
+                        ]
+                    })
+                ]
+            })
+        ]
+    });
+    sectionsChildren.push(sigTable);
+
+    // Salto de página para el Anexo I
+    sectionsChildren.push(new Paragraph({
+        pageBreakBefore: true,
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 200, after: 200 },
+        children: [
+            new TextRun({ text: 'ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS - ' + nomCom, bold: true, size: 22, font })
+        ]
+    }));
+
+    // Tabla de Tarifas Anexo I
+    const cellBorderSolid = {
+        top: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' },
+        bottom: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' },
+        left: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' },
+        right: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' }
+    };
+
+    const tableHeaderRow = new TableRow({
+        tableHeader: true,
+        children: [
+            new TableCell({
+                width: { size: 20, type: WidthType.PERCENTAGE },
+                borders: cellBorderSolid,
+                shading: { fill: '1E293B' },
+                margins: { top: 100, bottom: 100, left: 120, right: 120 },
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'RMS', bold: true, font, size: 18, color: 'FFFFFF' })] })]
+            }),
+            new TableCell({
+                width: { size: 55, type: WidthType.PERCENTAGE },
+                borders: cellBorderSolid,
+                shading: { fill: '1E293B' },
+                margins: { top: 100, bottom: 100, left: 120, right: 120 },
+                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DESCRIPCIÓN DE LA ACTIVIDAD', bold: true, font, size: 18, color: 'FFFFFF' })] })]
+            }),
+            new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                borders: cellBorderSolid,
+                shading: { fill: '1E293B' },
+                margins: { top: 100, bottom: 100, left: 120, right: 120 },
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'TARIFA (C$)', bold: true, font, size: 18, color: 'FFFFFF' })] })]
+            })
+        ]
+    });
+
+    const tableRows = [tableHeaderRow];
+
+    tarifas.forEach((t, idx) => {
+        const bg = idx % 2 === 0 ? 'F8FAFC' : 'FFFFFF';
+        const priceStr = 'C$ ' + Number(t.tarifa || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 });
+        tableRows.push(new TableRow({
+            children: [
+                new TableCell({
+                    width: { size: 20, type: WidthType.PERCENTAGE },
+                    borders: cellBorderSolid,
+                    shading: { fill: bg },
+                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(t.rms || '-'), font, size: 18 })] })]
+                }),
+                new TableCell({
+                    width: { size: 55, type: WidthType.PERCENTAGE },
+                    borders: cellBorderSolid,
+                    shading: { fill: bg },
+                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: String(t.descripcion || ''), font, size: 18 })] })]
+                }),
+                new TableCell({
+                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    borders: cellBorderSolid,
+                    shading: { fill: bg },
+                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: priceStr, bold: true, font, size: 18 })] })]
+                })
+            ]
+        }));
+    });
+
+    // Fila de Combustible
+    const fuelPriceStr = 'C$ ' + combustible.toLocaleString('es-NI', { minimumFractionDigits: 2 });
+    tableRows.push(new TableRow({
+        children: [
+            new TableCell({
+                width: { size: 75, type: WidthType.PERCENTAGE },
+                columnSpan: 2,
+                borders: cellBorderSolid,
+                shading: { fill: 'F1F5F9' },
+                margins: { top: 90, bottom: 90, left: 100, right: 100 },
+                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD', bold: true, font, size: 18 })] })]
+            }),
+            new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                borders: cellBorderSolid,
+                shading: { fill: 'F1F5F9' },
+                margins: { top: 90, bottom: 90, left: 100, right: 100 },
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: fuelPriceStr, bold: true, font, size: 18, color: '00A859' })] })]
+            })
+        ]
+    }));
+
+    const annexTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: tableRows
+    });
+    sectionsChildren.push(annexTable);
+
+    const doc = new Document({
+        sections: [{
+            properties: {
+                page: {
+                    margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+                }
+            },
+            children: sectionsChildren
+        }]
+    });
+
+    return await window.docx.Packer.toBlob(doc);
+}
+
+// Descargar archivo Blob de forma segura y compatible con todos los navegadores
+function saveBlobAsFile(blob, fileName) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }, 500);
+}
+
+// Descargador unificado de contrato
+async function downloadContractDocxFile(data) {
+    const safeName = (data.nombre_comercial || data.nombre || 'PROVEEDOR').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // 1. Método Principal: Generación cliente con docx.js (100% nativo, seguro, fiel a la previsualización)
+    if (window.docx) {
+        try {
+            const blob = await buildDocxFromContractData(data);
+            if (blob && blob.size > 2000) {
+                saveBlobAsFile(blob, `CONTRATO_SERVICIOS_${safeName}.docx`);
+                return;
+            }
+        } catch (e) {
+            console.warn("Fallo generador local docx.js, intentando alternativa backend...", e);
+        }
+    }
+
+    // 2. Método Secundario: Intentar backend /api/generate-contract si está activo
     try {
         const response = await fetch('/api/generate-contract', {
             method: 'POST',
@@ -3289,45 +3613,64 @@ async function downloadContractDocx() {
 
         if (response.ok) {
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const safeName = data.nombre_comercial.replace(/[^a-zA-Z0-9_-]/g, '_');
-            a.download = `CONTRATO_SERVICIOS_${safeName}.docx`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            return;
+            // IMPORTANTE: Verificar que el archivo no esté vacío (evita hoja en blanco)
+            if (blob && blob.size > 2000) {
+                saveBlobAsFile(blob, `CONTRATO_SERVICIOS_${safeName}.docx`);
+                return;
+            }
         }
-    } catch (err) {
-        console.log("Servidor backend no disponible o en entorno estático. Generando documento en el navegador...");
-    } finally {
-        if (btn) btn.innerHTML = originalText;
+    } catch (e) {
+        console.log("Servidor backend no disponible o en entorno estático.");
     }
 
-    // Fallback: Descarga directa generada en el navegador (funciona 100% en Render Web)
-    downloadClientSideContractDoc(data);
+    // 3. Método de Respaldo: WordML Oficial compatible con Microsoft Word
+    downloadWordMLContract(data);
 }
 
-function downloadClientSideContractDoc(data) {
+// Descargar el Contrato en Word (.docx) desde el Paso 4 del Asistente
+async function downloadContractDocx() {
+    const data = getWizardData();
+    const btn = document.getElementById('btn-download-contract-docx');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Generando documento Word...';
+    }
+
+    try {
+        await downloadContractDocxFile(data);
+    } catch (err) {
+        console.error("Error al descargar contrato:", err);
+        alert("Ocurrió un inconveniente al generar el contrato: " + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+}
+
+// Descarga en formato WordML como fallback si docx.js no está en memoria
+function downloadWordMLContract(data) {
     const safeName = (data.nombre_comercial || data.nombre || 'PROVEEDOR').replace(/[^a-zA-Z0-9_-]/g, '_');
-    
+    const nomRep = (data.nombre_representante || data.nombre || 'REPRESENTANTE LEGAL').toUpperCase();
+    const nomCom = (data.nombre_comercial || data.nombre || 'CONTRATISTA').toUpperCase();
+
     let tableRowsHtml = '';
     (data.tarifas || []).forEach(t => {
         tableRowsHtml += `
             <tr>
-                <td style="text-align: center; border: 1pt solid #000000; padding: 4pt 6pt;">${t.rms || '-'}</td>
-                <td style="border: 1pt solid #000000; padding: 4pt 6pt;">${t.descripcion}</td>
-                <td style="text-align: right; font-weight: bold; border: 1pt solid #000000; padding: 4pt 6pt;">C$ ${Number(t.tarifa || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 5pt;">${t.rms || '-'}</td>
+                <td style="border: 1pt solid #cbd5e1; padding: 5pt;">${t.descripcion}</td>
+                <td style="text-align: right; font-weight: bold; border: 1pt solid #cbd5e1; padding: 5pt;">C$ ${Number(t.tarifa || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
             </tr>
         `;
     });
 
     tableRowsHtml += `
         <tr style="background-color: #F1F5F9; font-weight: bold;">
-            <td colspan="2" style="border: 1pt solid #000000; padding: 4pt 6pt;">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD</td>
-            <td style="text-align: right; border: 1pt solid #000000; padding: 4pt 6pt;">C$ ${Number(data.tarifa_combustible || 12.0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+            <td colspan="2" style="border: 1pt solid #cbd5e1; padding: 5pt;">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD</td>
+            <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt; color: #00A859;">C$ ${Number(data.tarifa_combustible || 12.0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
         </tr>
     `;
 
@@ -3335,7 +3678,7 @@ function downloadClientSideContractDoc(data) {
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head>
             <meta charset='utf-8'>
-            <title>CONTRATO DE SERVICIOS - ${data.nombre_comercial}</title>
+            <title>CONTRATO DE SERVICIOS - ${nomCom}</title>
             <!--[if gte mso 9]>
             <xml>
                 <w:WordDocument>
@@ -3346,63 +3689,63 @@ function downloadClientSideContractDoc(data) {
             </xml>
             <![endif]-->
             <style>
-                @page { size: 8.5in 11in; margin: 1in; mso-header-margin: 0.5in; mso-footer-margin: 0.5in; }
-                body { font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.5; color: #000000; text-align: justify; }
-                h1 { text-align: center; font-size: 12pt; font-weight: bold; margin-bottom: 18pt; text-transform: uppercase; }
-                .clause-title { font-weight: bold; margin-top: 14pt; margin-bottom: 4pt; }
-                table { width: 100%; border-collapse: collapse; margin-top: 12pt; margin-bottom: 12pt; font-size: 9pt; }
+                @page { size: 8.5in 11in; margin: 1in; }
+                body { font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.4; color: #000000; text-align: justify; }
+                h1 { text-align: center; font-size: 12pt; font-weight: bold; margin-bottom: 14pt; }
+                .clause-title { font-weight: bold; margin-top: 10pt; margin-bottom: 3pt; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10pt; margin-bottom: 10pt; font-size: 9pt; }
                 th { background-color: #1E293B; color: #FFFFFF; font-weight: bold; border: 1pt solid #000000; padding: 5pt; }
-                .sig-table { width: 100%; border: none; margin-top: 40pt; }
-                .sig-table td { width: 50%; border: none; text-align: center; vertical-align: top; }
+                .sig-table { width: 100%; border: none; margin-top: 30pt; }
+                .sig-table td { width: 48%; border: none; text-align: center; vertical-align: top; }
                 .sig-bar { border-top: 1pt solid #000000; width: 75%; margin: 0 auto; padding-top: 4pt; font-weight: bold; }
             </style>
         </head>
         <body>
             <h1>CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRES ACONDICIONADOS</h1>
-            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)</strong>, legalmente establecida conforme las leyes de la República de Nicaragua, lo que demuestra con los siguientes documentos habilitantes: a) Testimonio de escritura pública número doce (12) de Constitución de Sociedad Anónima y Estatutos y b) Testimonio de escritura pública número ciento noventa y dos (192), denominada Poder Especial de Representación, y que en lo sucesivo se denominará <strong>EL CONTRATANTE</strong>, y por otra parte, <strong>${(data.nombre_representante || data.nombre || '').toUpperCase()}</strong>, mayor de edad, ${(data.estado_civil || 'casado').toLowerCase()}, ${(data.profesion || 'comerciante').toLowerCase()}, con domicilio en ${data.domicilio || 'Managua'}, titular de cédula de identidad nicaragüense número: <strong>${data.cedula || ''}</strong>${data.ruc ? ` y cédula RUC: <strong>${data.ruc}</strong>` : ''}, quien actúa en nombre e interés de negocio bajo ${data.regimen || 'Régimen de Cuota Fija'} denominado <strong>${(data.nombre_comercial || data.nombre || '').toUpperCase()}</strong>, quien en adelante se denominará <strong>EL CONTRATISTA</strong>, ambas partes de común acuerdo convenimos en celebrar el siguiente:</p>
+            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)</strong>, legalmente establecida conforme las leyes de la República de Nicaragua, según Testimonio de Escritura Pública número doce (12) de Constitución de Sociedad y Poder Especial de Representación número ciento noventa y dos (192), y que en lo sucesivo se denominará <strong>EL CONTRATANTE</strong>, y por otra parte, <strong>${nomRep}</strong>, mayor de edad, ${(data.estado_civil || 'casado').toLowerCase()}, ${(data.profesion || 'técnico').toLowerCase()}, con domicilio en ${data.domicilio || 'Managua'}, titular de cédula de identidad nicaragüense número: <strong>${data.cedula || '[PENDIENTE: CÉDULA]'}</strong>${data.ruc ? ` y cédula RUC: <strong>${data.ruc}</strong>` : ''}, quien actúa en nombre e interés de negocio bajo ${data.regimen || 'Régimen de Cuota Fija'} denominado <strong>${nomCom}</strong>, quien en adelante se denominará <strong>EL CONTRATISTA</strong>, ambas partes de común acuerdo convenimos en celebrar el siguiente:</p>
             
-            <p style="text-align: center; font-weight: bold; margin: 15pt 0;">CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS</p>
+            <p style="text-align: center; font-weight: bold; margin: 12pt 0;">CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS</p>
 
             <div class="clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
             <p>El presente contrato tiene por objeto la prestación del servicio de instalación de equipos de aire acondicionado, incluyendo la colocación, conexión eléctrica, pruebas de funcionamiento y puesta en marcha de los sistemas, conforme a las especificaciones técnicas y condiciones establecidas por el CLIENTE.</p>
 
             <div class="clause-title">SEGUNDA [ALCANCES DEL CONTRATO]:</div>
-            <p>Los alcances de los trabajos a realizar por EL CONTRATISTA estarán sujeto a las siguientes: Visitar el local previamente indicado por EL CONTRATANTE, proporcionar la lista de materiales necesarios, y realizar la instalación de aires acondicionados en residencias o locales programados por EL CONTRATANTE.</p>
+            <p>Los alcances de los trabajos a realizar por EL CONTRATISTA estarán sujetos a visitar el local previamente indicado, determinar la lista de insumos y materiales requeridos, y realizar la instalación y mantenimientos en residencias o comercios programados por EL CONTRATANTE.</p>
 
             <div class="clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
-            <p>Forman parte integral del presente contrato los siguientes documentos: Anexo de tarifas de instalación y combustible, Órdenes de Compras aprobadas, Órdenes de Trabajo de levantamiento de visita, Actas de Recepción final firmadas por el cliente receptor, y Facturas por cada prestación de servicio brindada.</p>
+            <p>Forman parte integral del presente contrato los siguientes documentos: Anexo de tarifas de instalación y combustible, Órdenes de Compra aprobadas, Órdenes de Trabajo de levantamiento de visita, Actas de Recepción final firmadas por el cliente receptor, y Facturas comerciales por cada prestación brindada.</p>
 
             <div class="clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
-            <p>Portar uniforme de Maestros o de Centro de Servicios garantizando la limpieza y cuidado de estos, llevar a cabo instalaciones de calidad respetando las normas de los fabricantes, reportar incidencias en ruta y asumir los costos por reclamos atribuibles a mala instalación.</p>
+            <p>Portar debidamente el uniforme de Maestros o Centro de Servicios, llevar a cabo las instalaciones con los más altos estándares de calidad, reportar incidencias inmediatas en ruta, y asumir los costos por reclamos atribuibles a mala instalación o fallas de mano de obra en garantía.</p>
 
             <div class="clause-title">QUINTA [RESPONSABILIDAD EN MATERIA DE HIGIENE Y SEGURIDAD OCUPACIONAL]:</div>
-            <p>EL CONTRATISTA se obliga a cumplir de manera estricta con todas las disposiciones de la Ley N.º 618 "Ley General de Higiene y Seguridad del Trabajo", garantizando certificaciones médicas ocupacionales vigentes, certificación para trabajos en altura superior a 1.80 metros, acreditación técnica en seguridad eléctrica, y el uso permanente de Equipos de Protección Personal (EPP).</p>
+            <p>EL CONTRATISTA se obliga a cumplir de manera estricta con todas las disposiciones de la Ley N.º 618 "Ley General de Higiene y Seguridad del Trabajo", garantizando certificaciones médicas ocupacionales vigentes, certificación para trabajos en altura mayores a 1.80 metros, acreditación técnica en seguridad eléctrica, y el uso permanente de Equipos de Protección Personal (EPP).</p>
 
             <div class="clause-title">SEXTA [PLAZO]:</div>
-            <p>El plazo de este contrato es de DOCE (12) meses contados a partir de la firma del contrato, prorrogable automáticamente por sucesivos períodos de igual vigencia salvo notificación contraria con 30 días de anticipación.</p>
+            <p>El plazo de este contrato es de DOCE (12) meses contados a partir de su firma, prorrogable automáticamente por períodos iguales salvo notificación escrita en contrario con 30 días de anticipación.</p>
 
             <div class="clause-title">SÉPTIMA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
-            <p>Las partes acuerdan que el valor del presente contrato estará debidamente detallado de acuerdo a las actividades ampliamente descritas en el Anexo. Previa validación semanal de los servicios realizados y emisión de factura con las retenciones de ley, los pagos serán realizados mediante transferencia bancaria a la cuenta de <strong>${(data.banco || 'BANCO').toUpperCase()}</strong> número: <strong>${data.cuenta_bancaria || 'XXXXXXXXXXX'}</strong> en moneda córdobas a nombre de <strong>${(data.titular_cuenta || data.nombre_representante || '').toUpperCase()}</strong>.</p>
+            <p>Las partes acuerdan que el valor de los servicios estará regido por las tarifas detalladas en el Anexo I. Previa validación semanal de las órdenes de trabajo realizadas y facturación correspondiente con retenciones de ley aplicadas, los pagos serán realizados mediante transferencia bancaria a la cuenta de <strong>${(data.banco || 'BAC Credomatic').toUpperCase()}</strong> número: <strong>${data.cuenta_bancaria || 'PENDIENTE'}</strong> en moneda córdobas a nombre de <strong>${(data.titular_cuenta || nomRep).toUpperCase()}</strong>.</p>
 
             <div class="clause-title">OCTAVA [MANTENIMIENTO DE VALOR]:</div>
-            <p>Se reconoce la cláusula de mantenimiento de valor en córdobas conforme al tipo de cambio oficial del Banco Central de Nicaragua (Art. 38, Ley 732).</p>
+            <p>Se reconoce la cláusula de mantenimiento de valor en córdobas conforme al tipo de cambio oficial emitido por el Banco Central de Nicaragua al día del pago efectivo (Art. 38, Ley 732).</p>
 
             <div class="clause-title">NOVENA [NATURALEZA DE LA RELACIÓN Y SEGURIDAD SOCIAL]:</div>
-            <p>La relación es estrictamente civil y no genera vínculo laboral ni prestaciones sociales. EL CONTRATISTA se compromete a que todo su personal esté afiliado al Instituto Nicaragüense de Seguridad Social (INSS) durante la vigencia del contrato.</p>
+            <p>La relación es estrictamente civil y no genera vínculo laboral ni prestaciones sociales entre las partes. EL CONTRATISTA se compromete a mantener a su personal afiliado al Instituto Nicaragüense de Seguridad Social (INSS) y al día con sus contribuciones.</p>
 
             <div class="clause-title">DÉCIMA A DÉCIMA SEXTA [CONDICIONES TÉCNICAS, GARANTÍA Y CONFIDENCIALIDAD]:</div>
-            <p>El CONTRATISTA garantiza vicios ocultos por el término de un (1) año tras la firma del acta de recepción final. Se establece una multa del 1.25% por cada día de atraso hasta acumular un máximo de 8 días. El contrato no podrá ser cedido sin consentimiento previo por escrito.</p>
+            <p>El CONTRATISTA garantiza vicios ocultos de las instalaciones por el término de un (1) año tras la firma del acta de entrega final. En caso de atrasos injustificados, se establece una penalización del 1.25% diario hasta un máximo de 8 días. El contrato no podrá ser cedido sin autorización escrita.</p>
 
             <div class="clause-title">DÉCIMA SÉPTIMA [AVISOS Y NOTIFICACIONES]:</div>
             <p>
-                <strong>CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA ubicadas en edificio Centro de distribución, rotonda el periodista 100m al este, Managua. Con Atención a: Jose Raudes, Ángel Campos (Tel: 78862226 / 82672246 - jose.raudes@sinsa.com.ni).<br>
-                <strong>CONTRATISTA:</strong> ${(data.nombre_comercial || data.nombre || '').toUpperCase()}, ${data.direccion || 'Managua, Nicaragua'}. Con Atención a: ${data.nombre_representante || data.nombre || ''} (Tel: ${data.telefono || ''} - ${data.correo || ''}).
+                <strong>CONTRATANTE:</strong> Oficinas Centro de Servicios SINSA, Centro de Distribución, Rotonda El Periodista 100m al este, Managua. Con Atención a: Jose Raudes / Ángel Campos (Tel: 78862226 / 82672246 - jose.raudes@sinsa.com.ni).<br>
+                <strong>CONTRATISTA:</strong> ${nomCom}, ${data.direccion || 'Managua, Nicaragua'}. Con Atención a: ${nomRep} (Tel: ${data.telefono || ''} - ${data.correo || ''}).
             </p>
 
             <div class="clause-title">DÉCIMA OCTAVA A VIGÉSIMA [SOLUCIÓN DE CONTROVERSIAS Y ACEPTACIÓN]:</div>
-            <p>En caso de controversias las partes acudirán ante mediador de la Dirección de Resolución Alterna de Conflictos (DIRAC) de Managua. Se prohíbe terminantemente la contratación o participación de menores de edad.</p>
+            <p>En caso de controversias, las partes acudirán en primera instancia ante la Dirección de Resolución Alterna de Conflictos (DIRAC). Se prohíbe terminantemente la contratación o participación de menores de edad.</p>
 
-            <p style="margin-top: 15pt;">En fe de lo cual firmamos el presente contrato, en dos tantos de un mismo tenor, en la ciudad de Managua, a los ${data.dia || 23} días del mes de ${data.mes || 'octubre'} del año ${data.anio || 2026}.</p>
+            <p style="margin-top: 15pt;">En fe de lo cual firmamos el presente contrato, en dos tantos de un mismo tenor, en la ciudad de Managua, a los ${data.dia || new Date().getDate()} días del mes de ${data.mes || 'septiembre'} del año ${data.anio || 2026}.</p>
 
             <table class="sig-table">
                 <tr>
@@ -3413,15 +3756,15 @@ function downloadClientSideContractDoc(data) {
                     </td>
                     <td>
                         <div class="sig-bar">EL CONTRATISTA</div>
-                        <div>${data.nombre_representante || data.nombre || ''}</div>
-                        <div style="font-size: 8pt; color: #555555;">${data.nombre_comercial || data.nombre || ''}</div>
+                        <div>${nomRep}</div>
+                        <div style="font-size: 8pt; color: #555555;">${nomCom}</div>
                     </td>
                 </tr>
             </table>
 
             <br style="page-break-before: always;">
             <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 20pt; margin-bottom: 10pt;">
-                ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS - ${(data.nombre_comercial || data.nombre || '').toUpperCase()}
+                ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS - ${nomCom}
             </div>
 
             <table>
@@ -3441,14 +3784,7 @@ function downloadClientSideContractDoc(data) {
     `;
 
     const blob = new Blob(['\ufeff', wordContent], { type: 'application/msword;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `CONTRATO_SERVICIOS_${safeName}.doc`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    saveBlobAsFile(blob, `CONTRATO_SERVICIOS_${safeName}.doc`);
 }
 
 // Finalizar la vinculación y activar en pagos
@@ -3720,25 +4056,9 @@ async function downloadContractForProvider(prov) {
     };
 
     try {
-        const response = await fetch('/api/generate-contract', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) throw new Error("No se pudo generar el contrato Word.");
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const safeName = (prov.nombre_comercial || prov.nombre).replace(/[^a-zA-Z0-9_-]/g, '_');
-        a.download = `CONTRATO_SERVICIOS_${safeName}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        await downloadContractDocxFile(payload);
     } catch (e) {
+        console.error("Error al descargar contrato:", e);
         alert("Error al descargar contrato: " + e.message);
     }
 }
