@@ -2461,6 +2461,85 @@ async function loadProveedoresRegistrados() {
         console.log("Modo offline o servidor local sin API de proveedores activa.");
     }
 
+    // 2.5 Garantizar que ENERGY SYSTEMS esté registrado con la información del contrato firmado
+    const energyKey = "ENERGY SYSTEMS";
+    let energyProv = proveedoresRegistrados.find(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === energyKey);
+    const energyTarifas = [
+        { rms: '101016766', descripcion: 'INSTALACION BASICA DE AIRE ACONDICIONADO 12K Y 18K BTU', tarifa: 1500 },
+        { rms: '101016773', descripcion: 'INSTALACION BASICA DE AIRE ACONDICIONADO 24K BTU', tarifa: 1800 },
+        { rms: '101016781', descripcion: 'DESINSTALACION DE AIRE ACONDICIONADO 12K Y 18K BTU', tarifa: 800 },
+        { rms: '101016790', descripcion: 'DESINSTALACION DE AIRE ACONDICIONADO 24K BTU', tarifa: 900 },
+        { rms: '101016802', descripcion: 'MANTENIMIENTO PREVENTIVO DE AIRE ACONDICIONADO 12K Y 18K BTU', tarifa: 700 },
+        { rms: '101016810', descripcion: 'MANTENIMIENTO PREVENTIVO DE AIRE ACONDICIONADO 24K BTU', tarifa: 850 }
+    ];
+
+    if (!energyProv) {
+        energyProv = {
+            nombre_comercial: 'ENERGY SYSTEMS',
+            nombre_representante: 'JOSE ARMANDO VANEGAS SALAZAR',
+            cedula: '001-090987-0043X',
+            ruc: '0010909870043X',
+            estado_civil: 'Soltero',
+            profesion: 'Técnico Especialista en HVAC',
+            domicilio: 'Managua, Nicaragua',
+            regimen: 'Régimen General',
+            banco: 'Banco LAFISE Bancentro',
+            cuenta_bancaria: '102201948',
+            titular_cuenta: 'JOSE ARMANDO VANEGAS SALAZAR',
+            telefono: '8645-3129 / 8856-1234',
+            correo: 'energy.systems.ni@gmail.com',
+            direccion: 'Reparto San Antonio, de la Iglesia San Antonio 2 c al sur, 1 c al este, casa #D-12, Managua',
+            tarifa_combustible: 12.0,
+            tarifas: energyTarifas,
+            contrato_rubricado: {
+                fileName: 'CONTRADO ENERGY FIRMADO (2).pdf',
+                fileSize: '3.8 MB',
+                uploadDate: '23/09/2026',
+                observaciones: 'Contrato formal rubricado y legalizado por SILVA INTERNACIONAL S.A. y ENERGY SYSTEMS'
+            },
+            documentos: {
+                cedula: { fileName: 'Cedula_Jose_Armando_Vanegas.pdf', validated: true, notRequired: false },
+                ruc: { fileName: 'RUC_Energy_Systems.pdf', validated: true, notRequired: false },
+                matricula: { fileName: 'Matricula_Alcaldia_Managua_2026.pdf', validated: true, notRequired: false },
+                solvencia_fiscal: { fileName: 'Solvencia_Fiscal_DGI_Vigente.pdf', validated: true, notRequired: false },
+                poder_legal: { notRequired: true, justification: 'Persona natural con negocio / Titular directo' },
+                certificacion_bancaria: { fileName: 'Certificacion_Cuenta_LAFISE.pdf', validated: true, notRequired: false },
+                antecedentes: { fileName: 'Record_Policia_Vanegas.pdf', validated: true, notRequired: false },
+                certificacion_tecnica: { fileName: 'Certificacion_Tecnica_Refrigeracion.pdf', validated: true, notRequired: false },
+                seguro_inss: { fileName: 'Constancia_Cumplimiento_INSS.pdf', validated: true, notRequired: false }
+            }
+        };
+        proveedoresRegistrados.unshift(energyProv);
+    } else {
+        // Asegurar que tenga los datos oficiales completos
+        if (!energyProv.nombre_representante || energyProv.nombre_representante === 'En trámite' || energyProv.cedula === 'En trámite') {
+            energyProv.nombre_representante = 'JOSE ARMANDO VANEGAS SALAZAR';
+            energyProv.cedula = '001-090987-0043X';
+            energyProv.ruc = '0010909870043X';
+            energyProv.banco = 'Banco LAFISE Bancentro';
+            energyProv.cuenta_bancaria = '102201948';
+            energyProv.titular_cuenta = 'JOSE ARMANDO VANEGAS SALAZAR';
+            energyProv.direccion = 'Reparto San Antonio, de la Iglesia San Antonio 2 c al sur, 1 c al este, casa #D-12, Managua';
+            energyProv.tarifas = energyTarifas;
+        }
+        if (!energyProv.contrato_rubricado) {
+            energyProv.contrato_rubricado = {
+                fileName: 'CONTRADO ENERGY FIRMADO (2).pdf',
+                fileSize: '3.8 MB',
+                uploadDate: '23/09/2026',
+                observaciones: 'Contrato formal rubricado y legalizado por SILVA INTERNACIONAL S.A. y ENERGY SYSTEMS'
+            };
+        }
+    }
+
+    // Sincronizar también con tablaOferta para el motor de cálculo
+    if (!tablaOferta['ENERGY SYSTEMS']) {
+        tablaOferta['ENERGY SYSTEMS'] = {};
+    }
+    energyTarifas.forEach(t => {
+        tablaOferta['ENERGY SYSTEMS'][t.descripcion] = t.tarifa;
+    });
+
     // 3. Si tablaOferta tiene proveedores que no están en el directorio, agregarlos como base
     Object.keys(tablaOferta).forEach(pName => {
         const k = pName.trim().toUpperCase();
@@ -3356,7 +3435,7 @@ function renderContractPreview() {
     const repNameDisplay = data.nombre_representante || '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>';
     const cedulaDisplay = data.cedula || '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>';
     const cuentaDisplay = data.cuenta_bancaria || '<span class="missing-field-highlight">[PENDIENTE: CUENTA BANCARIA]</span>';
-    const titularDisplay = data.titular_cuenta || repNameDisplay;
+    const titularDisplay = data.titular_cuenta || (data.nombre_representante || 'EL CONTRATISTA');
     const direccionDisplay = data.direccion || '<span class="missing-field-highlight">[PENDIENTE: DIRECCIÓN]</span>';
     const telefonoDisplay = data.telefono || '<span class="missing-field-highlight">[PENDIENTE: TELÉFONO]</span>';
     const correoDisplay = data.correo || '<span class="missing-field-highlight">[PENDIENTE: CORREO]</span>';
@@ -3393,66 +3472,113 @@ function renderContractPreview() {
 
     tableRowsHtml += `
         <tr style="background: #F1F5F9; font-weight: bold;">
-            <td colspan="2">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD</td>
+            <td colspan="2">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)</td>
             <td style="text-align: right; color: #00A859;">C$ ${Number(data.tarifa_combustible || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
         </tr>
     `;
 
+    const logoSrc = (typeof SINSA_LOGO_BASE64 !== 'undefined' && SINSA_LOGO_BASE64) 
+        ? 'data:image/png;base64,' + SINSA_LOGO_BASE64 
+        : 'sinsa_logo.png';
+
     viewer.innerHTML = `
-        <div class="contract-header-title">
-            CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRES ACONDICIONADOS
+        <div class="contract-header-logo-row">
+            <img src="${logoSrc}" alt="SINSA" class="contract-header-logo" onerror="this.src='sinsa_logo.png'">
         </div>
 
-        <p>
-            Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)</strong>, legalmente establecida conforme las leyes de la República de Nicaragua, según Testimonio de Escritura Pública número doce (12) de Constitución de Sociedad y Poder Especial de Representación número ciento noventa y dos (192), y que en lo sucesivo se denominará <strong>EL CONTRATANTE</strong>, y por otra parte, <strong>${data.nombre_representante ? data.nombre_representante.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>'}</strong>, mayor de edad, ${(data.estado_civil || 'casado').toLowerCase()}, ${(data.profesion || 'técnico').toLowerCase()}, con domicilio en ${data.domicilio || 'Managua'}, titular de cédula de identidad nicaragüense número: ${data.cedula ? `<strong>${data.cedula}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>'}${data.ruc ? ` y cédula RUC: <strong>${data.ruc}</strong>` : ''}, quien actúa en nombre e interés de negocio bajo ${data.regimen} denominado <strong>${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</strong>, quien en adelante se denominará <strong>EL CONTRATISTA</strong>, ambas partes de común acuerdo convenimos en celebrar el siguiente:
-        </p>
+        <div class="contract-header-title">
+            CONTRATO DE SERVICIOS DE INSTALACION DE AIRES<br>ACONDICIONADOS.
+        </div>
 
-        <p style="text-align: center; font-weight: bold; margin: 1.2rem 0;">
-            CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS
+        <p style="text-align: justify; text-justify: inter-word;">
+            Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; y por otra parte, <strong>${data.nombre_representante ? data.nombre_representante.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>'}</strong>, mayor de edad, ${(data.estado_civil || 'soltero').toLowerCase()}, ${(data.profesion || 'técnico').toLowerCase()}, con domicilio en ${data.domicilio || 'la ciudad de Managua'}, con cédula de identidad nicaragüense número: ${data.cedula ? `<strong>${data.cedula}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>'}, quien actúa en nombre y representación del negocio mercantil bajo ${data.regimen || 'régimen tributario'} denominado <strong>${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</strong>${data.ruc ? ` con número RUC: <strong>${data.ruc}</strong>` : ''}, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:
         </p>
 
         <div class="contract-clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
-        <p>El presente contrato tiene por objeto la prestación del servicio de instalación de equipos de aire acondicionado, incluyendo la colocación, conexión eléctrica, pruebas de funcionamiento y puesta en marcha de los sistemas, conforme a las especificaciones técnicas y condiciones establecidas por el CLIENTE. El CONTRATISTA se obliga a realizar dichos trabajos con personal calificado, utilizando materiales y herramientas adecuadas, garantizando la correcta instalación y funcionamiento.</p>
+        <p style="text-align: justify;">Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>.</p>
 
         <div class="contract-clause-title">SEGUNDA [ALCANCES DEL CONTRATO]:</div>
-        <p>Los alcances de los trabajos a realizar por EL CONTRATISTA estarán sujetos a visitar el local previamente indicado, determinar la lista de insumos y materiales requeridos, y realizar la instalación y mantenimientos en residencias o comercios programados por EL CONTRATANTE.</p>
+        <p>Los alcances de los servicios a brindar por parte de <strong>EL CONTRATISTA</strong> comprenden:</p>
+        <ul class="contract-clause-list">
+            <li><strong>Sección 1 (Visita previa):</strong> Presentarse en el sitio o inmueble indicado por <strong>EL CONTRATANTE</strong>, inspeccionar las condiciones físicas, eléctricas y mecánicas del área de instalación, y determinar la factibilidad técnica y los insumos complementarios requeridos.</li>
+            <li><strong>Sección 2 (Lista de materiales):</strong> Remitir al personal de Centro de Servicios de <strong>EL CONTRATANTE</strong> el informe técnico detallado y la lista de materiales adicionales no contemplados en el kit básico que deban ser presupuestados y facturados al cliente final.</li>
+            <li><strong>Sección 3 (Ejecución e instalación en residencias o comercios):</strong> Ejecutar las instalaciones de equipos de aire acondicionado tipo Split u otras capacidades asignadas, cumpliendo estrictamente los estándares técnicos del fabricante, pruebas de vacío con bomba, sellado hermético de tuberías, fijación segura de condensadoras y evaporadoras, limpieza del área de trabajo y entrega a entera satisfacción del cliente.</li>
+        </ul>
 
         <div class="contract-clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
-        <p>Forman parte integral del presente contrato los siguientes documentos: Anexo de tarifas de instalación y combustible, Órdenes de Compra aprobadas, Órdenes de Trabajo de levantamiento de visita, Actas de Recepción final firmadas por el cliente receptor, y Facturas comerciales por cada prestación brindada.</p>
+        <p>Forman parte integrante del presente contrato los siguientes documentos:</p>
+        <ol class="contract-clause-numbered">
+            <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de Managua.</li>
+            <li>Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por <strong>EL CONTRATANTE</strong> para cada labor asignada.</li>
+            <li>El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de <strong>EL CONTRATANTE</strong>.</li>
+            <li>Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.</li>
+            <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
+        </ol>
 
         <div class="contract-clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
-        <p>Portar debidamente el uniforme de Maestros o Centro de Servicios, llevar a cabo las instalaciones con los más altos estándares de calidad, reportar incidencias inmediatas en ruta, y asumir los costos por reclamos atribuibles a mala instalación o fallas de mano de obra en garantía.</p>
+        <p><strong>EL CONTRATISTA</strong> se compromete formalmente a:</p>
+        <ol class="contract-clause-numbered">
+            <li>Portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por <strong>EL CONTRATANTE</strong> (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.</li>
+            <li>Se prohíbe de manera expresa a <strong>EL CONTRATISTA</strong> y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.</li>
+            <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
+            <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de <strong>EL CONTRATANTE</strong> y las normas técnicas aplicables en Nicaragua.</li>
+            <li>Reportar inmediatamente a los coordinadores de <strong>EL CONTRATANTE</strong> cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
+            <li>Cumplir estrictamente con la programación de citas y horarios previamente coordinados con el cliente y notificados por <strong>EL CONTRATANTE</strong>.</li>
+            <li>Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de <strong>EL CONTRATANTE</strong>.</li>
+            <li>Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.</li>
+            <li>Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para <strong>EL CONTRATANTE</strong> ni para el cliente.</li>
+            <li>Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.</li>
+        </ol>
 
-        <div class="contract-clause-title">QUINTA [RESPONSABILIDAD EN MATERIA DE HIGIENE Y SEGURIDAD OCUPACIONAL]:</div>
-        <p>EL CONTRATISTA se obliga a cumplir de manera estricta con todas las disposiciones de la Ley N.º 618 "Ley General de Higiene y Seguridad del Trabajo", garantizando que todo el personal involucrado cuente con certificaciones médicas ocupacionales vigentes, certificación para trabajos en altura mayores a 1.80 metros, acreditación técnica en seguridad eléctrica, y el uso permanente de Equipos de Protección Personal (EPP).</p>
+        <div class="contract-clause-title">QUINTA [PLAZO DEL CONTRATO]:</div>
+        <p style="text-align: justify;">El plazo del presente contrato es de DOCE (12) MESES calendario, contados a partir de la fecha de su suscripción. Este plazo se prorrogará automáticamente por períodos sucesivos de igual duración, salvo que cualquiera de las partes notifique por escrito a la otra su decisión de no renovarlo con al menos treinta (30) días de anticipación a la fecha de vencimiento.</p>
 
-        <div class="contract-clause-title">SEXTA [PLAZO]:</div>
-        <p>El plazo de este contrato es de DOCE (12) meses contados a partir de su firma, prorrogable automáticamente por períodos iguales salvo notificación escrita en contrario con 30 días de anticipación.</p>
+        <div class="contract-clause-title">SEXTA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
+        <p style="text-align: justify;">El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán de manera semanal, previa presentación de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ${cuentaDisplay} del banco <strong>${(data.banco || 'Banco').toUpperCase()}</strong> en moneda córdobas a nombre de <strong>${titularDisplay}</strong>.</p>
 
-        <div class="contract-clause-title">SÉPTIMA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
-        <p>Las partes acuerdan que el valor de los servicios estará regido por las tarifas detalladas en el Anexo I. Previa validación semanal de las órdenes de trabajo realizadas y facturación correspondiente con retenciones de ley aplicadas, los pagos serán realizados mediante transferencia bancaria a la cuenta de <strong>${(data.banco || 'BAC Credomatic').toUpperCase()}</strong> número: ${data.cuenta_bancaria ? `<strong>${data.cuenta_bancaria}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CUENTA BANCARIA]</span>'} en moneda córdobas a nombre de ${titularDisplay}.</p>
+        <div class="contract-clause-title">SÉPTIMA [MANTENIMIENTO DE VALOR]:</div>
+        <p style="text-align: justify;">Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).</p>
 
-        <div class="contract-clause-title">OCTAVA [MANTENIMIENTO DE VALOR]:</div>
-        <p>Se reconoce la cláusula de mantenimiento de valor en córdobas conforme al tipo de cambio oficial emitido por el Banco Central de Nicaragua al día del pago efectivo (Art. 38, Ley 732).</p>
+        <div class="contract-clause-title">OCTAVA [RELACIÓN COMERCIAL Y RESPONSABILIDAD LABORAL]:</div>
+        <p style="text-align: justify;">Queda claramente convenido que la relación jurídica que une a las partes es de naturaleza estrictamente civil y mercantil independiente, por lo que no existe ni existirá ningún vínculo de subordinación laboral ni relación obrero-patronal entre <strong>EL CONTRATANTE</strong> y el personal dependiente o subcontratado por <strong>EL CONTRATISTA</strong>. En consecuencia, <strong>EL CONTRATISTA</strong> asume la responsabilidad exclusiva por el pago de salarios, prestaciones sociales, seguro social (INSS), aportes al INATEC y demás obligaciones laborales vigentes en la República de Nicaragua respecto a su personal.</p>
 
-        <div class="contract-clause-title">NOVENA [NATURALEZA DE LA RELACIÓN Y SEGURIDAD SOCIAL]:</div>
-        <p>La relación es estrictamente civil y no genera vínculo laboral ni prestaciones sociales entre las partes. EL CONTRATISTA se compromete a mantener a su personal afiliado al Instituto Nicaragüense de Seguridad Social (INSS) y al día con sus contribuciones.</p>
+        <div class="contract-clause-title">NOVENA [CONOCIMIENTOS TÉCNICOS Y CAPACIDAD]:</div>
+        <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> declara bajo promesa de ley que cuenta con los conocimientos técnicos, experiencia profesional comprobada, personal idóneo y licencias necesarias para desempeñar cabalmente los servicios encomendados, obligándose a ejecutar cada trabajo bajo las mejores prácticas de la ingeniería y refrigeración.</p>
 
-        <div class="contract-clause-title">DÉCIMA A DÉCIMA SEXTA [CONDICIONES TÉCNICAS, GARANTÍA Y CONFIDENCIALIDAD]:</div>
-        <p>El CONTRATISTA garantiza vicios ocultos de las instalaciones por el término de un (1) año tras la firma del acta de entrega final. En caso de atrasos injustificados, se establece una penalización del 1.25% diario hasta un máximo de 8 días. El contrato no podrá ser cedido sin autorización escrita.</p>
+        <div class="contract-clause-title">DÉCIMA [GARANTÍA DE LOS TRABAJOS Y RESPONSABILIDAD CIVIL]:</div>
+        <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> otorga una garantía de DOCE (12) MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> corregirá de inmediato el daño sin costo alguno. Asimismo, responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.</p>
 
-        <div class="contract-clause-title">DÉCIMA SÉPTIMA [AVISOS Y NOTIFICACIONES]:</div>
-        <p>
-            <strong>CONTRATANTE:</strong> Oficinas Centro de Servicios SINSA, Centro de Distribución, Rotonda El Periodista 100m al este, Managua. Atención: Jose Raudes / Ángel Campos (Tel: 78862226 / 82672246 - jose.raudes@sinsa.com.ni).<br>
-            <strong>CONTRATISTA:</strong> ${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}, ${direccionDisplay}. Atención: ${repNameDisplay} (Tel: ${telefonoDisplay} - ${correoDisplay}).
-        </p>
+        <div class="contract-clause-title">DÉCIMA PRIMERA [PENALIZACIONES Y MULTAS]:</div>
+        <p style="text-align: justify;">El incumplimiento injustificado en los tiempos de entrega, retrasos en la atención de visitas o inasistencia a citas concertadas con los clientes facultará a <strong>EL CONTRATANTE</strong> a deducir una penalidad equivalente al uno punto veinticinco por ciento (1.25%) diario sobre el valor total de la orden de trabajo correspondiente, hasta por un período máximo de ocho (8) días hábiles, tras lo cual <strong>EL CONTRATANTE</strong> podrá rescindir unilateralmente el servicio y reasignarlo a otro proveedor, deduciendo los costos sobrevenidos a <strong>EL CONTRATISTA</strong>.</p>
 
-        <div class="contract-clause-title">DÉCIMA OCTAVA A VIGÉSIMA [SOLUCIÓN DE CONTROVERSIAS Y ACEPTACIÓN]:</div>
-        <p>En caso de controversias, las partes acudirán en primera instancia ante la Dirección de Resolución Alterna de Conflictos (DIRAC). Se prohíbe terminantemente la contratación o participación de menores de edad.</p>
+        <div class="contract-clause-title">DÉCIMA SEGUNDA [PROHIBICIÓN DE CESIÓN]:</div>
+        <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> no podrá ceder, transferir ni delegar total ni parcialmente los derechos, obligaciones o servicios derivados del presente contrato a favor de terceras personas naturales o jurídicas, sin el previo consentimiento expreso y por escrito de <strong>EL CONTRATANTE</strong>.</p>
 
-        <p style="margin-top: 1.5rem;">
-            En fe de lo cual firmamos el presente contrato, en dos tantos de un mismo tenor, en la ciudad de Managua, a los ${data.dia} días del mes de ${data.mes} del año ${data.anio}.
-        </p>
+        <div class="contract-clause-title">DÉCIMA TERCERA [MODIFICACIONES Y ADENDAS]:</div>
+        <p style="text-align: justify;">Cualquier modificación a los términos, condiciones, alcances o tarifas de este contrato deberá constar por escrito mediante Adenda debidamente rubricada y suscrita por los representantes autorizados de ambas partes.</p>
+
+        <div class="contract-clause-title">DÉCIMA CUARTA [CONFIDENCIALIDAD]:</div>
+        <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.</p>
+
+        <div class="contract-clause-title">DÉCIMA QUINTA [AVISOS Y NOTIFICACIONES]:</div>
+        <p>Todas las comunicaciones, avisos y notificaciones entre las partes se considerarán válidamente efectuadas en las siguientes direcciones:</p>
+        <ul class="contract-clause-list">
+            <li><strong>EL CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: <strong>JOSE ALFREDO RAUDES ORTIZ / ÁNGEL CAMPOS</strong> (Tel: 7886-2226 / 8267-2246 - Correo: jose.raudes@sinsa.com.ni).</li>
+            <li><strong>EL CONTRATISTA:</strong> ${provNameDisplay}, con domicilio en ${direccionDisplay}. Con Atención a: ${repNameDisplay} (Teléfono: ${telefonoDisplay} - Correo Electrónico: ${correoDisplay}).</li>
+        </ul>
+        <p style="text-align: justify;">Cualquier cambio de domicilio o datos de contacto deberá notificarse formalmente por escrito con al menos veinticuatro (24) horas de anticipación para que surta plenos efectos legales.</p>
+
+        <div class="contract-clause-title">DÉCIMA SEXTA [DOMICILIO CONTRACTUAL]:</div>
+        <p style="text-align: justify;">Para todos los efectos legales y judiciales derivados del presente contrato, las partes fijan de común acuerdo como domicilio especial y contractual la ciudad de Managua, República de Nicaragua.</p>
+
+        <div class="contract-clause-title">DÉCIMA SÉPTIMA [SOLUCIÓN DE CONTROVERSIAS]:</div>
+        <p style="text-align: justify;">Cualquier discrepancia, desavenencia o controversia que surja entre las partes en relación con la interpretación, ejecución o terminación del presente contrato, será sometida en primer lugar a un trámite de mediación y conciliación ante la Dirección de Resolución Alterna de Conflictos (DIRAC). Si transcurrido un plazo de diez (10) días hábiles las partes no alcanzaren un acuerdo conciliatorio satisfactorio, la controversia se ventilará ante los juzgados ordinarios competentes del departamento de Managua.</p>
+
+        <div class="contract-clause-title">DÉCIMA OCTAVA [EQUIPOS, HERRAMIENTAS E INSUMOS]:</div>
+        <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> suministrará a su propia costa todos los medios de transporte y movilización adecuados, así como las herramientas e instrumentos técnicos necesarios para la debida ejecución de los servicios (escaleras certificadas, bombas de vacío, manómetros digitales o análogos para refrigerantes R410A y R32, abocardadores excéntricos, llaves dinamométricas, amperímetros y multímetros). Cuando los materiales o repuestos de instalación sean provistos por <strong>EL CONTRATANTE</strong>, <strong>EL CONTRATISTA</strong> deberá retirarlos formalmente de las bodegas designadas presentando la orden respectiva.</p>
+
+        <div class="contract-clause-title">DÉCIMA NOVENA [ACEPTACIÓN]:</div>
+        <p style="text-align: justify;">Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ${data.dia || new Date().getDate()} días del mes de ${data.mes || 'septiembre'} del año ${data.anio || 2026}.</p>
 
         <div class="contract-signatures-grid">
             <div>
@@ -3470,15 +3596,18 @@ function renderContractPreview() {
         </div>
 
         <div style="page-break-before: always; margin-top: 3rem; border-top: 2px dashed #94A3B8; padding-top: 2rem;">
-            <div style="text-align: center; font-weight: bold; font-size: 1.1rem; margin-bottom: 1rem;">
-                ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS
+            <div class="contract-header-logo-row">
+                <img src="${logoSrc}" alt="SINSA" class="contract-header-logo" onerror="this.src='sinsa_logo.png'">
+            </div>
+            <div style="text-align: center; font-weight: bold; font-size: 1.1rem; margin-bottom: 1.5rem; letter-spacing: 0.5px;">
+                ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS - ${(data.nombre_comercial || 'CONTRATISTA').toUpperCase()}
             </div>
             <table class="contract-annex-table">
                 <thead>
                     <tr>
-                        <th style="width: 150px; text-align: center;">RMS</th>
-                        <th>DESCRIPCIÓN DE LA ACTIVIDAD</th>
-                        <th style="width: 170px; text-align: right;">TARIFA (C$)</th>
+                        <th style="width: 150px; text-align: center;">CODIGO</th>
+                        <th>DESCRIPCION</th>
+                        <th style="width: 170px; text-align: right;">PRECIO</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -3486,27 +3615,49 @@ function renderContractPreview() {
                 </tbody>
             </table>
         </div>
+
+        <div class="contract-footer-page-row">
+            Página Oficial de Contrato &bull; SILVA INTERNACIONAL S.A. (SINSA) &bull; Centro de Servicios
+        </div>
     `;
 }
 
+// Función auxiliar para obtener el logo de SINSA en Uint8Array para docx.js
+function getSinsaLogoUint8Array() {
+    try {
+        if (typeof SINSA_LOGO_BASE64 !== 'undefined' && SINSA_LOGO_BASE64) {
+            const bin = window.atob(SINSA_LOGO_BASE64);
+            const len = bin.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = bin.charCodeAt(i);
+            }
+            return bytes;
+        }
+    } catch (e) {
+        console.warn("No se pudo obtener bytes de logo SINSA:", e);
+    }
+    return null;
+}
+
 // ==========================================================================
-// GENERADOR NATIVO DE CONTRATO WORD (.DOCX) FIEL A LA PREVISUALIZACIÓN
+// GENERADOR NATIVO DE CONTRATO WORD (.DOCX) FIEL A LA PREVISUALIZACIÓN Y FORMATO OFICIAL
 // ==========================================================================
 
 async function buildDocxFromContractData(data) {
     if (!window.docx) throw new Error("Librería docx.js no cargada.");
 
-    const { Document, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle } = window.docx;
+    const { Document, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle, Header, Footer, PageNumber, ImageRun } = window.docx;
 
     const nomRep = (data.nombre_representante || data.nombre || 'REPRESENTANTE LEGAL').toUpperCase();
     const nomCom = (data.nombre_comercial || data.nombre || 'CONTRATISTA').toUpperCase();
     const cedula = data.cedula ? data.cedula.trim() : '[PENDIENTE: CÉDULA]';
     const ruc = data.ruc && data.ruc.trim() ? ' y cédula RUC: ' + data.ruc.trim() : '';
-    const estCivil = (data.estado_civil || 'mayor de edad').toLowerCase();
+    const estCivil = (data.estado_civil || 'soltero').toLowerCase();
     const prof = (data.profesion || 'técnico').toLowerCase();
-    const dom = data.domicilio || 'Managua';
-    const reg = data.regimen || 'Régimen de Cuota Fija';
-    const banco = (data.banco || 'BAC Credomatic').toUpperCase();
+    const dom = data.domicilio || 'la ciudad de Managua';
+    const reg = data.regimen || 'Régimen General';
+    const banco = (data.banco || 'Banco').toUpperCase();
     const cta = data.cuenta_bancaria ? data.cuenta_bancaria.trim() : '[PENDIENTE: CUENTA BANCARIA]';
     const titular = (data.titular_cuenta || nomRep).toUpperCase();
     const dir = data.direccion || 'Managua, Nicaragua';
@@ -3530,95 +3681,205 @@ async function buildDocxFromContractData(data) {
     }
 
     const font = 'Times New Roman';
-    const sizeBody = 22; // 11pt (Word usa medios puntos: 22 = 11pt)
+    const sizeBody = 22; // 11pt
     const sizeTitle = 26; // 13pt
     const paragraphSpacing = { after: 140, line: 276 }; // 1.15 interlineado
 
+    // Configurar encabezado con logo oficial SINSA y línea divisoria negra (tal como en CONTRADO ENERGY FIRMADO)
+    const logoBytes = getSinsaLogoUint8Array();
+    const headerChildren = [];
+    if (logoBytes) {
+        headerChildren.push(new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { after: 120 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
+            children: [
+                new ImageRun({
+                    data: logoBytes,
+                    transformation: { width: 90, height: 54 }
+                })
+            ]
+        }));
+    } else {
+        headerChildren.push(new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { after: 120 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
+            children: [
+                new TextRun({ text: 'SILVA INTERNACIONAL S.A. (SINSA)', bold: true, font, size: 18 })
+            ]
+        }));
+    }
+
+    // Configurar pie de página con número de página "Página X de Y" y línea superior
+    const footerChildren = [
+        new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { before: 120 },
+            border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'CBD5E1' } },
+            children: [
+                new TextRun({ text: 'Página ', font, size: 18, color: '64748B' }),
+                new TextRun({ children: [PageNumber.CURRENT], font, size: 18, color: '64748B' }),
+                new TextRun({ text: ' de ', font, size: 18, color: '64748B' }),
+                new TextRun({ children: [PageNumber.TOTAL_PAGES], font, size: 18, color: '64748B' })
+            ]
+        })
+    ];
+
     const sectionsChildren = [];
 
-    // Título Principal
+    // Título Principal Centrado
     sectionsChildren.push(new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 240 },
         children: [
-            new TextRun({ text: 'CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRES ACONDICIONADOS', bold: true, size: sizeTitle, font })
+            new TextRun({ text: 'CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS.', bold: true, size: sizeTitle, font })
         ]
     }));
 
-    // Comparecencia / Preámbulo (Fiel y justificado a la previsualización)
+    // Preámbulo / Comparecencia Oficial Completa (con Escrituras 12 y 192)
     sectionsChildren.push(new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
         spacing: paragraphSpacing,
         children: [
             new TextRun({ text: 'Nosotros, ', font, size: sizeBody }),
             new TextRun({ text: 'OSCAR RENÉ VARGAS REYES', bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada ', font, size: sizeBody }),
-            new TextRun({ text: 'SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)', bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', legalmente establecida conforme las leyes de la República de Nicaragua, según Testimonio de Escritura Pública número doce (12) de Constitución de Sociedad y Poder Especial de Representación número ciento noventa y dos (192), y que en lo sucesivo se denominará ', font, size: sizeBody }),
-            new TextRun({ text: 'EL CONTRATANTE', bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', y por otra parte, ', font, size: sizeBody }),
+            new TextRun({ text: ', mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada ', font, size: sizeBody }),
+            new TextRun({ text: 'SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', que se abrevia ', font, size: sizeBody }),
+            new TextRun({ text: '"SINSA"', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como ', font, size: sizeBody }),
+            new TextRun({ text: '"EL CONTRATANTE"', bold: true, font, size: sizeBody }),
+            new TextRun({ text: '; y por otra parte, ', font, size: sizeBody }),
             new TextRun({ text: nomRep, bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', mayor de edad, ' + estCivil + ', ' + prof + ', con domicilio en ' + dom + ', titular de cédula de identidad nicaragüense número: ', font, size: sizeBody }),
+            new TextRun({ text: ', mayor de edad, ' + estCivil + ', ' + prof + ', con domicilio en ' + dom + ', con cédula de identidad nicaragüense número: ', font, size: sizeBody }),
             new TextRun({ text: cedula, bold: true, font, size: sizeBody }),
-            new TextRun({ text: ruc + ', quien actúa en nombre e interés de negocio bajo ' + reg + ' denominado ', font, size: sizeBody }),
+            new TextRun({ text: ruc + ', quien actúa en nombre y representación del negocio mercantil bajo ' + reg + ' denominado ', font, size: sizeBody }),
             new TextRun({ text: nomCom, bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', quien en adelante se denominará ', font, size: sizeBody }),
-            new TextRun({ text: 'EL CONTRATISTA', bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', ambas partes de común acuerdo convenimos en celebrar el siguiente:', font, size: sizeBody })
+            new TextRun({ text: ', quien en adelante se denominará simplemente como ', font, size: sizeBody }),
+            new TextRun({ text: '"EL CONTRATISTA"', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', acordamos celebrar el presente ', font, size: sizeBody }),
+            new TextRun({ text: 'CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', el que se regirá bajo las siguientes cláusulas y estipulaciones:', font, size: sizeBody })
         ]
     }));
 
-    // Subtítulo
-    sectionsChildren.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 200, after: 200 },
-        children: [
-            new TextRun({ text: 'CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS', bold: true, size: 22, font })
-        ]
-    }));
-
-    // Cláusulas Primera a Vigésima
-    const clauses = [
-        { num: 'PRIMERA [OBJETO DEL CONTRATO]:', text: 'El presente contrato tiene por objeto la prestación del servicio de instalación de equipos de aire acondicionado, incluyendo la colocación, conexión eléctrica, pruebas de funcionamiento y puesta en marcha de los sistemas, conforme a las especificaciones técnicas y condiciones establecidas por el CLIENTE. El CONTRATISTA se obliga a realizar dichos trabajos con personal calificado, utilizando materiales y herramientas adecuadas, garantizando la correcta instalación y funcionamiento.' },
-        { num: 'SEGUNDA [ALCANCES DEL CONTRATO]:', text: 'Los alcances de los trabajos a realizar por EL CONTRATISTA estarán sujetos a visitar el local previamente indicado, determinar la lista de insumos y materiales requeridos, y realizar la instalación y mantenimientos en residencias o comercios programados por EL CONTRATANTE.' },
-        { num: 'TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:', text: 'Forman parte integral del presente contrato los siguientes documentos: Anexo de tarifas de instalación y combustible, Órdenes de Compra aprobadas, Órdenes de Trabajo de levantamiento de visita, Actas de Recepción final firmadas por el cliente receptor, y Facturas comerciales por cada prestación brindada.' },
-        { num: 'CUARTA [OBLIGACIONES DEL CONTRATISTA]:', text: 'Portar debidamente el uniforme de Maestros o Centro de Servicios, llevar a cabo las instalaciones con los más altos estándares de calidad, reportar incidencias inmediatas en ruta, y asumir los costos por reclamos atribuibles a mala instalación o fallas de mano de obra en garantía.' },
-        { num: 'QUINTA [RESPONSABILIDAD EN MATERIA DE HIGIENE Y SEGURIDAD OCUPACIONAL]:', text: 'EL CONTRATISTA se obliga a cumplir de manera estricta con todas las disposiciones de la Ley N.º 618 "Ley General de Higiene y Seguridad del Trabajo", garantizando que todo el personal involucrado cuente con certificaciones médicas ocupacionales vigentes, certificación para trabajos en altura mayores a 1.80 metros, acreditación técnica en seguridad eléctrica, y el uso permanente de Equipos de Protección Personal (EPP).' },
-        { num: 'SEXTA [PLAZO]:', text: 'El plazo de este contrato es de DOCE (12) meses contados a partir de su firma, prorrogable automáticamente por períodos iguales salvo notificación escrita en contrario con 30 días de anticipación.' },
-        { num: 'SÉPTIMA [VALOR DEL CONTRATO Y FORMA DE PAGO]:', text: 'Las partes acuerdan que el valor de los servicios estará regido por las tarifas detalladas en el Anexo I. Previa validación semanal de las órdenes de trabajo realizadas y facturación correspondiente con retenciones de ley aplicadas, los pagos serán realizados mediante transferencia bancaria a la cuenta de ' + banco + ' número: ' + cta + ' en moneda córdobas a nombre de ' + titular + '.' },
-        { num: 'OCTAVA [MANTENIMIENTO DE VALOR]:', text: 'Se reconoce la cláusula de mantenimiento de valor en córdobas conforme al tipo de cambio oficial emitido por el Banco Central de Nicaragua al día del pago efectivo (Art. 38, Ley 732).' },
-        { num: 'NOVENA [NATURALEZA DE LA RELACIÓN Y SEGURIDAD SOCIAL]:', text: 'La relación es estrictamente civil y no genera vínculo laboral ni prestaciones sociales entre las partes. EL CONTRATISTA se compromete a mantener a su personal afiliado al Instituto Nicaragüense de Seguridad Social (INSS) y al día con sus contribuciones.' },
-        { num: 'DÉCIMA A DÉCIMA SEXTA [CONDICIONES TÉCNICAS, GARANTÍA Y CONFIDENCIALIDAD]:', text: 'El CONTRATISTA garantiza vicios ocultos de las instalaciones por el término de un (1) año tras la firma del acta de entrega final. En caso de atrasos injustificados, se establece una penalización del 1.25% diario hasta un máximo de 8 días. El contrato no podrá ser cedido sin autorización escrita.' },
-        { num: 'DÉCIMA SÉPTIMA [AVISOS Y NOTIFICACIONES]:', text: 'CONTRATANTE: Oficinas Centro de Servicios SINSA, Centro de Distribución, Rotonda El Periodista 100m al este, Managua. Atención: Jose Raudes / Ángel Campos (Tel: 78862226 / 82672246 - jose.raudes@sinsa.com.ni).\nCONTRATISTA: ' + nomCom + ', ' + dir + '. Atención: ' + nomRep + ' (Tel: ' + tel + ' - ' + correo + ').' },
-        { num: 'DÉCIMA OCTAVA A VIGÉSIMA [SOLUCIÓN DE CONTROVERSIAS Y ACEPTACIÓN]:', text: 'En caso de controversias, las partes acudirán en primera instancia ante la Dirección de Resolución Alterna de Conflictos (DIRAC). Se prohíbe terminantemente la contratación o participación de menores de edad.' }
-    ];
-
-    clauses.forEach(cl => {
+    // Helper para estructurar cláusulas oficiales
+    function addClause(numTitle, bodyParagraphs) {
         sectionsChildren.push(new Paragraph({
-            spacing: { before: 140, after: 60 },
+            spacing: { before: 180, after: 60 },
             children: [
-                new TextRun({ text: cl.num, bold: true, font, size: sizeBody })
+                new TextRun({ text: numTitle, bold: true, font, size: sizeBody })
             ]
         }));
-        sectionsChildren.push(new Paragraph({
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: paragraphSpacing,
-            children: [
-                new TextRun({ text: cl.text, font, size: sizeBody })
-            ]
-        }));
-    });
+        (Array.isArray(bodyParagraphs) ? bodyParagraphs : [bodyParagraphs]).forEach(bp => {
+            sectionsChildren.push(new Paragraph({
+                alignment: AlignmentType.JUSTIFIED,
+                spacing: paragraphSpacing,
+                children: typeof bp === 'string' ? [new TextRun({ text: bp, font, size: sizeBody })] : bp
+            }));
+        });
+    }
 
-    // Fecha
-    sectionsChildren.push(new Paragraph({
-        alignment: AlignmentType.JUSTIFIED,
-        spacing: { before: 200, after: 300 },
-        children: [
-            new TextRun({ text: 'En fe de lo cual firmamos el presente contrato, en dos tantos de un mismo tenor, en la ciudad de Managua, a los ' + dia + ' días del mes de ' + mes + ' del año ' + anio + '.', font, size: sizeBody })
-        ]
-    }));
+    // CLÁUSULAS 1ª A 19ª IDÉNTICAS AL CONTRATO FIRMADO DE REFERENCIA
+    addClause('PRIMERA [OBJETO DEL CONTRATO]:', 
+        'Por medio del presente documento, EL CONTRATANTE contrata los servicios profesionales independientes de EL CONTRATISTA para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de EL CONTRATANTE.'
+    );
 
-    // Tabla de Firmas (Fiel a la vista: amplio espacio para firma autógrafa y línea superior)
+    addClause('SEGUNDA [ALCANCES DEL CONTRATO]:', [
+        'Los alcances de los servicios a brindar por parte de EL CONTRATISTA comprenden:',
+        '• Sección 1 (Visita previa): Presentarse en el sitio o inmueble indicado por EL CONTRATANTE, inspeccionar las condiciones físicas, eléctricas y mecánicas del área de instalación, y determinar la factibilidad técnica y los insumos complementarios requeridos.',
+        '• Sección 2 (Lista de materiales): Remitir al personal de Centro de Servicios de EL CONTRATANTE el informe técnico detallado y la lista de materiales adicionales no contemplados en el kit básico que deban ser presupuestados y facturados al cliente final.',
+        '• Sección 3 (Ejecución e instalación en residencias o comercios): Ejecutar las instalaciones de equipos de aire acondicionado tipo Split u otras capacidades asignadas, cumpliendo estrictamente los estándares técnicos del fabricante, pruebas de vacío con bomba, sellado hermético de tuberías, fijación segura de condensadoras y evaporadoras, limpieza del área de trabajo y entrega a entera satisfacción del cliente.'
+    ]);
+
+    addClause('TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:', [
+        'Forman parte integrante del presente contrato los siguientes documentos:',
+        '1. El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de Managua.',
+        '2. Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por EL CONTRATANTE para cada labor asignada.',
+        '3. El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de EL CONTRATANTE.',
+        '4. Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.',
+        '5. Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.'
+    ]);
+
+    addClause('CUARTA [OBLIGACIONES DEL CONTRATISTA]:', [
+        'EL CONTRATISTA se compromete formalmente a:',
+        '1. Portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por EL CONTRATANTE (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.',
+        '2. Se prohíbe de manera expresa a EL CONTRATISTA y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.',
+        '3. Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.',
+        '4. Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de EL CONTRATANTE y las normas técnicas aplicables en Nicaragua.',
+        '5. Reportar inmediatamente a los coordinadores de EL CONTRATANTE cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.',
+        '6. Cumplir estrictamente con la programación de citas y horarios previamente coordinados con el cliente y notificados por EL CONTRATANTE.',
+        '7. Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de EL CONTRATANTE.',
+        '8. Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.',
+        '9. Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para EL CONTRATANTE ni para el cliente.',
+        '10. Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.'
+    ]);
+
+    addClause('QUINTA [PLAZO DEL CONTRATO]:',
+        'El plazo del presente contrato es de DOCE (12) MESES calendario, contados a partir de la fecha de su suscripción. Este plazo se prorrogará automáticamente por períodos sucesivos de igual duración, salvo que cualquiera de las partes notifique por escrito a la otra su decisión de no renovarlo con al menos treinta (30) días de anticipación a la fecha de vencimiento.'
+    );
+
+    addClause('SEXTA [VALOR DEL CONTRATO Y FORMA DE PAGO]:',
+        'El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán de manera semanal, previa presentación de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. EL CONTRATANTE efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ' + cta + ' del banco ' + banco + ' en moneda córdobas a nombre de ' + titular + '.'
+    );
+
+    addClause('SÉPTIMA [MANTENIMIENTO DE VALOR]:',
+        'Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).'
+    );
+
+    addClause('OCTAVA [RELACIÓN COMERCIAL Y RESPONSABILIDAD LABORAL]:',
+        'Queda claramente convenido que la relación jurídica que une a las partes es de naturaleza estrictamente civil y mercantil independiente, por lo que no existe ni existirá ningún vínculo de subordinación laboral ni relación obrero-patronal entre EL CONTRATANTE y el personal dependiente o subcontratado por EL CONTRATISTA. En consecuencia, EL CONTRATISTA asume la responsabilidad exclusiva por el pago de salarios, prestaciones sociales, seguro social (INSS), aportes al INATEC y demás obligaciones laborales vigentes en la República de Nicaragua respecto a su personal.'
+    );
+
+    addClause('NOVENA [CONOCIMIENTOS TÉCNICOS Y CAPACIDAD]:',
+        'EL CONTRATISTA declara bajo promesa de ley que cuenta con los conocimientos técnicos, experiencia profesional comprobada, personal idóneo y licencias necesarias para desempeñar cabalmente los servicios encomendados, obligándose a ejecutar cada trabajo bajo las mejores prácticas de la ingeniería y refrigeración.'
+    );
+
+    addClause('DÉCIMA [GARANTÍA DE LOS TRABAJOS Y RESPONSABILIDAD CIVIL]:',
+        'EL CONTRATISTA otorga una garantía de DOCE (12) MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, EL CONTRATISTA corregirá de inmediato el daño sin costo alguno. Asimismo, responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.'
+    );
+
+    addClause('DÉCIMA PRIMERA [PENALIZACIONES Y MULTAS]:',
+        'El incumplimiento injustificado en los tiempos de entrega, retrasos en la atención de visitas o inasistencia a citas concertadas con los clientes facultará a EL CONTRATANTE a deducir una penalidad equivalente al uno punto veinticinco por ciento (1.25%) diario sobre el valor total de la orden de trabajo correspondiente, hasta por un período máximo de ocho (8) días hábiles, tras lo cual EL CONTRATANTE podrá rescindir unilateralmente el servicio y reasignarlo a otro proveedor, deduciendo los costos sobrevenidos a EL CONTRATISTA.'
+    );
+
+    addClause('DÉCIMA SEGUNDA [PROHIBICIÓN DE CESIÓN]:',
+        'EL CONTRATISTA no podrá ceder, transferir ni delegar total ni parcialmente los derechos, obligaciones o servicios derivados del presente contrato a favor de terceras personas naturales o jurídicas, sin el previo consentimiento expreso y por escrito de EL CONTRATANTE.'
+    );
+
+    addClause('DÉCIMA TERCERA [MODIFICACIONES Y ADENDAS]:',
+        'Cualquier modificación a los términos, condiciones, alcances o tarifas de este contrato deberá constar por escrito mediante Adenda debidamente rubricada y suscrita por los representantes autorizados de ambas partes.'
+    );
+
+    addClause('DÉCIMA CUARTA [CONFIDENCIALIDAD]:',
+        'EL CONTRATISTA se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.'
+    );
+
+    addClause('DÉCIMA QUINTA [AVISOS Y NOTIFICACIONES]:', [
+        'Todas las comunicaciones, avisos y notificaciones entre las partes se considerarán válidamente efectuadas en las siguientes direcciones:',
+        '• EL CONTRATANTE: Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: JOSE ALFREDO RAUDES ORTIZ / ÁNGEL CAMPOS (Tel: 7886-2226 / 8267-2246 - Correo: jose.raudes@sinsa.com.ni).',
+        '• EL CONTRATISTA: ' + nomCom + ', con domicilio en ' + dir + '. Con Atención a: ' + nomRep + ' (Teléfono: ' + tel + ' - Correo Electrónico: ' + correo + ').',
+        'Cualquier cambio de domicilio o datos de contacto deberá notificarse formalmente por escrito con al menos veinticuatro (24) horas de anticipación para que surta plenos efectos legales.'
+    ]);
+
+    addClause('DÉCIMA SEXTA [DOMICILIO CONTRACTUAL]:',
+        'Para todos los efectos legales y judiciales derivados del presente contrato, las partes fijan de común acuerdo como domicilio especial y contractual la ciudad de Managua, República de Nicaragua.'
+    );
+
+    addClause('DÉCIMA SÉPTIMA [SOLUCIÓN DE CONTROVERSIAS]:',
+        'Cualquier discrepancia, desavenencia o controversia que surja entre las partes en relación con la interpretación, ejecución o terminación del presente contrato, será sometida en primer lugar a un trámite de mediación y conciliación ante la Dirección de Resolución Alterna de Conflictos (DIRAC). Si transcurrido un plazo de diez (10) días hábiles las partes no alcanzaren un acuerdo conciliatorio satisfactorio, la controversia se ventilará ante los juzgados ordinarios competentes del departamento de Managua.'
+    );
+
+    addClause('DÉCIMA OCTAVA [EQUIPOS, HERRAMIENTAS E INSUMOS]:',
+        'EL CONTRATISTA suministrará a su propia costa todos los medios de transporte y movilización adecuados, así como las herramientas e instrumentos técnicos necesarios para la debida ejecución de los servicios (escaleras certificadas, bombas de vacío, manómetros digitales o análogos para refrigerantes R410A y R32, abocardadores excéntricos, llaves dinamométricas, amperímetros y multímetros). Cuando los materiales o repuestos de instalación sean provistos por EL CONTRATANTE, EL CONTRATISTA deberá retirarlos formalmente de las bodegas designadas presentando la orden respectiva.'
+    );
+
+    addClause('DÉCIMA NOVENA [ACEPTACIÓN]:',
+        'Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ' + dia + ' días del mes de ' + mes + ' del año ' + anio + '.'
+    );
+
+    // Tabla de Firmas (Fiel al documento oficial: espacio para firma autógrafa y línea superior)
     const sigBorderNone = {
         top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
         bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
@@ -3715,7 +3976,7 @@ async function buildDocxFromContractData(data) {
         ]
     }));
 
-    // Tabla de Tarifas Anexo I
+    // Tabla de Tarifas Anexo I con encabezados CODIGO, DESCRIPCION, PRECIO
     const cellBorderSolid = {
         top: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' },
         bottom: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' },
@@ -3729,23 +3990,23 @@ async function buildDocxFromContractData(data) {
             new TableCell({
                 width: { size: 20, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
-                shading: { fill: '1E293B' },
+                shading: { fill: '0F172A' },
                 margins: { top: 100, bottom: 100, left: 120, right: 120 },
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'RMS', bold: true, font, size: 18, color: 'FFFFFF' })] })]
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CODIGO', bold: true, font, size: 18, color: 'FFFFFF' })] })]
             }),
             new TableCell({
                 width: { size: 55, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
-                shading: { fill: '1E293B' },
+                shading: { fill: '0F172A' },
                 margins: { top: 100, bottom: 100, left: 120, right: 120 },
-                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DESCRIPCIÓN DE LA ACTIVIDAD', bold: true, font, size: 18, color: 'FFFFFF' })] })]
+                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DESCRIPCION', bold: true, font, size: 18, color: 'FFFFFF' })] })]
             }),
             new TableCell({
                 width: { size: 25, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
-                shading: { fill: '1E293B' },
+                shading: { fill: '0F172A' },
                 margins: { top: 100, bottom: 100, left: 120, right: 120 },
-                children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'TARIFA (C$)', bold: true, font, size: 18, color: 'FFFFFF' })] })]
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'PRECIO (C$)', bold: true, font, size: 18, color: 'FFFFFF' })] })]
             })
         ]
     });
@@ -3792,7 +4053,7 @@ async function buildDocxFromContractData(data) {
                 borders: cellBorderSolid,
                 shading: { fill: 'F1F5F9' },
                 margins: { top: 90, bottom: 90, left: 100, right: 100 },
-                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD', bold: true, font, size: 18 })] })]
+                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)', bold: true, font, size: 18 })] })]
             }),
             new TableCell({
                 width: { size: 25, type: WidthType.PERCENTAGE },
@@ -3825,6 +4086,8 @@ async function buildDocxFromContractData(data) {
                     margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
                 }
             },
+            headers: headerChildren.length > 0 ? { default: new Header({ children: headerChildren }) } : undefined,
+            footers: { default: new Footer({ children: footerChildren }) },
             children: sectionsChildren
         }]
     });
@@ -4514,6 +4777,24 @@ function downloadWordMLContract(data) {
     const safeName = (data.nombre_comercial || data.nombre || 'PROVEEDOR').replace(/[^a-zA-Z0-9_-]/g, '_');
     const nomRep = (data.nombre_representante || data.nombre || 'REPRESENTANTE LEGAL').toUpperCase();
     const nomCom = (data.nombre_comercial || data.nombre || 'CONTRATISTA').toUpperCase();
+    const cedula = data.cedula ? data.cedula.trim() : '[PENDIENTE: CÉDULA]';
+    const ruc = data.ruc && data.ruc.trim() ? ' y cédula RUC: ' + data.ruc.trim() : '';
+    const estCivil = (data.estado_civil || 'soltero').toLowerCase();
+    const prof = (data.profesion || 'técnico').toLowerCase();
+    const dom = data.domicilio || 'la ciudad de Managua';
+    const reg = data.regimen || 'Régimen General';
+    const banco = (data.banco || 'Banco').toUpperCase();
+    const cta = data.cuenta_bancaria ? data.cuenta_bancaria.trim() : '[PENDIENTE: CUENTA BANCARIA]';
+    const titular = (data.titular_cuenta || nomRep).toUpperCase();
+    const dir = data.direccion || 'Managua, Nicaragua';
+    const tel = data.telefono || 'Pendiente';
+    const correo = data.correo || 'Pendiente';
+
+    const now = new Date();
+    const dia = data.dia || now.getDate();
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const mes = data.mes || meses[now.getMonth()];
+    const anio = data.anio || now.getFullYear();
 
     let tableRowsHtml = '';
     (data.tarifas || []).forEach(t => {
@@ -4528,10 +4809,18 @@ function downloadWordMLContract(data) {
 
     tableRowsHtml += `
         <tr style="background-color: #F1F5F9; font-weight: bold;">
-            <td colspan="2" style="border: 1pt solid #cbd5e1; padding: 5pt;">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD</td>
+            <td colspan="2" style="border: 1pt solid #cbd5e1; padding: 5pt;">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)</td>
             <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt; color: #00A859;">C$ ${Number(data.tarifa_combustible || 12.0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
         </tr>
     `;
+
+    const logoHtml = (typeof SINSA_LOGO_BASE64 !== 'undefined' && SINSA_LOGO_BASE64)
+        ? `<div style="text-align: right; border-bottom: 2pt solid #000000; padding-bottom: 6pt; margin-bottom: 18pt;">
+             <img src="data:image/png;base64,${SINSA_LOGO_BASE64}" width="120" height="72" alt="SINSA" />
+           </div>`
+        : `<div style="text-align: right; border-bottom: 2pt solid #000000; padding-bottom: 6pt; margin-bottom: 18pt; font-weight: bold; font-size: 11pt;">
+             SILVA INTERNACIONAL S.A. (SINSA)
+           </div>`;
 
     const wordContent = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -4549,89 +4838,138 @@ function downloadWordMLContract(data) {
             <![endif]-->
             <style>
                 @page { size: 8.5in 11in; margin: 1in; }
-                body { font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.4; color: #000000; text-align: justify; }
-                h1 { text-align: center; font-size: 12pt; font-weight: bold; margin-bottom: 14pt; }
-                .clause-title { font-weight: bold; margin-top: 10pt; margin-bottom: 3pt; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10pt; margin-bottom: 10pt; font-size: 9pt; }
-                th { background-color: #1E293B; color: #FFFFFF; font-weight: bold; border: 1pt solid #000000; padding: 5pt; }
-                .sig-table { width: 100%; border: none; margin-top: 30pt; }
+                body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; line-height: 1.45; color: #000000; text-align: justify; }
+                h1 { text-align: center; font-size: 13pt; font-weight: bold; margin-bottom: 16pt; }
+                .clause-title { font-weight: bold; margin-top: 12pt; margin-bottom: 3pt; }
+                ul, ol { margin: 4pt 0 8pt 20pt; padding-left: 0; }
+                li { margin-bottom: 3pt; text-align: justify; }
+                table { width: 100%; border-collapse: collapse; margin-top: 12pt; margin-bottom: 12pt; font-size: 9.5pt; }
+                th { background-color: #0F172A; color: #FFFFFF; font-weight: bold; border: 1pt solid #000000; padding: 6pt; }
+                .sig-table { width: 100%; border: none; margin-top: 36pt; }
                 .sig-table td { width: 48%; border: none; text-align: center; vertical-align: top; }
                 .sig-bar { border-top: 1pt solid #000000; width: 75%; margin: 0 auto; padding-top: 4pt; font-weight: bold; }
             </style>
         </head>
         <body>
-            <h1>CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRES ACONDICIONADOS</h1>
-            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad, titular de cédula de identidad nicaragüense, quien actúa en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA (SINSA)</strong>, legalmente establecida conforme las leyes de la República de Nicaragua, según Testimonio de Escritura Pública número doce (12) de Constitución de Sociedad y Poder Especial de Representación número ciento noventa y dos (192), y que en lo sucesivo se denominará <strong>EL CONTRATANTE</strong>, y por otra parte, <strong>${nomRep}</strong>, mayor de edad, ${(data.estado_civil || 'casado').toLowerCase()}, ${(data.profesion || 'técnico').toLowerCase()}, con domicilio en ${data.domicilio || 'Managua'}, titular de cédula de identidad nicaragüense número: <strong>${data.cedula || '[PENDIENTE: CÉDULA]'}</strong>${data.ruc ? ` y cédula RUC: <strong>${data.ruc}</strong>` : ''}, quien actúa en nombre e interés de negocio bajo ${data.regimen || 'Régimen de Cuota Fija'} denominado <strong>${nomCom}</strong>, quien en adelante se denominará <strong>EL CONTRATISTA</strong>, ambas partes de común acuerdo convenimos en celebrar el siguiente:</p>
-            
-            <p style="text-align: center; font-weight: bold; margin: 12pt 0;">CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS</p>
+            ${logoHtml}
+
+            <h1>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS.</h1>
+
+            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; y por otra parte, <strong>${nomRep}</strong>, mayor de edad, ${estCivil}, ${prof}, con domicilio en ${dom}, con cédula de identidad nicaragüense número: <strong>${cedula}</strong>${ruc}, quien actúa en nombre y representación del negocio mercantil bajo ${reg} denominado <strong>${nomCom}</strong>, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:</p>
 
             <div class="clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
-            <p>El presente contrato tiene por objeto la prestación del servicio de instalación de equipos de aire acondicionado, incluyendo la colocación, conexión eléctrica, pruebas de funcionamiento y puesta en marcha de los sistemas, conforme a las especificaciones técnicas y condiciones establecidas por el CLIENTE.</p>
+            <p>Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>.</p>
 
             <div class="clause-title">SEGUNDA [ALCANCES DEL CONTRATO]:</div>
-            <p>Los alcances de los trabajos a realizar por EL CONTRATISTA estarán sujetos a visitar el local previamente indicado, determinar la lista de insumos y materiales requeridos, y realizar la instalación y mantenimientos en residencias o comercios programados por EL CONTRATANTE.</p>
+            <p>Los alcances de los servicios a brindar por parte de <strong>EL CONTRATISTA</strong> comprenden:</p>
+            <ul>
+                <li><strong>Sección 1 (Visita previa):</strong> Presentarse en el sitio o inmueble indicado por EL CONTRATANTE, inspeccionar las condiciones físicas, eléctricas y mecánicas del área de instalación, y determinar la factibilidad técnica y los insumos complementarios requeridos.</li>
+                <li><strong>Sección 2 (Lista de materiales):</strong> Remitir al personal de Centro de Servicios de EL CONTRATANTE el informe técnico detallado y la lista de materiales adicionales no contemplados en el kit básico que deban ser presupuestados y facturados al cliente final.</li>
+                <li><strong>Sección 3 (Ejecución e instalación en residencias o comercios):</strong> Ejecutar las instalaciones de equipos de aire acondicionado tipo Split u otras capacidades asignadas, cumpliendo estrictamente los estándares técnicos del fabricante, pruebas de vacío con bomba, sellado hermético de tuberías, fijación segura de condensadoras y evaporadoras, limpieza del área de trabajo y entrega a entera satisfacción del cliente.</li>
+            </ul>
 
             <div class="clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
-            <p>Forman parte integral del presente contrato los siguientes documentos: Anexo de tarifas de instalación y combustible, Órdenes de Compra aprobadas, Órdenes de Trabajo de levantamiento de visita, Actas de Recepción final firmadas por el cliente receptor, y Facturas comerciales por cada prestación brindada.</p>
+            <p>Forman parte integrante del presente contrato los siguientes documentos:</p>
+            <ol>
+                <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de Managua.</li>
+                <li>Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por EL CONTRATANTE para cada labor asignada.</li>
+                <li>El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de EL CONTRATANTE.</li>
+                <li>Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.</li>
+                <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
+            </ol>
 
             <div class="clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
-            <p>Portar debidamente el uniforme de Maestros o Centro de Servicios, llevar a cabo las instalaciones con los más altos estándares de calidad, reportar incidencias inmediatas en ruta, y asumir los costos por reclamos atribuibles a mala instalación o fallas de mano de obra en garantía.</p>
+            <p><strong>EL CONTRATISTA</strong> se compromete formalmente a:</p>
+            <ol>
+                <li>Portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por EL CONTRATANTE (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.</li>
+                <li>Se prohíbe de manera expresa a EL CONTRATISTA y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.</li>
+                <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
+                <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de EL CONTRATANTE y las normas técnicas aplicables en Nicaragua.</li>
+                <li>Reportar inmediatamente a los coordinadores de EL CONTRATANTE cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
+                <li>Cumplir estrictamente con la programación de citas y horarios previamente coordinados con el cliente y notificados por EL CONTRATANTE.</li>
+                <li>Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de EL CONTRATANTE.</li>
+                <li>Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.</li>
+                <li>Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para EL CONTRATANTE ni para el cliente.</li>
+                <li>Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.</li>
+            </ol>
 
-            <div class="clause-title">QUINTA [RESPONSABILIDAD EN MATERIA DE HIGIENE Y SEGURIDAD OCUPACIONAL]:</div>
-            <p>EL CONTRATISTA se obliga a cumplir de manera estricta con todas las disposiciones de la Ley N.º 618 "Ley General de Higiene y Seguridad del Trabajo", garantizando certificaciones médicas ocupacionales vigentes, certificación para trabajos en altura mayores a 1.80 metros, acreditación técnica en seguridad eléctrica, y el uso permanente de Equipos de Protección Personal (EPP).</p>
+            <div class="clause-title">QUINTA [PLAZO DEL CONTRATO]:</div>
+            <p>El plazo del presente contrato es de DOCE (12) MESES calendario, contados a partir de la fecha de su suscripción. Este plazo se prorrogará automáticamente por períodos sucesivos de igual duración, salvo que cualquiera de las partes notifique por escrito a la otra su decisión de no renovarlo con al menos treinta (30) días de anticipación a la fecha de vencimiento.</p>
 
-            <div class="clause-title">SEXTA [PLAZO]:</div>
-            <p>El plazo de este contrato es de DOCE (12) meses contados a partir de su firma, prorrogable automáticamente por períodos iguales salvo notificación escrita en contrario con 30 días de anticipación.</p>
+            <div class="clause-title">SEXTA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
+            <p>El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán de manera semanal, previa presentación de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: <strong>${cta}</strong> del banco <strong>${banco}</strong> en moneda córdobas a nombre de <strong>${titular}</strong>.</p>
 
-            <div class="clause-title">SÉPTIMA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
-            <p>Las partes acuerdan que el valor de los servicios estará regido por las tarifas detalladas en el Anexo I. Previa validación semanal de las órdenes de trabajo realizadas y facturación correspondiente con retenciones de ley aplicadas, los pagos serán realizados mediante transferencia bancaria a la cuenta de <strong>${(data.banco || 'BAC Credomatic').toUpperCase()}</strong> número: <strong>${data.cuenta_bancaria || 'PENDIENTE'}</strong> en moneda córdobas a nombre de <strong>${(data.titular_cuenta || nomRep).toUpperCase()}</strong>.</p>
+            <div class="clause-title">SÉPTIMA [MANTENIMIENTO DE VALOR]:</div>
+            <p>Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).</p>
 
-            <div class="clause-title">OCTAVA [MANTENIMIENTO DE VALOR]:</div>
-            <p>Se reconoce la cláusula de mantenimiento de valor en córdobas conforme al tipo de cambio oficial emitido por el Banco Central de Nicaragua al día del pago efectivo (Art. 38, Ley 732).</p>
+            <div class="clause-title">OCTAVA [RELACIÓN COMERCIAL Y RESPONSABILIDAD LABORAL]:</div>
+            <p>Queda claramente convenido que la relación jurídica que une a las partes es de naturaleza estrictamente civil y mercantil independiente, por lo que no existe ni existirá ningún vínculo de subordinación laboral ni relación obrero-patronal entre <strong>EL CONTRATANTE</strong> y el personal dependiente o subcontratado por <strong>EL CONTRATISTA</strong>. En consecuencia, <strong>EL CONTRATISTA</strong> asume la responsabilidad exclusiva por el pago de salarios, prestaciones sociales, seguro social (INSS), aportes al INATEC y demás obligaciones laborales vigentes en la República de Nicaragua respecto a su personal.</p>
 
-            <div class="clause-title">NOVENA [NATURALEZA DE LA RELACIÓN Y SEGURIDAD SOCIAL]:</div>
-            <p>La relación es estrictamente civil y no genera vínculo laboral ni prestaciones sociales entre las partes. EL CONTRATISTA se compromete a mantener a su personal afiliado al Instituto Nicaragüense de Seguridad Social (INSS) y al día con sus contribuciones.</p>
+            <div class="clause-title">NOVENA [CONOCIMIENTOS TÉCNICOS Y CAPACIDAD]:</div>
+            <p><strong>EL CONTRATISTA</strong> declara bajo promesa de ley que cuenta con los conocimientos técnicos, experiencia profesional comprobada, personal idóneo y licencias necesarias para desempeñar cabalmente los servicios encomendados, obligándose a ejecutar cada trabajo bajo las mejores prácticas de la ingeniería y refrigeración.</p>
 
-            <div class="clause-title">DÉCIMA A DÉCIMA SEXTA [CONDICIONES TÉCNICAS, GARANTÍA Y CONFIDENCIALIDAD]:</div>
-            <p>El CONTRATISTA garantiza vicios ocultos de las instalaciones por el término de un (1) año tras la firma del acta de entrega final. En caso de atrasos injustificados, se establece una penalización del 1.25% diario hasta un máximo de 8 días. El contrato no podrá ser cedido sin autorización escrita.</p>
+            <div class="clause-title">DÉCIMA [GARANTÍA DE LOS TRABAJOS Y RESPONSABILIDAD CIVIL]:</div>
+            <p><strong>EL CONTRATISTA</strong> otorga una garantía de DOCE (12) MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> corregirá de inmediato el daño sin costo alguno. Asimismo, responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.</p>
 
-            <div class="clause-title">DÉCIMA SÉPTIMA [AVISOS Y NOTIFICACIONES]:</div>
-            <p>
-                <strong>CONTRATANTE:</strong> Oficinas Centro de Servicios SINSA, Centro de Distribución, Rotonda El Periodista 100m al este, Managua. Con Atención a: Jose Raudes / Ángel Campos (Tel: 78862226 / 82672246 - jose.raudes@sinsa.com.ni).<br>
-                <strong>CONTRATISTA:</strong> ${nomCom}, ${data.direccion || 'Managua, Nicaragua'}. Con Atención a: ${nomRep} (Tel: ${data.telefono || ''} - ${data.correo || ''}).
-            </p>
+            <div class="clause-title">DÉCIMA PRIMERA [PENALIZACIONES Y MULTAS]:</div>
+            <p>El incumplimiento injustificado en los tiempos de entrega, retrasos en la atención de visitas o inasistencia a citas concertadas con los clientes facultará a <strong>EL CONTRATANTE</strong> a deducir una penalidad equivalente al uno punto veinticinco por ciento (1.25%) diario sobre el valor total de la orden de trabajo correspondiente, hasta por un período máximo de ocho (8) días hábiles, tras lo cual <strong>EL CONTRATANTE</strong> podrá rescindir unilateralmente el servicio y reasignarlo a otro proveedor, deduciendo los costos sobrevenidos a <strong>EL CONTRATISTA</strong>.</p>
 
-            <div class="clause-title">DÉCIMA OCTAVA A VIGÉSIMA [SOLUCIÓN DE CONTROVERSIAS Y ACEPTACIÓN]:</div>
-            <p>En caso de controversias, las partes acudirán en primera instancia ante la Dirección de Resolución Alterna de Conflictos (DIRAC). Se prohíbe terminantemente la contratación o participación de menores de edad.</p>
+            <div class="clause-title">DÉCIMA SEGUNDA [PROHIBICIÓN DE CESIÓN]:</div>
+            <p><strong>EL CONTRATISTA</strong> no podrá ceder, transferir ni delegar total ni parcialmente los derechos, obligaciones o servicios derivados del presente contrato a favor de terceras personas naturales o jurídicas, sin el previo consentimiento expreso y por escrito de <strong>EL CONTRATANTE</strong>.</p>
 
-            <p style="margin-top: 15pt;">En fe de lo cual firmamos el presente contrato, en dos tantos de un mismo tenor, en la ciudad de Managua, a los ${data.dia || new Date().getDate()} días del mes de ${data.mes || 'septiembre'} del año ${data.anio || 2026}.</p>
+            <div class="clause-title">DÉCIMA TERCERA [MODIFICACIONES Y ADENDAS]:</div>
+            <p>Cualquier modificación a los términos, condiciones, alcances o tarifas de este contrato deberá constar por escrito mediante Adenda debidamente rubricada y suscrita por los representantes autorizados de ambas partes.</p>
+
+            <div class="clause-title">DÉCIMA CUARTA [CONFIDENCIALIDAD]:</div>
+            <p><strong>EL CONTRATISTA</strong> se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.</p>
+
+            <div class="clause-title">DÉCIMA QUINTA [AVISOS Y NOTIFICACIONES]:</div>
+            <p>Todas las comunicaciones, avisos y notificaciones entre las partes se considerarán válidamente efectuadas en las siguientes direcciones:</p>
+            <ul>
+                <li><strong>EL CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: <strong>JOSE ALFREDO RAUDES ORTIZ / ÁNGEL CAMPOS</strong> (Tel: 7886-2226 / 8267-2246 - Correo: jose.raudes@sinsa.com.ni).</li>
+                <li><strong>EL CONTRATISTA:</strong> ${nomCom}, con domicilio en ${dir}. Con Atención a: ${nomRep} (Tel: ${tel} - Correo Electrónico: ${correo}).</li>
+            </ul>
+            <p>Cualquier cambio de domicilio o datos de contacto deberá notificarse formalmente por escrito con al menos veinticuatro (24) horas de anticipación para que surta plenos efectos legales.</p>
+
+            <div class="clause-title">DÉCIMA SEXTA [DOMICILIO CONTRACTUAL]:</div>
+            <p>Para todos los efectos legales y judiciales derivados del presente contrato, las partes fijan de común acuerdo como domicilio especial y contractual la ciudad de Managua, República de Nicaragua.</p>
+
+            <div class="clause-title">DÉCIMA SÉPTIMA [SOLUCIÓN DE CONTROVERSIAS]:</div>
+            <p>Cualquier discrepancia, desavenencia o controversia que surja entre las partes en relación con la interpretación, ejecución o terminación del presente contrato, será sometida en primer lugar a un trámite de mediación y conciliación ante la Dirección de Resolución Alterna de Conflictos (DIRAC). Si transcurrido un plazo de diez (10) días hábiles las partes no alcanzaren un acuerdo conciliatorio satisfactorio, la controversia se ventilará ante los juzgados ordinarios competentes del departamento de Managua.</p>
+
+            <div class="clause-title">DÉCIMA OCTAVA [EQUIPOS, HERRAMIENTAS E INSUMOS]:</div>
+            <p><strong>EL CONTRATISTA</strong> suministrará a su propia costa todos los medios de transporte y movilización adecuados, así como las herramientas e instrumentos técnicos necesarios para la debida ejecución de los servicios (escaleras certificadas, bombas de vacío, manómetros digitales o análogos para refrigerantes R410A y R32, abocardadores excéntricos, llaves dinamométricas, amperímetros y multímetros). Cuando los materiales o repuestos de instalación sean provistos por <strong>EL CONTRATANTE</strong>, <strong>EL CONTRATISTA</strong> deberá retirarlos formalmente de las bodegas designadas presentando la orden respectiva.</p>
+
+            <div class="clause-title">DÉCIMA NOVENA [ACEPTACIÓN]:</div>
+            <p>Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ${dia} días del mes de ${mes} del año ${anio}.</p>
 
             <table class="sig-table">
                 <tr>
                     <td>
                         <div class="sig-bar">EL CONTRATANTE</div>
                         <div>Oscar René Vargas Reyes</div>
-                        <div style="font-size: 8pt; color: #555555;">SILVA INTERNACIONAL, S.A. (SINSA)</div>
+                        <div style="font-size: 8.5pt; color: #555555;">SILVA INTERNACIONAL S.A. (SINSA)</div>
                     </td>
                     <td>
                         <div class="sig-bar">EL CONTRATISTA</div>
                         <div>${nomRep}</div>
-                        <div style="font-size: 8pt; color: #555555;">${nomCom}</div>
+                        <div style="font-size: 8.5pt; color: #555555;">${nomCom}</div>
                     </td>
                 </tr>
             </table>
 
             <br style="page-break-before: always;">
-            <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 20pt; margin-bottom: 10pt;">
+            ${logoHtml}
+            <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 20pt; margin-bottom: 12pt;">
                 ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS - ${nomCom}
             </div>
 
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 20%; text-align: center;">RMS</th>
-                        <th style="width: 55%; text-align: left;">DESCRIPCIÓN DE LA ACTIVIDAD</th>
-                        <th style="width: 25%; text-align: right;">TARIFA (C$)</th>
+                        <th style="width: 20%; text-align: center;">CODIGO</th>
+                        <th style="width: 55%; text-align: left;">DESCRIPCIÓN</th>
+                        <th style="width: 25%; text-align: right;">PRECIO (C$)</th>
                     </tr>
                 </thead>
                 <tbody>

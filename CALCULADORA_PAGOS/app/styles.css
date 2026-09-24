@@ -1478,18 +1478,69 @@ body {
     border-color: rgba(0, 168, 89, 0.25);
 }
 
+.contract-header-logo-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    border-bottom: 2px solid #000000;
+    padding-bottom: 0.6rem;
+    margin-bottom: 2rem;
+}
+
+.contract-header-logo-row img {
+    height: 46px;
+    width: auto;
+    object-fit: contain;
+}
+
+.contract-footer-page-row {
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid #CBD5E1;
+    padding-top: 0.5rem;
+    margin-top: 2.5rem;
+    font-size: 0.85rem;
+    color: #64748B;
+    font-family: 'Times New Roman', Times, serif;
+}
+
 .contract-header-title {
     text-align: center;
     font-weight: bold;
     font-size: 1.2rem;
     margin-bottom: 1.8rem;
     letter-spacing: 0.5px;
+    line-height: 1.4;
 }
 
 .contract-clause-title {
     font-weight: bold;
     margin-top: 1.4rem;
     margin-bottom: 0.4rem;
+}
+
+.contract-clause-list {
+    margin: 0.5rem 0 0.8rem 1.8rem;
+    padding-left: 0.5rem;
+    list-style-type: disc;
+}
+
+.contract-clause-list li {
+    margin-bottom: 0.4rem;
+    text-align: justify;
+    line-height: 1.6;
+}
+
+.contract-clause-numbered {
+    margin: 0.5rem 0 0.8rem 1.8rem;
+    padding-left: 0.5rem;
+    list-style-type: decimal;
+}
+
+.contract-clause-numbered li {
+    margin-bottom: 0.4rem;
+    text-align: justify;
+    line-height: 1.6;
 }
 
 .contract-signatures-grid {
