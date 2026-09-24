@@ -633,6 +633,9 @@
                                 </div>
                             </div>
 
+                            <!-- Flujo de Aprobación Legal y Carga de Contrato Rubricado -->
+                            <div id="wizard-rubrication-box"></div>
+
                             <!-- Live Contract Document Viewer -->
                             <div class="contract-paper-viewer" id="contract-paper-viewer">
                                 <!-- Contract content rendered live -->
@@ -691,6 +694,13 @@
                                 <option value="ALL">Todos los Estados</option>
                                 <option value="ACTIVO">Solo Activos (Vinculados)</option>
                                 <option value="BORRADOR">Solo Borradores / En Proceso</option>
+                            </select>
+
+                            <label style="font-size: 0.85rem; color: var(--text-muted); margin-left: 0.5rem;">Contrato:</label>
+                            <select id="directory-contract-filter" class="custom-select" style="width: 175px;">
+                                <option value="ALL">Todos los Contratos</option>
+                                <option value="RUBRICADO">✓ Contrato Rubricado</option>
+                                <option value="PENDIENTE">⏳ VoBo Legal Pendiente</option>
                             </select>
                         </div>
                     </div>
@@ -850,6 +860,55 @@
                 <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 0.6rem; border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 1rem;">
                     <button id="btn-cancel-tarifas" class="btn btn-outline">Cancelar</button>
                     <button id="btn-save-modal-tarifas" class="btn btn-primary" style="background: var(--primary); color: white; border: none;">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay for Managing / Uploading Rubricated Contract -->
+        <div id="rubricar-modal-overlay" class="overlay hidden">
+            <div class="modal" style="max-width: 600px;">
+                <div class="modal-header">
+                    <div>
+                        <h3 id="rubricar-modal-title" style="color: var(--primary);">📜 Contrato Final Rubricado</h3>
+                        <p id="rubricar-modal-subtitle" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">Carga y resguardo del contrato formalizado con VoBo de Legal y firmas de las partes.</p>
+                    </div>
+                    <button id="close-rubricar-modal" class="btn-icon">✖</button>
+                </div>
+                <div class="modal-body" style="padding: 1rem 0;">
+                    <div style="background: var(--bg-panel-hover); padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; font-size: 0.88rem; line-height: 1.5; border-left: 4px solid var(--primary);">
+                        <strong style="color: var(--primary);">Flujo de Aprobación Legal & Rúbrica:</strong>
+                        <p style="margin: 0.35rem 0 0 0; color: var(--text-muted); font-size: 0.83rem;">
+                            1. Descargue el borrador formal generado por CalcPago.<br>
+                            2. El Área Legal revisa, valida y agrega cláusulas o adendas correspondientes.<br>
+                            3. Ambas partes (SINSA y Contratista) firman y rubrican cada una de las hojas.<br>
+                            4. Suba aquí el documento digital finalizado (PDF, Word o Imagen escaneada).
+                        </p>
+                    </div>
+
+                    <div id="rubricar-modal-current-status" style="margin-bottom: 1.2rem;">
+                        <!-- Contenido dinámico según si ya tiene contrato o no -->
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                            Seleccionar Archivo Digital (.pdf, .docx, .png, .jpg)
+                        </label>
+                        <input type="file" id="input-modal-rubricar" class="custom-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                        <small style="display: block; color: var(--text-muted); margin-top: 0.3rem;">Formatos recomendados: PDF firmado o DOCX con control de cambios legal.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                            Observaciones / Dictamen de Legal (Opcional)
+                        </label>
+                        <textarea id="modal-rubricar-notes" class="custom-input" rows="2" placeholder="Ej. Aprobado por Asesoría Legal. Rubricado por Apoderado Especial SINSA y Representante el 25/09/2026."></textarea>
+                    </div>
+                </div>
+                <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 0.6rem; border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 1rem;">
+                    <button id="btn-cancel-rubricar" class="btn btn-outline">Cancelar</button>
+                    <button id="btn-save-rubricar" class="btn btn-primary" style="background: var(--primary); color: white; border: none; font-weight: 600;">
+                        💾 Guardar en Expediente
+                    </button>
                 </div>
             </div>
         </div>

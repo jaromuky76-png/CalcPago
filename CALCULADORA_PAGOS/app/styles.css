@@ -1367,6 +1367,37 @@ body {
     animation: fadeIn 0.25s ease;
 }
 
+.rubrication-workflow-box {
+    margin: 1.5rem 0;
+    padding: 1.2rem;
+    background: var(--bg-panel);
+    border: 1.5px solid var(--glass-border);
+    border-radius: 12px;
+    transition: all 0.25s ease;
+}
+
+.rubrication-workflow-box.has-file {
+    border-color: rgba(16, 185, 129, 0.45);
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.05), var(--bg-panel));
+}
+
+.badge-tag.badge-rubricated {
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.badge-tag.badge-legal-pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.doc-checklist-card.card-rubricado {
+    border: 1.5px solid rgba(16, 185, 129, 0.45);
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.05), var(--bg-panel));
+}
+
 .doc-upload-zone {
     border: 1.5px dashed var(--glass-border);
     border-radius: 8px;

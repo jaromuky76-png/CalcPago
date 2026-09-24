@@ -2022,10 +2022,67 @@ let proveedoresRegistrados = [];
 let currentWizardStep = 1;
 let wizardDocuments = {};
 let wizardTarifas = [];
+let wizardContratoRubricado = null;
 let isRestoringDraft = false;
 let autosaveTimer = null;
 const STORAGE_KEY_WIZARD_DRAFT = 'calcPago_activeWizardDraft';
 const STORAGE_KEY_PROVIDERS = 'calcPago_proveedoresRegistrados';
+
+// Utilidades del Módulo de Proveedores
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function formatFileSize(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function safeSaveProvidersLocally(providers) {
+    try {
+        localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(providers));
+    } catch (e) {
+        console.warn("Límite de cuota de localStorage alcanzado. Almacenando versión sin binarios pesados en local:", e);
+        try {
+            const lightList = providers.map(p => {
+                if (p.contrato_rubricado && p.contrato_rubricado.dataUrl && p.contrato_rubricado.dataUrl.length > 50000) {
+                    const clone = { ...p, contrato_rubricado: { ...p.contrato_rubricado } };
+                    delete clone.contrato_rubricado.dataUrl;
+                    clone.contrato_rubricado.hasStoredData = true;
+                    return clone;
+                }
+                return p;
+            });
+            localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(lightList));
+        } catch (err2) {
+            console.error("Error al guardar respaldo ligero en localStorage:", err2);
+        }
+    }
+}
+
+function viewOrDownloadRubricatedFile(fileRecord) {
+    if (!fileRecord || !fileRecord.dataUrl) {
+        alert("⚠️ No se encontró el archivo digital del contrato rubricado en el registro.");
+        return;
+    }
+    const a = document.createElement('a');
+    a.href = fileRecord.dataUrl;
+    a.download = fileRecord.fileName || 'Contrato_Rubricado_SINSA.pdf';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+    }, 200);
+}
 
 // Calcular Porcentaje de Avance del Proveedor (0 - 100%)
 function calculateOnboardingProgress(data) {
@@ -2208,9 +2265,11 @@ function loadDraftIntoForm(draft, targetStep = null) {
 
     wizardDocuments = draft.documentos ? JSON.parse(JSON.stringify(draft.documentos)) : {};
     wizardTarifas = draft.tarifas ? JSON.parse(JSON.stringify(draft.tarifas)) : [];
+    wizardContratoRubricado = draft.contrato_rubricado ? JSON.parse(JSON.stringify(draft.contrato_rubricado)) : null;
 
     renderWizardDocs();
     renderWizardTariffTable();
+    renderWizardRubricationSection();
 
     isRestoringDraft = false;
 
@@ -2259,7 +2318,7 @@ async function saveCurrentWizardAsDraft(goToDirectory = true) {
         proveedoresRegistrados.push(draftRecord);
     }
 
-    localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(proveedoresRegistrados));
+    safeSaveProvidersLocally(proveedoresRegistrados);
 
     // Intentar sincronizar con backend
     try {
@@ -2314,7 +2373,7 @@ async function deleteProviderDraft(provName) {
     proveedoresRegistrados = proveedoresRegistrados.filter(p => 
         (p.nombre_comercial || p.nombre || '').trim().toUpperCase() !== provName.trim().toUpperCase()
     );
-    localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(proveedoresRegistrados));
+    safeSaveProvidersLocally(proveedoresRegistrados);
 
     // Si coincide con el borrador activo, limpiarlo
     const activeDraftJson = localStorage.getItem(STORAGE_KEY_WIZARD_DRAFT);
@@ -2732,6 +2791,7 @@ function goToWizardStep(stepNum) {
         renderWizardTariffTable();
     } else if (stepNum === 4) {
         renderContractPreview();
+        renderWizardRubricationSection();
     }
 
     window.scrollTo({ top: 120, behavior: 'smooth' });
@@ -2750,6 +2810,8 @@ function resetWizardForm() {
     });
     wizardDocuments = {};
     wizardTarifas = [];
+    wizardContratoRubricado = null;
+    renderWizardRubricationSection();
     localStorage.removeItem(STORAGE_KEY_WIZARD_DRAFT);
     isRestoringDraft = false;
 
@@ -3126,8 +3188,152 @@ function getWizardData() {
         anio: 2026,
         tarifa_combustible: parseFloat(document.getElementById('wiz-fuel-rate')?.value) || 12.0,
         tarifas: wizardTarifas ? [...wizardTarifas] : [],
-        documentos: wizardDocuments ? { ...wizardDocuments } : {}
+        documentos: wizardDocuments ? { ...wizardDocuments } : {},
+        contrato_rubricado: wizardContratoRubricado ? JSON.parse(JSON.stringify(wizardContratoRubricado)) : null,
+        estado_contrato: (wizardContratoRubricado && wizardContratoRubricado.fileName) ? 'RUBRICADO' : 'PENDIENTE_RUBRICA'
     };
+}
+
+// Renderizar Sección de Visto Bueno Legal y Carga de Contrato Rubricado en Paso 4
+function renderWizardRubricationSection() {
+    const container = document.getElementById('wizard-rubrication-box');
+    if (!container) return;
+
+    const hasFile = !!(wizardContratoRubricado && wizardContratoRubricado.fileName);
+
+    let html = `
+        <div class="rubrication-workflow-box ${hasFile ? 'has-file' : ''}">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 0.8rem;">
+                <div>
+                    <h4 style="margin: 0; color: var(--primary); font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>⚖️</span>
+                        <span>Flujo de Aprobación Legal y Carga de Contrato Rubricado</span>
+                    </h4>
+                    <p style="margin: 0.3rem 0 0 0; font-size: 0.82rem; color: var(--text-muted); max-width: 680px;">
+                        El borrador generado se somete a revisión y Visto Bueno (VoBo) del Área Legal. Una vez acordadas las adendas y rubricadas todas las páginas por ambas partes (SINSA y Contratista), adjunte el documento final.
+                    </p>
+                </div>
+                <span class="badge-tag ${hasFile ? 'badge-rubricated' : 'badge-legal-pending'}" style="margin: 0;">
+                    ${hasFile ? '✓ Contrato Final Rubricado' : '⏳ VoBo Legal / Rúbrica Pendiente'}
+                </span>
+            </div>
+
+            <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 8px; padding: 0.85rem; margin-bottom: 1rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; font-size: 0.8rem;">
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                        <span style="font-size: 1.1rem; line-height: 1;">1️⃣</span>
+                        <div>
+                            <strong>Descarga Borrador</strong>
+                            <div style="color: var(--text-muted);">Descargue el .docx para remitir a Legal.</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                        <span style="font-size: 1.1rem; line-height: 1;">2️⃣</span>
+                        <div>
+                            <strong>VoBo Legal & Rúbricas</strong>
+                            <div style="color: var(--text-muted);">Legal valida y se rubrica en cada una de las hojas.</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                        <span style="font-size: 1.1rem; line-height: 1;">3️⃣</span>
+                        <div>
+                            <strong>Carga Documento Final</strong>
+                            <div style="color: var(--text-muted);">Adjunte el PDF o digital final para el expediente.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    `;
+
+    if (hasFile) {
+        html += `
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 8px; padding: 0.9rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="font-size: 1.8rem; line-height: 1;">📑</div>
+                    <div>
+                        <div style="font-weight: 700; color: #059669; font-size: 0.9rem;">
+                            ${escapeHtml(wizardContratoRubricado.fileName)}
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+                            <span>Tamaño: ${wizardContratoRubricado.fileSize || 'N/D'}</span> • 
+                            <span>Cargado: ${wizardContratoRubricado.uploadDate || 'Hoy'}</span>
+                            ${wizardContratoRubricado.observaciones ? ` • <span style="font-style: italic;">"${escapeHtml(wizardContratoRubricado.observaciones)}"</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button id="btn-wiz-view-rubricado" class="btn btn-outline" style="font-size: 0.82rem; color: #059669; border-color: rgba(16, 185, 129, 0.5);">
+                        📥 Descargar / Ver
+                    </button>
+                    <button id="btn-wiz-change-rubricado" class="btn btn-outline" style="font-size: 0.82rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.4);">
+                        🗑️ Reemplazar
+                    </button>
+                </div>
+            </div>
+            <input type="file" id="input-wiz-contrato-rubricado" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display: none;">
+        `;
+    } else {
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem; background: var(--bg-card); border: 1.5px dashed var(--glass-border); border-radius: 8px; padding: 1rem;">
+                <div>
+                    <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-main);">
+                        ¿Ya cuenta con el contrato final revisado por Legal y rubricado por las partes?
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+                        Suba el archivo escaneado (PDF, DOCX o imagen). Si el trámite con Legal sigue en curso, puede finalizar la vinculación y subirlo más adelante desde el <strong>Directorio</strong>.
+                    </div>
+                </div>
+                <div>
+                    <input type="file" id="input-wiz-contrato-rubricado" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display: none;">
+                    <button id="btn-trigger-upload-wiz-rubricado" class="btn btn-outline" style="font-size: 0.85rem; border-color: var(--primary); color: var(--primary); font-weight: 600;">
+                        📤 Subir Contrato Rubricado (.pdf / .docx)
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+    container.innerHTML = html;
+
+    const inputWiz = document.getElementById('input-wiz-contrato-rubricado');
+    const btnTrigger = document.getElementById('btn-trigger-upload-wiz-rubricado');
+    const btnChange = document.getElementById('btn-wiz-change-rubricado');
+    const btnView = document.getElementById('btn-wiz-view-rubricado');
+
+    if (btnTrigger && inputWiz) {
+        btnTrigger.addEventListener('click', () => inputWiz.click());
+    }
+
+    if (btnChange && inputWiz) {
+        btnChange.addEventListener('click', () => inputWiz.click());
+    }
+
+    if (btnView && wizardContratoRubricado) {
+        btnView.addEventListener('click', () => viewOrDownloadRubricatedFile(wizardContratoRubricado));
+    }
+
+    if (inputWiz) {
+        inputWiz.addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const dataUrl = evt.target.result;
+                wizardContratoRubricado = {
+                    fileName: file.name,
+                    fileSize: formatFileSize(file.size),
+                    uploadDate: new Date().toLocaleString(),
+                    dataUrl: dataUrl,
+                    observaciones: 'Cargado durante formalización en asistente'
+                };
+                triggerWizardAutosave();
+                renderWizardRubricationSection();
+            };
+            reader.readAsDataURL(file);
+        });
+    }
 }
 
 // Renderizar Vista Previa del Contrato Formal en Paso 4
@@ -3805,6 +4011,10 @@ async function finishProviderOnboarding() {
     data.estado = 'ACTIVO';
     data.progreso = 100;
     data.fecha_formalizacion = new Date().toLocaleDateString();
+    if (!data.contrato_rubricado && wizardContratoRubricado) {
+        data.contrato_rubricado = JSON.parse(JSON.stringify(wizardContratoRubricado));
+    }
+    data.estado_contrato = (data.contrato_rubricado && data.contrato_rubricado.fileName) ? 'RUBRICADO' : 'PENDIENTE_RUBRICA';
 
     // 1. Guardar en lista de proveedores registrados
     const existingIdx = proveedoresRegistrados.findIndex(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === provName.toUpperCase());
@@ -3814,7 +4024,7 @@ async function finishProviderOnboarding() {
         proveedoresRegistrados.push(data);
     }
 
-    localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(proveedoresRegistrados));
+    safeSaveProvidersLocally(proveedoresRegistrados);
 
     // 2. Limpiar borrador temporal activo
     localStorage.removeItem(STORAGE_KEY_WIZARD_DRAFT);
@@ -3874,6 +4084,7 @@ function initDirectoryModule() {
     document.getElementById('directory-search')?.addEventListener('input', renderDirectory);
     document.getElementById('directory-regimen-filter')?.addEventListener('change', renderDirectory);
     document.getElementById('directory-status-filter')?.addEventListener('change', renderDirectory);
+    document.getElementById('directory-contract-filter')?.addEventListener('change', renderDirectory);
 
     // Modales de expediente y tarifas
     document.getElementById('close-expediente')?.addEventListener('click', () => {
@@ -3888,6 +4099,20 @@ function initDirectoryModule() {
     document.getElementById('btn-cancel-tarifas')?.addEventListener('click', () => {
         document.getElementById('edit-tarifas-modal-overlay')?.classList.add('hidden');
     });
+
+    // Modal de Contrato Rubricado
+    document.getElementById('close-rubricar-modal')?.addEventListener('click', () => {
+        document.getElementById('rubricar-modal-overlay')?.classList.add('hidden');
+    });
+    document.getElementById('btn-cancel-rubricar')?.addEventListener('click', () => {
+        document.getElementById('rubricar-modal-overlay')?.classList.add('hidden');
+    });
+    document.getElementById('btn-save-rubricar')?.addEventListener('click', saveRubricatedContractFromModal);
+    document.getElementById('rubricar-modal-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'rubricar-modal-overlay') {
+            document.getElementById('rubricar-modal-overlay').classList.add('hidden');
+        }
+    });
 }
 
 function renderDirectory() {
@@ -3897,6 +4122,7 @@ function renderDirectory() {
     const searchTerm = document.getElementById('directory-search')?.value.toLowerCase().trim() || '';
     const regimenFilter = document.getElementById('directory-regimen-filter')?.value || 'ALL';
     const statusFilter = document.getElementById('directory-status-filter')?.value || 'ALL';
+    const contractFilter = document.getElementById('directory-contract-filter')?.value || 'ALL';
 
     grid.innerHTML = '';
 
@@ -3906,13 +4132,19 @@ function renderDirectory() {
         const ruc = (p.ruc || p.cedula || '').toLowerCase();
         const reg = p.regimen || 'Régimen de Cuota Fija';
         const isDraft = p.estado === 'BORRADOR';
+        const hasRubricado = !!(p.contrato_rubricado && p.contrato_rubricado.fileName);
+
         const matchesStatus = statusFilter === 'ALL' || 
                               (statusFilter === 'BORRADOR' && isDraft) || 
                               (statusFilter === 'ACTIVO' && !isDraft);
 
+        const matchesContract = contractFilter === 'ALL' ||
+                                (contractFilter === 'RUBRICADO' && hasRubricado) ||
+                                (contractFilter === 'PENDIENTE' && !hasRubricado);
+
         const matchesSearch = !searchTerm || nom.includes(searchTerm) || rep.includes(searchTerm) || ruc.includes(searchTerm);
         const matchesRegimen = regimenFilter === 'ALL' || reg === regimenFilter;
-        return matchesSearch && matchesRegimen && matchesStatus;
+        return matchesSearch && matchesRegimen && matchesStatus && matchesContract;
     });
 
     if (filtered.length === 0) {
@@ -3933,6 +4165,7 @@ function renderDirectory() {
         const fuelRate = prov.tarifa_combustible !== undefined ? prov.tarifa_combustible : 12.0;
         const isDraft = prov.estado === 'BORRADOR';
         const prog = prov.progreso !== undefined ? prov.progreso : (isDraft ? calculateOnboardingProgress(prov) : 100);
+        const hasRubricado = !!(prov.contrato_rubricado && prov.contrato_rubricado.fileName);
 
         const card = document.createElement('div');
         card.className = 'directory-card';
@@ -3952,6 +4185,9 @@ function renderDirectory() {
                         <span class="badge-tag" style="margin: 0; font-size: 0.7rem;">${prov.regimen || 'Cuota Fija'}</span>
                         <span class="badge-tag ${isDraft ? 'badge-draft' : 'badge-active'}" style="margin: 0; font-size: 0.7rem;">
                             ${isDraft ? `🟡 Borrador (${prog}%)` : '🟢 Activo'}
+                        </span>
+                        <span class="badge-tag ${hasRubricado ? 'badge-rubricated' : 'badge-legal-pending'}" style="margin: 0; font-size: 0.7rem;">
+                            ${hasRubricado ? '✓ Rubricado' : '⏳ VoBo Legal Pendiente'}
                         </span>
                     </div>
                 </div>
@@ -3990,7 +4226,10 @@ function renderDirectory() {
 
             <div class="directory-card-actions">
                 <div class="directory-actions-row">
-                    <button class="btn btn-outline" data-dir-contract="${provName}" title="Descargar Contrato Word">📄 Contrato</button>
+                    <button class="btn btn-outline" data-dir-contract="${provName}" title="Descargar Borrador Word">📄 Borrador</button>
+                    <button class="btn btn-outline" data-dir-rubricar="${provName}" title="${hasRubricado ? 'Ver/Descargar Contrato Rubricado' : 'Subir Contrato Rubricado por Legal'}" style="${hasRubricado ? 'color: #059669; border-color: rgba(16, 185, 129, 0.5);' : 'color: var(--primary);'}">
+                        ${hasRubricado ? '📜 Ver Rubricado' : '📤 Subir Rubricado'}
+                    </button>
                     <button class="btn btn-outline" data-dir-exp="${provName}" title="Ver Documentos">📁 Expediente</button>
                     <button class="btn btn-outline" data-dir-tariffs="${provName}" title="Ver Tarifas">💲 Tarifas</button>
                     ${isDraft ? `<button class="btn btn-outline" data-dir-del="${provName}" title="Eliminar Borrador" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4); flex: 0.5;">🗑️</button>` : ''}
@@ -4010,6 +4249,10 @@ function renderDirectory() {
         // Eventos de botones
         card.querySelector(`[data-dir-contract="${provName}"]`)?.addEventListener('click', () => {
             downloadContractForProvider(prov);
+        });
+
+        card.querySelector(`[data-dir-rubricar="${provName}"]`)?.addEventListener('click', () => {
+            openRubricarModal(prov);
         });
 
         card.querySelector(`[data-dir-exp="${provName}"]`)?.addEventListener('click', () => {
@@ -4090,6 +4333,66 @@ function openExpedienteModal(prov) {
         docsList.innerHTML = '';
         const provDocs = prov.documentos || {};
 
+        // 1. Tarjeta Especial: Contrato Formal Rubricado
+        const rubricado = prov.contrato_rubricado;
+        const hasRubricado = !!(rubricado && rubricado.fileName);
+
+        const contractCard = document.createElement('div');
+        contractCard.className = `doc-checklist-card ${hasRubricado ? 'card-rubricado completed' : ''}`;
+        contractCard.style.marginBottom = '1rem';
+        contractCard.innerHTML = `
+            <div class="doc-card-top">
+                <div style="flex: 1;">
+                    <div class="doc-info-title" style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span>📜</span>
+                        <strong>Contrato Marco de Servicios (Legal & Rúbricas)</strong>
+                    </div>
+                    <div class="doc-info-sub" style="margin-top: 3px;">
+                        ${hasRubricado ? 
+                            `<strong>${escapeHtml(rubricado.fileName)}</strong> (${rubricado.fileSize || 'N/D'}) • Registrado: ${rubricado.uploadDate || 'Previamente'}` : 
+                            'Borrador generado por CalcPago. Pendiente de visto bueno legal y firma rubricada en cada hoja.'}
+                    </div>
+                    ${(hasRubricado && rubricado.observaciones) ? `
+                        <div style="font-size: 0.78rem; color: #059669; margin-top: 4px;">
+                            Dictamen Legal: <em>"${escapeHtml(rubricado.observaciones)}"</em>
+                        </div>
+                    ` : ''}
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                    <span class="status-badge ${hasRubricado ? 'uploaded' : 'pending'}">
+                        ${hasRubricado ? '✓ Rubricado' : '⏳ Pendiente Rúbrica'}
+                    </span>
+                    <div style="display: flex; gap: 0.4rem; margin-top: 4px;">
+                        ${hasRubricado ? `
+                            <button type="button" class="btn btn-outline" id="btn-exp-view-rubricado" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; color: #059669; border-color: rgba(16,185,129,0.5);">
+                                📥 Ver Rubricado
+                            </button>
+                        ` : ''}
+                        <button type="button" class="btn btn-outline" id="btn-exp-manage-rubricado" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; color: var(--primary); border-color: var(--primary);">
+                            ${hasRubricado ? '🔄 Reemplazar' : '📤 Subir Rubricado'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        docsList.appendChild(contractCard);
+
+        setTimeout(() => {
+            document.getElementById('btn-exp-view-rubricado')?.addEventListener('click', () => {
+                viewOrDownloadRubricatedFile(rubricado);
+            });
+            document.getElementById('btn-exp-manage-rubricado')?.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                openRubricarModal(prov);
+            });
+        }, 50);
+
+        // Subtítulo divisor
+        const divider = document.createElement('div');
+        divider.style.cssText = 'font-weight: 700; font-size: 0.85rem; color: var(--text-muted); margin: 0.8rem 0 0.4rem 0; border-top: 1px solid var(--glass-border); padding-top: 0.8rem;';
+        divider.textContent = '📋 Requisitos Documentales del Expediente:';
+        docsList.appendChild(divider);
+
         reqDocs.forEach(doc => {
             const docData = provDocs[doc.id] || {};
             const isNotReq = !!docData.notRequired;
@@ -4137,6 +4440,143 @@ function openExpedienteModal(prov) {
     }
 
     modal.classList.remove('hidden');
+}
+
+// Modal de Gestión y Carga de Contrato Rubricado
+let currentRubricarProvider = null;
+
+function openRubricarModal(prov) {
+    currentRubricarProvider = prov;
+    const modal = document.getElementById('rubricar-modal-overlay');
+    const title = document.getElementById('rubricar-modal-title');
+    const statusBox = document.getElementById('rubricar-modal-current-status');
+    const fileInput = document.getElementById('input-modal-rubricar');
+    const notesText = document.getElementById('modal-rubricar-notes');
+
+    if (!modal) return;
+
+    const provName = prov.nombre_comercial || prov.nombre || 'Contratista';
+    if (title) {
+        title.textContent = `📜 Contrato Rubricado: ${provName}`;
+    }
+
+    if (fileInput) {
+        fileInput.value = '';
+    }
+
+    const rubricado = prov.contrato_rubricado;
+    const hasRubricado = !!(rubricado && rubricado.fileName);
+
+    if (notesText) {
+        notesText.value = (rubricado && rubricado.observaciones) ? rubricado.observaciones : '';
+    }
+
+    if (statusBox) {
+        if (hasRubricado) {
+            statusBox.innerHTML = `
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <div style="font-weight: 700; color: #059669; font-size: 0.88rem;">
+                            ✓ Contrato Rubricado Registrado en Expediente
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                            <strong>${escapeHtml(rubricado.fileName)}</strong> (${rubricado.fileSize || 'N/D'}) • Subido: ${rubricado.uploadDate || 'Previamente'}
+                        </div>
+                    </div>
+                    <div>
+                        <button type="button" id="btn-modal-view-current-rubricado" class="btn btn-outline" style="font-size: 0.8rem; color: #059669; border-color: rgba(16, 185, 129, 0.5);">
+                            📥 Ver Documento
+                        </button>
+                    </div>
+                </div>
+            `;
+            setTimeout(() => {
+                document.getElementById('btn-modal-view-current-rubricado')?.addEventListener('click', () => {
+                    viewOrDownloadRubricatedFile(rubricado);
+                });
+            }, 50);
+        } else {
+            statusBox.innerHTML = `
+                <div style="background: rgba(245, 158, 11, 0.08); border: 1.5px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 0.85rem;">
+                    <div style="font-weight: 600; color: #d97706; font-size: 0.88rem;">
+                        ⏳ Estado Actual: Pendiente de Rúbrica / VoBo Legal
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+                        Aún no se ha adjuntado el contrato rubricado por ambas partes. Seleccione a continuación el archivo final escaneado para incorporarlo formalmente a este expediente.
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    modal.classList.remove('hidden');
+}
+
+async function saveRubricatedContractFromModal() {
+    if (!currentRubricarProvider) return;
+    const fileInput = document.getElementById('input-modal-rubricar');
+    const notesText = document.getElementById('modal-rubricar-notes');
+    const notes = notesText ? notesText.value.trim() : '';
+
+    const file = fileInput && fileInput.files && fileInput.files[0];
+
+    const finalizeSave = async (fileRecord) => {
+        const provName = currentRubricarProvider.nombre_comercial || currentRubricarProvider.nombre;
+        const idx = proveedoresRegistrados.findIndex(p => 
+            (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === provName.trim().toUpperCase()
+        );
+
+        if (idx >= 0) {
+            proveedoresRegistrados[idx].contrato_rubricado = fileRecord;
+            proveedoresRegistrados[idx].estado_contrato = 'RUBRICADO';
+            currentRubricarProvider = proveedoresRegistrados[idx];
+        } else {
+            currentRubricarProvider.contrato_rubricado = fileRecord;
+            currentRubricarProvider.estado_contrato = 'RUBRICADO';
+            proveedoresRegistrados.push(currentRubricarProvider);
+        }
+
+        safeSaveProvidersLocally(proveedoresRegistrados);
+
+        try {
+            await fetch('/api/save-provider', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentRubricarProvider)
+            });
+        } catch (e) {
+            console.log("Guardado local completado.");
+        }
+
+        document.getElementById('rubricar-modal-overlay')?.classList.add('hidden');
+        renderDirectory();
+        alert(`📜 ¡Contrato rubricado de "${provName}" guardado exitosamente en el expediente!`);
+    };
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = async function(evt) {
+            const fileRecord = {
+                fileName: file.name,
+                fileSize: formatFileSize(file.size),
+                uploadDate: new Date().toLocaleString(),
+                dataUrl: evt.target.result,
+                observaciones: notes
+            };
+            await finalizeSave(fileRecord);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        if (currentRubricarProvider.contrato_rubricado && currentRubricarProvider.contrato_rubricado.fileName) {
+            const fileRecord = {
+                ...currentRubricarProvider.contrato_rubricado,
+                observaciones: notes
+            };
+            await finalizeSave(fileRecord);
+        } else {
+            alert("⚠️ Por favor seleccione el archivo digital (.pdf o .docx) del contrato rubricado.");
+        }
+    }
 }
 
 // Modal de Tarifas del Proveedor
@@ -4215,7 +4655,14 @@ function openTarifasModal(prov) {
             });
 
             saveAndRefresh();
-            localStorage.setItem('calcPago_proveedoresRegistrados', JSON.stringify(proveedoresRegistrados));
+            safeSaveProvidersLocally(proveedoresRegistrados);
+            try {
+                fetch('/api/save-provider', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(prov)
+                }).catch(() => {});
+            } catch(e){}
             renderDirectory();
             modal.classList.add('hidden');
             alert(`¡Tarifario de "${provName}" actualizado con éxito!`);
