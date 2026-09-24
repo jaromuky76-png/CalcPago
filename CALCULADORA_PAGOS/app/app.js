@@ -1,7 +1,7 @@
 // app.js
 
 // State variables
-let tablaOferta = {}; // Formato: { "GLOBAL AIR": { "Actividad 1": 100, ... }, "ENERGY": { ... } }
+let tablaOferta = {}; // Formato: { "GLOBAL AIR": { "Actividad 1": 100, ... }, "ENERGY SYSTEM": { ... } }
 let currentOTData = []; // Array de objetos con datos de la OT
 let selectedProvider = 'ALL';
 let providerDeductions = {}; // { "GLOBAL AIR": { 1: [{name, amount}], 2: [], ... } }
@@ -20,11 +20,116 @@ const inputOT = document.getElementById('input-ot');
 const tableBody = document.getElementById('table-body');
 const summaryCards = document.getElementById('summary-cards');
 
+// Normalizador global del nombre de proveedor
+function normalizeProviderName(name) {
+    if (!name) return '';
+    const upper = name.trim().toUpperCase();
+    if (upper === 'ENERGY' || upper === 'ENERGY SYSTEMS' || upper === 'ENERGY SYSTEM') {
+        return 'ENERGY SYSTEM';
+    }
+    return name.trim();
+}
+
+function setupEnergyAliases() {
+    if (!tablaOferta || typeof tablaOferta !== 'object') return;
+    if (tablaOferta['ENERGY SYSTEM']) {
+        try {
+            Object.defineProperty(tablaOferta, 'ENERGY', {
+                get: function() { return this['ENERGY SYSTEM']; },
+                set: function(v) { this['ENERGY SYSTEM'] = v; },
+                enumerable: false,
+                configurable: true
+            });
+            Object.defineProperty(tablaOferta, 'ENERGY SYSTEMS', {
+                get: function() { return this['ENERGY SYSTEM']; },
+                set: function(v) { this['ENERGY SYSTEM'] = v; },
+                enumerable: false,
+                configurable: true
+            });
+        } catch (e) {}
+    }
+}
+
+function consolidateEnergyProvider() {
+    if (tablaOferta && typeof tablaOferta === 'object') {
+        if (!tablaOferta['ENERGY SYSTEM']) {
+            tablaOferta['ENERGY SYSTEM'] = {};
+        }
+        if (tablaOferta['ENERGY']) {
+            Object.assign(tablaOferta['ENERGY SYSTEM'], tablaOferta['ENERGY']);
+            delete tablaOferta['ENERGY'];
+        }
+        if (tablaOferta['ENERGY SYSTEMS']) {
+            Object.assign(tablaOferta['ENERGY SYSTEM'], tablaOferta['ENERGY SYSTEMS']);
+            delete tablaOferta['ENERGY SYSTEMS'];
+        }
+        setupEnergyAliases();
+        localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
+    }
+
+    if (Array.isArray(currentOTData)) {
+        currentOTData.forEach(d => {
+            if (d.proveedor === 'ENERGY' || d.proveedor === 'ENERGY SYSTEMS') {
+                d.proveedor = 'ENERGY SYSTEM';
+            }
+        });
+    }
+
+    // Unificar deducciones, facturas y extras si venían con nombre legacy
+    [providerDeductions, providerFacturas, providerExtras].forEach(obj => {
+        if (obj && typeof obj === 'object') {
+            if (!obj['ENERGY SYSTEM']) obj['ENERGY SYSTEM'] = {};
+            if (obj['ENERGY']) {
+                Object.assign(obj['ENERGY SYSTEM'], obj['ENERGY']);
+                delete obj['ENERGY'];
+            }
+            if (obj['ENERGY SYSTEMS']) {
+                Object.assign(obj['ENERGY SYSTEM'], obj['ENERGY SYSTEMS']);
+                delete obj['ENERGY SYSTEMS'];
+            }
+        }
+    });
+
+    if (selectedProvider === 'ENERGY' || selectedProvider === 'ENERGY SYSTEMS') {
+        selectedProvider = 'ENERGY SYSTEM';
+    }
+
+    // Limpiar también en calcPago_workspaceState de localStorage
+    try {
+        const wsStr = localStorage.getItem('calcPago_workspaceState');
+        if (wsStr) {
+            const ws = JSON.parse(wsStr);
+            if (ws.tablaOferta) {
+                if (!ws.tablaOferta['ENERGY SYSTEM']) ws.tablaOferta['ENERGY SYSTEM'] = {};
+                if (ws.tablaOferta['ENERGY']) {
+                    Object.assign(ws.tablaOferta['ENERGY SYSTEM'], ws.tablaOferta['ENERGY']);
+                    delete ws.tablaOferta['ENERGY'];
+                }
+                if (ws.tablaOferta['ENERGY SYSTEMS']) {
+                    Object.assign(ws.tablaOferta['ENERGY SYSTEM'], ws.tablaOferta['ENERGY SYSTEMS']);
+                    delete ws.tablaOferta['ENERGY SYSTEMS'];
+                }
+            }
+            if (Array.isArray(ws.currentOTData)) {
+                ws.currentOTData.forEach(item => {
+                    item.proveedor = normalizeProviderName(item.proveedor);
+                });
+            }
+            if (ws.selectedProvider) {
+                ws.selectedProvider = normalizeProviderName(ws.selectedProvider);
+            }
+            localStorage.setItem('calcPago_workspaceState', JSON.stringify(ws));
+        }
+    } catch (e) {}
+}
+
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
     const savedOferta = localStorage.getItem('calcPago_tablaOferta');
     if (savedOferta) {
-        tablaOferta = JSON.parse(savedOferta);
+        try {
+            tablaOferta = JSON.parse(savedOferta);
+        } catch(e) {}
     }
     
     // Auto-restaurar estado de la sesión guardado previamente
@@ -36,14 +141,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.currentOTData && state.currentOTData.length > 0) {
                 currentOTData = state.currentOTData.map(d => ({
                     ...d,
+                    proveedor: normalizeProviderName(d.proveedor),
                     fechaObj: d.fechaObj ? new Date(d.fechaObj) : new Date()
                 }));
             }
             if (state.providerDeductions) providerDeductions = state.providerDeductions;
             if (state.providerFacturas) providerFacturas = state.providerFacturas;
             if (state.providerExtras) providerExtras = state.providerExtras;
-            if (state.selectedProvider) selectedProvider = state.selectedProvider;
+            if (state.selectedProvider) selectedProvider = normalizeProviderName(state.selectedProvider);
 
+            consolidateEnergyProvider();
             updateInitialProviderSelect();
             updateManageProviderSelect();
             updateMonthFilter();
@@ -55,6 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Error al restaurar área de trabajo previa:", err);
         }
     } else {
+        consolidateEnergyProvider();
         if (Object.keys(tablaOferta).length > 0) {
             updateInitialProviderSelect();
             updateManageProviderSelect();
@@ -381,9 +489,12 @@ function handleOfertaUpload(file) {
             
             // Los proveedores son todas las columnas DESPUÉS de DESCRIPCION
             for(let i = descIndex + 1; i < headers.length; i++) {
-                const headerVal = headers[i];
+                let headerVal = headers[i];
                 if(headerVal && headerVal !== 'NA' && headerVal !== 'N/A' && headerVal.length > 1) {
-                    parsedData[headerVal] = {};
+                    headerVal = normalizeProviderName(headerVal);
+                    if (!parsedData[headerVal]) {
+                        parsedData[headerVal] = {};
+                    }
                     providerCols[i] = headerVal;
                 }
             }
@@ -425,13 +536,15 @@ function handleOfertaUpload(file) {
             // En lugar de reemplazar completamente, fusionamos los datos (Merge)
             // Esto permite mantener los proveedores o actividades previas.
             Object.keys(parsedData).forEach(provider => {
-                if (!tablaOferta[provider]) {
-                    tablaOferta[provider] = {};
+                const normProvider = normalizeProviderName(provider);
+                if (!tablaOferta[normProvider]) {
+                    tablaOferta[normProvider] = {};
                 }
                 Object.keys(parsedData[provider]).forEach(act => {
-                    tablaOferta[provider][act] = parsedData[provider][act];
+                    tablaOferta[normProvider][act] = parsedData[provider][act];
                 });
             });
+            consolidateEnergyProvider();
             saveAndRefresh();
             
             // Visual success indicator
@@ -490,7 +603,7 @@ function handleOTUpload(file) {
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
                 if (!row) continue;
-                const providerRaw = row[31] ? row[31].toString().toUpperCase().trim() : '';
+                const providerRaw = row[31] ? normalizeProviderName(row[31].toString()) : '';
                 
                 if (providerRaw) {
                     const ordenStr = row[2] ? row[2].toString().trim() : 'N/A';
@@ -2450,8 +2563,9 @@ async function loadProveedoresRegistrados() {
             if (Array.isArray(serverList) && serverList.length > 0) {
                 // Merge without duplicates
                 serverList.forEach(sp => {
-                    const k = (sp.nombre_comercial || sp.nombre || '').trim().toUpperCase();
-                    if (!proveedoresRegistrados.some(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === k)) {
+                    const normSp = normalizeProviderName(sp.nombre_comercial || sp.nombre || '');
+                    const k = normSp.trim().toUpperCase();
+                    if (!proveedoresRegistrados.some(p => normalizeProviderName(p.nombre_comercial || p.nombre || '').trim().toUpperCase() === k)) {
                         proveedoresRegistrados.push(sp);
                     }
                 });
@@ -2461,90 +2575,85 @@ async function loadProveedoresRegistrados() {
         console.log("Modo offline o servidor local sin API de proveedores activa.");
     }
 
-    // 2.5 Garantizar que ENERGY SYSTEMS esté registrado con la información del contrato firmado
-    const energyKey = "ENERGY SYSTEMS";
-    let energyProv = proveedoresRegistrados.find(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === energyKey);
+    // 2.5 Consolidar proveedor único oficial ENERGY SYSTEM
+    // Limpiar cualquier variación previa de ENERGY o ENERGY SYSTEMS para asegurar una única ficha limpia
+    proveedoresRegistrados = proveedoresRegistrados.filter(p => {
+        const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
+        return k !== 'ENERGY' && k !== 'ENERGY SYSTEMS' && k !== 'ENERGY SYSTEM';
+    });
+
     const energyTarifas = [
         { rms: '101016766', descripcion: 'INSTALACION BASICA DE AIRE ACONDICIONADO 12K Y 18K BTU', tarifa: 1500 },
         { rms: '101016773', descripcion: 'INSTALACION BASICA DE AIRE ACONDICIONADO 24K BTU', tarifa: 1800 },
         { rms: '101016781', descripcion: 'DESINSTALACION DE AIRE ACONDICIONADO 12K Y 18K BTU', tarifa: 800 },
         { rms: '101016790', descripcion: 'DESINSTALACION DE AIRE ACONDICIONADO 24K BTU', tarifa: 900 },
         { rms: '101016802', descripcion: 'MANTENIMIENTO PREVENTIVO DE AIRE ACONDICIONADO 12K Y 18K BTU', tarifa: 700 },
-        { rms: '101016810', descripcion: 'MANTENIMIENTO PREVENTIVO DE AIRE ACONDICIONADO 24K BTU', tarifa: 850 }
+        { rms: '101016810', descripcion: 'MANTENIMIENTO PREVENTIVO DE AIRE ACONDICIONADO 24K BTU', tarifa: 850 },
+        { rms: '101026007', descripcion: 'INSTALACION BASICA DE A/C 12000 BTU INVERTER Y CONVENCIONAL', tarifa: 1500 },
+        { rms: '101025389', descripcion: 'INSTALACION BASICA DE A/C 18000 BTU INVERTER Y CONVENCIONAL', tarifa: 1500 },
+        { rms: '145518214', descripcion: 'INSTALACION BASICA DE A/C 24000 BTU INVERTER Y CONVENCIONAL', tarifa: 1800 },
+        { rms: '130196460', descripcion: 'INSTALACION BASICA DE A/C 36000 BTU INVERTER Y CONVENCIONAL', tarifa: 2500 },
+        { rms: '130196451', descripcion: 'DESINSTALACION DE A/C DE 12,000 Y 18,000 BTU', tarifa: 800 },
+        { rms: '137301040', descripcion: 'DESINSTALACION DE A/C DE 24,000 Y 36,000 BTU', tarifa: 900 },
+        { rms: '101026023', descripcion: 'MANTENIMIENTO PREVENTIVO DE A/C 12000 Y 18000 BTU', tarifa: 700 },
+        { rms: '101026031', descripcion: 'MANTENIMIENTO PREVENTIVO DE A/C 24000 Y 36000 BTU', tarifa: 850 }
     ];
 
-    if (!energyProv) {
-        energyProv = {
-            nombre_comercial: 'ENERGY SYSTEMS',
-            nombre_representante: 'JOSE ARMANDO VANEGAS SALAZAR',
-            cedula: '001-090987-0043X',
-            ruc: '0010909870043X',
-            estado_civil: 'Soltero',
-            profesion: 'Técnico Especialista en HVAC',
-            domicilio: 'Managua, Nicaragua',
-            regimen: 'Régimen General',
-            banco: 'Banco LAFISE Bancentro',
-            cuenta_bancaria: '102201948',
-            titular_cuenta: 'JOSE ARMANDO VANEGAS SALAZAR',
-            telefono: '8645-3129 / 8856-1234',
-            correo: 'energy.systems.ni@gmail.com',
-            direccion: 'Reparto San Antonio, de la Iglesia San Antonio 2 c al sur, 1 c al este, casa #D-12, Managua',
-            tarifa_combustible: 12.0,
-            tarifas: energyTarifas,
-            contrato_rubricado: {
-                fileName: 'CONTRADO ENERGY FIRMADO (2).pdf',
-                fileSize: '3.8 MB',
-                uploadDate: '23/09/2026',
-                observaciones: 'Contrato formal rubricado y legalizado por SILVA INTERNACIONAL S.A. y ENERGY SYSTEMS'
-            },
-            documentos: {
-                cedula: { fileName: 'Cedula_Jose_Armando_Vanegas.pdf', validated: true, notRequired: false },
-                ruc: { fileName: 'RUC_Energy_Systems.pdf', validated: true, notRequired: false },
-                matricula: { fileName: 'Matricula_Alcaldia_Managua_2026.pdf', validated: true, notRequired: false },
-                solvencia_fiscal: { fileName: 'Solvencia_Fiscal_DGI_Vigente.pdf', validated: true, notRequired: false },
-                poder_legal: { notRequired: true, justification: 'Persona natural con negocio / Titular directo' },
-                certificacion_bancaria: { fileName: 'Certificacion_Cuenta_LAFISE.pdf', validated: true, notRequired: false },
-                antecedentes: { fileName: 'Record_Policia_Vanegas.pdf', validated: true, notRequired: false },
-                certificacion_tecnica: { fileName: 'Certificacion_Tecnica_Refrigeracion.pdf', validated: true, notRequired: false },
-                seguro_inss: { fileName: 'Constancia_Cumplimiento_INSS.pdf', validated: true, notRequired: false }
-            }
-        };
-        proveedoresRegistrados.unshift(energyProv);
-    } else {
-        // Asegurar que tenga los datos oficiales completos
-        if (!energyProv.nombre_representante || energyProv.nombre_representante === 'En trámite' || energyProv.cedula === 'En trámite') {
-            energyProv.nombre_representante = 'JOSE ARMANDO VANEGAS SALAZAR';
-            energyProv.cedula = '001-090987-0043X';
-            energyProv.ruc = '0010909870043X';
-            energyProv.banco = 'Banco LAFISE Bancentro';
-            energyProv.cuenta_bancaria = '102201948';
-            energyProv.titular_cuenta = 'JOSE ARMANDO VANEGAS SALAZAR';
-            energyProv.direccion = 'Reparto San Antonio, de la Iglesia San Antonio 2 c al sur, 1 c al este, casa #D-12, Managua';
-            energyProv.tarifas = energyTarifas;
+    const energyProv = {
+        nombre_comercial: 'ENERGY SYSTEM',
+        nombre_representante: 'JOSE ARMANDO VANEGAS SALAZAR',
+        cedula: '001-090987-0043X',
+        ruc: '0010909870043X',
+        estado_civil: 'Soltero',
+        profesion: 'Técnico Especialista en HVAC',
+        domicilio: 'Managua, Nicaragua',
+        regimen: 'Régimen General',
+        banco: 'Banco LAFISE Bancentro',
+        cuenta_bancaria: '102201948',
+        titular_cuenta: 'JOSE ARMANDO VANEGAS SALAZAR',
+        telefono: '8645-3129 / 8856-1234',
+        correo: 'energy.systems.ni@gmail.com',
+        direccion: 'Reparto San Antonio, de la Iglesia San Antonio 2 c al sur, 1 c al este, casa #D-12, Managua',
+        tarifa_combustible: 12.0,
+        tarifas: energyTarifas,
+        contrato_rubricado: {
+            fileName: 'CONTRADO ENERGY FIRMADO (2).pdf',
+            fileSize: '3.8 MB',
+            uploadDate: '23/09/2026',
+            observaciones: 'Contrato formal rubricado y legalizado por SILVA INTERNACIONAL S.A. y ENERGY SYSTEM'
+        },
+        documentos: {
+            cedula: { fileName: 'Cedula_Jose_Armando_Vanegas.pdf', validated: true, notRequired: false },
+            ruc: { fileName: 'RUC_Energy_Systems.pdf', validated: true, notRequired: false },
+            matricula: { fileName: 'Matricula_Alcaldia_Managua_2026.pdf', validated: true, notRequired: false },
+            solvencia_fiscal: { fileName: 'Solvencia_Fiscal_DGI_Vigente.pdf', validated: true, notRequired: false },
+            poder_legal: { notRequired: true, justification: 'Persona natural con negocio / Titular directo' },
+            certificacion_bancaria: { fileName: 'Certificacion_Cuenta_LAFISE.pdf', validated: true, notRequired: false },
+            antecedentes: { fileName: 'Record_Policia_Vanegas.pdf', validated: true, notRequired: false },
+            certificacion_tecnica: { fileName: 'Certificacion_Tecnica_Refrigeracion.pdf', validated: true, notRequired: false },
+            seguro_inss: { fileName: 'Constancia_Cumplimiento_INSS.pdf', validated: true, notRequired: false }
         }
-        if (!energyProv.contrato_rubricado) {
-            energyProv.contrato_rubricado = {
-                fileName: 'CONTRADO ENERGY FIRMADO (2).pdf',
-                fileSize: '3.8 MB',
-                uploadDate: '23/09/2026',
-                observaciones: 'Contrato formal rubricado y legalizado por SILVA INTERNACIONAL S.A. y ENERGY SYSTEMS'
-            };
-        }
-    }
+    };
+    proveedoresRegistrados.unshift(energyProv);
 
     // Sincronizar también con tablaOferta para el motor de cálculo
-    if (!tablaOferta['ENERGY SYSTEMS']) {
-        tablaOferta['ENERGY SYSTEMS'] = {};
+    if (!tablaOferta['ENERGY SYSTEM']) {
+        tablaOferta['ENERGY SYSTEM'] = {};
     }
     energyTarifas.forEach(t => {
-        tablaOferta['ENERGY SYSTEMS'][t.descripcion] = t.tarifa;
+        tablaOferta['ENERGY SYSTEM'][t.descripcion] = t.tarifa;
     });
+    delete tablaOferta['ENERGY'];
+    delete tablaOferta['ENERGY SYSTEMS'];
+    setupEnergyAliases();
+    localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
 
     // 3. Si tablaOferta tiene proveedores que no están en el directorio, agregarlos como base
-    Object.keys(tablaOferta).forEach(pName => {
+    Object.keys(tablaOferta).forEach(rawPName => {
+        const pName = normalizeProviderName(rawPName);
         const k = pName.trim().toUpperCase();
-        if (!proveedoresRegistrados.some(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === k)) {
-            const acts = tablaOferta[pName] || {};
+        if (!proveedoresRegistrados.some(p => normalizeProviderName(p.nombre_comercial || p.nombre || '').trim().toUpperCase() === k)) {
+            const acts = tablaOferta[pName] || tablaOferta[rawPName] || {};
             const actList = Object.keys(acts).map(a => ({
                 rms: a.includes('101') || a.includes('130') || a.includes('145') || a.includes('137') ? a.substring(0, 9).trim() : '',
                 descripcion: a,
