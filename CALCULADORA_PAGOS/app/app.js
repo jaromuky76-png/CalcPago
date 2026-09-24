@@ -2699,6 +2699,14 @@ function initOnboardingWizard() {
     // Descarga de Word .docx
     document.getElementById('btn-download-contract-docx')?.addEventListener('click', downloadContractDocx);
 
+    // Descarga de Ficha de Cumplimiento .docx
+    const handleWizCompliance = () => {
+        const data = getWizardData();
+        downloadProviderComplianceDocx(data);
+    };
+    document.getElementById('btn-wiz-download-compliance')?.addEventListener('click', handleWizCompliance);
+    document.getElementById('btn-wiz-download-compliance-bottom')?.addEventListener('click', handleWizCompliance);
+
     // Imprimir / Guardar PDF
     document.getElementById('btn-print-contract')?.addEventListener('click', () => {
         window.print();
@@ -3448,14 +3456,16 @@ function renderContractPreview() {
 
         <div class="contract-signatures-grid">
             <div>
+                <div class="contract-sig-space"></div>
                 <div class="contract-sig-line">EL CONTRATANTE</div>
-                <div>Oscar René Vargas Reyes</div>
-                <div style="font-size: 0.85rem; color: #4B5563;">SILVA INTERNACIONAL S.A. (SINSA)</div>
+                <div class="contract-sig-name">Oscar René Vargas Reyes</div>
+                <div class="contract-sig-sub">SILVA INTERNACIONAL S.A. (SINSA)</div>
             </div>
             <div>
+                <div class="contract-sig-space"></div>
                 <div class="contract-sig-line">EL CONTRATISTA</div>
-                <div>${data.nombre_representante || '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE]</span>'}</div>
-                <div style="font-size: 0.85rem; color: #4B5563;">${data.nombre_comercial || '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</div>
+                <div class="contract-sig-name">${data.nombre_representante || '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE]</span>'}</div>
+                <div class="contract-sig-sub">${data.nombre_comercial || '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</div>
             </div>
         </div>
 
@@ -3519,10 +3529,10 @@ async function buildDocxFromContractData(data) {
         tarifas = Object.keys(acts).map(a => ({ rms: '', descripcion: a, tarifa: acts[a] }));
     }
 
-    const font = 'Arial';
-    const sizeBody = 20; // 10pt (docx usa medios puntos: 20 = 10pt)
-    const sizeTitle = 24; // 12pt
-    const paragraphSpacing = { after: 160 };
+    const font = 'Times New Roman';
+    const sizeBody = 22; // 11pt (Word usa medios puntos: 22 = 11pt)
+    const sizeTitle = 26; // 13pt
+    const paragraphSpacing = { after: 140, line: 276 }; // 1.15 interlineado
 
     const sectionsChildren = [];
 
@@ -3535,9 +3545,9 @@ async function buildDocxFromContractData(data) {
         ]
     }));
 
-    // Comparecencia / Preámbulo (Idéntico a la previsualización en pantalla)
+    // Comparecencia / Preámbulo (Fiel y justificado a la previsualización)
     sectionsChildren.push(new Paragraph({
-        alignment: AlignmentType.JUSTIFY,
+        alignment: AlignmentType.JUSTIFIED,
         spacing: paragraphSpacing,
         children: [
             new TextRun({ text: 'Nosotros, ', font, size: sizeBody }),
@@ -3563,7 +3573,7 @@ async function buildDocxFromContractData(data) {
         alignment: AlignmentType.CENTER,
         spacing: { before: 200, after: 200 },
         children: [
-            new TextRun({ text: 'CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS', bold: true, size: 21, font })
+            new TextRun({ text: 'CONTRATO DE SERVICIOS TERCERIZADOS DE INSTALACIÓN DE AIRES ACONDICIONADOS', bold: true, size: 22, font })
         ]
     }));
 
@@ -3591,7 +3601,7 @@ async function buildDocxFromContractData(data) {
             ]
         }));
         sectionsChildren.push(new Paragraph({
-            alignment: AlignmentType.JUSTIFY,
+            alignment: AlignmentType.JUSTIFIED,
             spacing: paragraphSpacing,
             children: [
                 new TextRun({ text: cl.text, font, size: sizeBody })
@@ -3601,22 +3611,16 @@ async function buildDocxFromContractData(data) {
 
     // Fecha
     sectionsChildren.push(new Paragraph({
-        alignment: AlignmentType.JUSTIFY,
-        spacing: { before: 200, after: 400 },
+        alignment: AlignmentType.JUSTIFIED,
+        spacing: { before: 200, after: 300 },
         children: [
             new TextRun({ text: 'En fe de lo cual firmamos el presente contrato, en dos tantos de un mismo tenor, en la ciudad de Managua, a los ' + dia + ' días del mes de ' + mes + ' del año ' + anio + '.', font, size: sizeBody })
         ]
     }));
 
-    // Tabla de Firmas
+    // Tabla de Firmas (Fiel a la vista: amplio espacio para firma autógrafa y línea superior)
     const sigBorderNone = {
         top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-        bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-        left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-        right: { style: BorderStyle.NONE, size: 0, color: 'auto' }
-    };
-    const sigBorderTop = {
-        top: { style: BorderStyle.SINGLE, size: 8, color: '000000' },
         bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
         left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
         right: { style: BorderStyle.NONE, size: 0, color: 'auto' }
@@ -3624,32 +3628,75 @@ async function buildDocxFromContractData(data) {
 
     const sigTable = new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: sigBorderNone,
         rows: [
             new TableRow({
                 children: [
                     new TableCell({
-                        width: { size: 48, type: WidthType.PERCENTAGE },
-                        borders: sigBorderTop,
-                        margins: { top: 120, bottom: 80, left: 100, right: 100 },
+                        width: { size: 45, type: WidthType.PERCENTAGE },
+                        borders: sigBorderNone,
                         children: [
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'EL CONTRATANTE', bold: true, font, size: sizeBody })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Oscar René Vargas Reyes', font, size: sizeBody })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A. (SINSA)', font, size: 18, color: '555555' })] })
+                            new Paragraph({
+                                spacing: { before: 800, after: 80 },
+                                children: []
+                            }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
+                                spacing: { before: 80, after: 40 },
+                                children: [
+                                    new TextRun({ text: 'EL CONTRATANTE', bold: true, font, size: sizeBody })
+                                ]
+                            }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                spacing: { after: 20 },
+                                children: [
+                                    new TextRun({ text: 'Oscar René Vargas Reyes', font, size: sizeBody })
+                                ]
+                            }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                children: [
+                                    new TextRun({ text: 'SILVA INTERNACIONAL S.A. (SINSA)', font, size: 18, color: '555555' })
+                                ]
+                            })
                         ]
                     }),
                     new TableCell({
-                        width: { size: 4, type: WidthType.PERCENTAGE },
+                        width: { size: 10, type: WidthType.PERCENTAGE },
                         borders: sigBorderNone,
                         children: [new Paragraph({})]
                     }),
                     new TableCell({
-                        width: { size: 48, type: WidthType.PERCENTAGE },
-                        borders: sigBorderTop,
-                        margins: { top: 120, bottom: 80, left: 100, right: 100 },
+                        width: { size: 45, type: WidthType.PERCENTAGE },
+                        borders: sigBorderNone,
                         children: [
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'EL CONTRATISTA', bold: true, font, size: sizeBody })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: nomRep, font, size: sizeBody })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: nomCom, font, size: 18, color: '555555' })] })
+                            new Paragraph({
+                                spacing: { before: 800, after: 80 },
+                                children: []
+                            }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
+                                spacing: { before: 80, after: 40 },
+                                children: [
+                                    new TextRun({ text: 'EL CONTRATISTA', bold: true, font, size: sizeBody })
+                                ]
+                            }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                spacing: { after: 20 },
+                                children: [
+                                    new TextRun({ text: nomRep, font, size: sizeBody })
+                                ]
+                            }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                children: [
+                                    new TextRun({ text: nomCom, font, size: 18, color: '555555' })
+                                ]
+                            })
                         ]
                     })
                 ]
@@ -3764,6 +3811,14 @@ async function buildDocxFromContractData(data) {
     sectionsChildren.push(annexTable);
 
     const doc = new Document({
+        styles: {
+            default: {
+                document: {
+                    run: { font, size: sizeBody },
+                    paragraph: { alignment: AlignmentType.JUSTIFIED, spacing: paragraphSpacing }
+                }
+            }
+        },
         sections: [{
             properties: {
                 page: {
@@ -3775,6 +3830,604 @@ async function buildDocxFromContractData(data) {
     });
 
     return await window.docx.Packer.toBlob(doc);
+}
+
+// ==========================================================================
+// GENERADOR OFICIAL DE FICHA DE CUMPLIMIENTO DOCUMENTAL Y REQUISITOS (.DOCX)
+// ==========================================================================
+
+async function buildComplianceDocx(prov) {
+    if (!window.docx) throw new Error("Librería docx.js no cargada.");
+
+    const { Document, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle, ShadingType } = window.docx;
+
+    const provName = prov.nombre_comercial || prov.nombre || 'CONTRATISTA';
+    const repName = prov.nombre_representante || provName;
+    const cedula = prov.cedula || 'Pendiente';
+    const ruc = prov.ruc || 'N/D';
+    const matricula = prov.matricula || 'N/D';
+    const regimen = prov.regimen || 'Régimen de Cuota Fija';
+    const banco = prov.banco || 'BAC Credomatic';
+    const cuenta = prov.cuenta_bancaria || 'Pendiente';
+    const direccion = prov.direccion || 'Managua, Nicaragua';
+    const telefono = prov.telefono || 'N/D';
+    const correo = prov.correo || 'N/D';
+
+    // Tarifas
+    let tarifas = prov.tarifas;
+    if (!tarifas || tarifas.length === 0) {
+        const provKey = prov.nombre_comercial || prov.nombre;
+        const acts = (typeof tablaOferta !== 'undefined' && tablaOferta[provKey]) ? tablaOferta[provKey] : {};
+        tarifas = Object.keys(acts).map(a => ({ rms: '', descripcion: a, tarifa: acts[a] }));
+    }
+
+    const combustible = Number(prov.tarifa_combustible !== undefined ? prov.tarifa_combustible : 12.0);
+
+    // Documentos y Regla de Cumplimiento
+    const reqDocs = DOCS_BY_REGIMEN[regimen] || DOCS_BY_REGIMEN["Régimen de Cuota Fija"];
+    const provDocs = prov.documentos || {};
+
+    let totalDocs = reqDocs.length;
+    let resolvedDocs = 0;
+    reqDocs.forEach(d => {
+        const docItem = provDocs[d.id] || {};
+        if (docItem.notRequired || docItem.validated) {
+            resolvedDocs++;
+        }
+    });
+
+    const rubricado = prov.contrato_rubricado;
+    const hasRubricado = !!(rubricado && rubricado.fileName);
+    const is100Percent = (resolvedDocs === totalDocs) && (prov.estado === 'ACTIVO' || hasRubricado);
+
+    const font = 'Times New Roman';
+    const sizeBody = 20; // 10pt
+    const sizeSmall = 18; // 9pt
+    const sizeSub = 22; // 11pt
+    const sizeTitle = 26; // 13pt
+
+    const borderThin = {
+        top: { style: BorderStyle.SINGLE, size: 4, color: 'CBD5E1' },
+        bottom: { style: BorderStyle.SINGLE, size: 4, color: 'CBD5E1' },
+        left: { style: BorderStyle.SINGLE, size: 4, color: 'CBD5E1' },
+        right: { style: BorderStyle.SINGLE, size: 4, color: 'CBD5E1' }
+    };
+
+    const noBorders = {
+        top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        right: { style: BorderStyle.NONE, size: 0, color: 'auto' }
+    };
+
+    const headerShading = { fill: '0F172A', type: ShadingType.CLEAR };
+    const sectionShading = { fill: 'F1F5F9', type: ShadingType.CLEAR };
+    const successShading = { fill: 'ECFDF5', type: ShadingType.CLEAR };
+    const warningShading = { fill: 'FFFBEB', type: ShadingType.CLEAR };
+
+    const children = [];
+
+    // Header Institucional SINSA
+    children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 60 },
+        children: [
+            new TextRun({ text: 'SILVA INTERNACIONAL, S.A. (SINSA)', bold: true, size: 24, font, color: '00A859' })
+        ]
+    }));
+    children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 120 },
+        children: [
+            new TextRun({ text: 'CENTRO DE SERVICIOS / GERENCIA DE OPERACIONES Y COMPRAS', bold: true, size: 18, font, color: '4B5563' })
+        ]
+    }));
+    children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+        children: [
+            new TextRun({ text: 'CONSTANCIA Y FICHA DE CUMPLIMIENTO DOCUMENTAL DE PROVEEDOR', bold: true, size: sizeTitle, font })
+        ]
+    }));
+
+    // Status Banner Box
+    const bannerTitle = is100Percent 
+        ? '✓ EXPEDIENTE 100% CUMPLIDO - PROVEEDOR HOMOLOGADO Y ACTIVO EN PAGOS' 
+        : `⏳ EXPEDIENTE EN REVISIÓN Y FORMALIZACIÓN (${resolvedDocs}/${totalDocs} RECAUDOS COMPLETADOS)`;
+    const bannerColor = is100Percent ? '059669' : 'D97706';
+    const bannerFill = is100Percent ? successShading : warningShading;
+
+    const statusBox = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: borderThin,
+        rows: [
+            new TableRow({
+                children: [
+                    new TableCell({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        shading: bannerFill,
+                        margins: { top: 120, bottom: 120, left: 160, right: 160 },
+                        children: [
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                children: [
+                                    new TextRun({ text: bannerTitle, bold: true, font, size: sizeSub, color: bannerColor })
+                                ]
+                            }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                spacing: { before: 60 },
+                                children: [
+                                    new TextRun({ text: `Emitido el: ${new Date().toLocaleDateString('es-NI')} | Conforme a la Política 10.PO.S01.0006 y Procedimiento 10.P.S01.0001 de SINSA`, font, size: sizeSmall, color: '4B5563' })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    });
+    children.push(statusBox);
+    children.push(new Paragraph({ spacing: { after: 180 }, children: [] }));
+
+    // SECTION I: Datos Generales
+    children.push(new Paragraph({
+        spacing: { before: 140, after: 80 },
+        children: [
+            new TextRun({ text: 'I. DATOS GENERALES Y FISCALES DEL PROVEEDOR', bold: true, font, size: sizeSub, color: '00A859' })
+        ]
+    }));
+
+    const generalRows = [
+        ['Nombre Comercial / Alias:', provName, 'Régimen Fiscal:', regimen],
+        ['Representante Legal / Titular:', repName, 'Cédula de Identidad:', cedula],
+        ['Cédula RUC:', ruc, 'Matrícula de Alcaldía:', matricula],
+        ['Teléfono de Contacto:', telefono, 'Correo Electrónico:', correo],
+        ['Dirección de Domicilio:', direccion, 'Banco y N.º Cuenta:', `${banco} - ${cuenta}`]
+    ];
+
+    const dataTableRows = generalRows.map(row => new TableRow({
+        children: [
+            new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                borders: borderThin,
+                shading: sectionShading,
+                margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                children: [new Paragraph({ children: [new TextRun({ text: row[0], bold: true, font, size: sizeSmall })] })]
+            }),
+            new TableCell({
+                width: { size: 30, type: WidthType.PERCENTAGE },
+                borders: borderThin,
+                margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                children: [new Paragraph({ children: [new TextRun({ text: String(row[1] || '-'), font, size: sizeSmall })] })]
+            }),
+            new TableCell({
+                width: { size: 20, type: WidthType.PERCENTAGE },
+                borders: borderThin,
+                shading: sectionShading,
+                margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                children: [new Paragraph({ children: [new TextRun({ text: row[2], bold: true, font, size: sizeSmall })] })]
+            }),
+            new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                borders: borderThin,
+                margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                children: [new Paragraph({ children: [new TextRun({ text: String(row[3] || '-'), font, size: sizeSmall })] })]
+            })
+        ]
+    }));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: dataTableRows
+    }));
+
+    children.push(new Paragraph({ spacing: { after: 180 }, children: [] }));
+
+    // SECTION II: Matriz de Verificación Documental
+    children.push(new Paragraph({
+        spacing: { before: 140, after: 80 },
+        children: [
+            new TextRun({ text: 'II. MATRIZ DE REQUISITOS DOCUMENTALES Y VERIFICACIÓN EN VENTANILLA', bold: true, font, size: sizeSub, color: '00A859' })
+        ]
+    }));
+
+    const docTableRows = [
+        new TableRow({
+            tableHeader: true,
+            children: [
+                new TableCell({
+                    width: { size: 6, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: headerShading,
+                    margins: { top: 80, bottom: 80, left: 80, right: 80 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '#', bold: true, font, size: sizeSmall, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 34, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: headerShading,
+                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Documento Exigido', bold: true, font, size: sizeSmall, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 20, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: headerShading,
+                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Estatus', bold: true, font, size: sizeSmall, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 40, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: headerShading,
+                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Evidencia Digital / Justificación', bold: true, font, size: sizeSmall, color: 'FFFFFF' })] })]
+                })
+            ]
+        })
+    ];
+
+    reqDocs.forEach((d, idx) => {
+        const item = provDocs[d.id] || {};
+        const isNotReq = !!item.notRequired;
+        const hasDoc = !isNotReq && item.validated;
+
+        let statusText = '⏳ PENDIENTE';
+        let statusColor = 'DC2626';
+        let detailText = 'Pendiente de entrega por el contratista';
+
+        if (isNotReq) {
+            statusText = '⚪ EXONERADO';
+            statusColor = '6B7280';
+            detailText = item.justification ? `No requerido — Justificación: "${item.justification}"` : 'Exonerado formalmente / No aplica';
+        } else if (hasDoc) {
+            statusText = '✓ VALIDADO';
+            statusColor = '059669';
+            detailText = `Archivo: ${item.fileName || 'Digitalizado en expediente'} (${item.fileSize || 'N/D'})`;
+        }
+
+        const bg = idx % 2 === 0 ? 'F8FAFC' : 'FFFFFF';
+
+        docTableRows.push(new TableRow({
+            children: [
+                new TableCell({
+                    width: { size: 6, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: { fill: bg },
+                    margins: { top: 60, bottom: 60, left: 80, right: 80 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(idx + 1), font, size: sizeSmall })] })]
+                }),
+                new TableCell({
+                    width: { size: 34, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: { fill: bg },
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [
+                        new Paragraph({ children: [new TextRun({ text: d.name, bold: true, font, size: sizeSmall })] }),
+                        new Paragraph({ children: [new TextRun({ text: d.desc, font, size: 16, color: '555555' })] })
+                    ]
+                }),
+                new TableCell({
+                    width: { size: 20, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: { fill: bg },
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: statusText, bold: true, font, size: sizeSmall, color: statusColor })] })]
+                }),
+                new TableCell({
+                    width: { size: 40, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: { fill: bg },
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: detailText, font, size: sizeSmall })] })]
+                })
+            ]
+        }));
+    });
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: docTableRows
+    }));
+
+    children.push(new Paragraph({ spacing: { after: 180 }, children: [] }));
+
+    // SECTION III: Formalización Legal y Contrato Rubricado
+    children.push(new Paragraph({
+        spacing: { before: 140, after: 80 },
+        children: [
+            new TextRun({ text: 'III. FORMALIZACIÓN LEGAL Y CONTRATO MARCO RUBRICADO', bold: true, font, size: sizeSub, color: '00A859' })
+        ]
+    }));
+
+    const legalRows = [
+        new TableRow({
+            children: [
+                new TableCell({
+                    width: { size: 30, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: sectionShading,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Contrato Marco de Servicios:', bold: true, font, size: sizeSmall })] })]
+                }),
+                new TableCell({
+                    width: { size: 70, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Generado y estandarizado conforme a políticas de contratación SINSA', font, size: sizeSmall })] })]
+                })
+            ]
+        }),
+        new TableRow({
+            children: [
+                new TableCell({
+                    width: { size: 30, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: sectionShading,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Estado de VoBo Legal y Rúbrica:', bold: true, font, size: sizeSmall })] })]
+                }),
+                new TableCell({
+                    width: { size: 70, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: hasRubricado ? '✓ CONTRATO FINAL RUBRICADO Y VISTO BUENO OTORGADO' : '⏳ PENDIENTE DE VISTO BUENO LEGAL Y RÚBRICAS', bold: true, font, size: sizeSmall, color: hasRubricado ? '059669' : 'D97706' })] })]
+                })
+            ]
+        }),
+        new TableRow({
+            children: [
+                new TableCell({
+                    width: { size: 30, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: sectionShading,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Archivo Rubricado en Expediente:', bold: true, font, size: sizeSmall })] })]
+                }),
+                new TableCell({
+                    width: { size: 70, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: hasRubricado ? `${rubricado.fileName} (${rubricado.fileSize || 'N/D'}) - Registrado el ${rubricado.uploadDate || 'N/D'}` : 'Sin archivo final rubricado adjunto', font, size: sizeSmall })] })]
+                })
+            ]
+        }),
+        new TableRow({
+            children: [
+                new TableCell({
+                    width: { size: 30, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: sectionShading,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Dictamen / Notas de Legal:', bold: true, font, size: sizeSmall })] })]
+                }),
+                new TableCell({
+                    width: { size: 70, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: (hasRubricado && rubricado.observaciones) ? rubricado.observaciones : 'Sin observaciones registradas', font, size: sizeSmall })] })]
+                })
+            ]
+        })
+    ];
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: legalRows
+    }));
+
+    children.push(new Paragraph({ spacing: { after: 180 }, children: [] }));
+
+    // SECTION IV: Tarifario y Condiciones Comerciales
+    children.push(new Paragraph({
+        spacing: { before: 140, after: 80 },
+        children: [
+            new TextRun({ text: `IV. TARIFARIO DE ACTIVIDADES AUTORIZADAS (${tarifas.length} ACTIVIDADES)`, bold: true, font, size: sizeSub, color: '00A859' })
+        ]
+    }));
+
+    const tariffTableRows = [
+        new TableRow({
+            tableHeader: true,
+            children: [
+                new TableCell({
+                    width: { size: 20, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: headerShading,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'RMS', bold: true, font, size: sizeSmall, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 55, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: headerShading,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Descripción del Servicio', bold: true, font, size: sizeSmall, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: headerShading,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Tarifa Acordada', bold: true, font, size: sizeSmall, color: 'FFFFFF' })] })]
+                })
+            ]
+        })
+    ];
+
+    tarifas.forEach((t, idx) => {
+        const bg = idx % 2 === 0 ? 'F8FAFC' : 'FFFFFF';
+        tariffTableRows.push(new TableRow({
+            children: [
+                new TableCell({
+                    width: { size: 20, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: { fill: bg },
+                    margins: { top: 50, bottom: 50, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(t.rms || '-'), font, size: sizeSmall })] })]
+                }),
+                new TableCell({
+                    width: { size: 55, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: { fill: bg },
+                    margins: { top: 50, bottom: 50, left: 100, right: 100 },
+                    children: [new Paragraph({ children: [new TextRun({ text: t.descripcion, font, size: sizeSmall })] })]
+                }),
+                new TableCell({
+                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    borders: borderThin,
+                    shading: { fill: bg },
+                    margins: { top: 50, bottom: 50, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `C$ ${Number(t.tarifa || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}`, bold: true, font, size: sizeSmall })] })]
+                })
+            ]
+        }));
+    });
+
+    // Combustible
+    tariffTableRows.push(new TableRow({
+        children: [
+            new TableCell({
+                width: { size: 75, type: WidthType.PERCENTAGE },
+                borders: borderThin,
+                shading: sectionShading,
+                columnSpan: 2,
+                margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                children: [new Paragraph({ children: [new TextRun({ text: 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD:', bold: true, font, size: sizeSmall })] })]
+            }),
+            new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                borders: borderThin,
+                shading: sectionShading,
+                margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `C$ ${combustible.toLocaleString('es-NI', { minimumFractionDigits: 2 })}`, bold: true, font, size: sizeSmall, color: '00A859' })] })]
+            })
+        ]
+    }));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: tariffTableRows
+    }));
+
+    children.push(new Paragraph({ spacing: { after: 280 }, children: [] }));
+
+    // SECTION V: Cuadro de Firmas Institucionales de Aprobación
+    children.push(new Paragraph({
+        spacing: { before: 180, after: 120 },
+        children: [
+            new TextRun({ text: 'V. APROBACIÓN Y CONFORMIDAD INSTITUCIONAL (SINSA)', bold: true, font, size: sizeSub, color: '00A859' })
+        ]
+    }));
+
+    const signTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: noBorders,
+        rows: [
+            new TableRow({
+                children: [
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: noBorders,
+                        children: [
+                            new Paragraph({ spacing: { before: 500, after: 40 }, children: [] }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
+                                spacing: { before: 60, after: 20 },
+                                children: [new TextRun({ text: 'Recepción y Ventanilla', bold: true, font, size: sizeSmall })]
+                            }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Mesa de Proveedores SINSA', font, size: 16, color: '555555' })] })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 5, type: WidthType.PERCENTAGE },
+                        borders: noBorders,
+                        children: [new Paragraph({})]
+                    }),
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: noBorders,
+                        children: [
+                            new Paragraph({ spacing: { before: 500, after: 40 }, children: [] }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
+                                spacing: { before: 60, after: 20 },
+                                children: [new TextRun({ text: 'Validación de Tarifas', bold: true, font, size: sizeSmall })]
+                            }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Coordinación de Maestros', font, size: 16, color: '555555' })] })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 5, type: WidthType.PERCENTAGE },
+                        borders: noBorders,
+                        children: [new Paragraph({})]
+                    }),
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: noBorders,
+                        children: [
+                            new Paragraph({ spacing: { before: 500, after: 40 }, children: [] }),
+                            new Paragraph({
+                                alignment: AlignmentType.CENTER,
+                                border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
+                                spacing: { before: 60, after: 20 },
+                                children: [new TextRun({ text: 'VoBo Formalización', bold: true, font, size: sizeSmall })]
+                            }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Asesoría Legal / Compras', font, size: 16, color: '555555' })] })
+                        ]
+                    })
+                ]
+            })
+        ]
+    });
+
+    children.push(signTable);
+
+    const doc = new Document({
+        styles: {
+            default: {
+                document: {
+                    run: { font, size: sizeBody },
+                    paragraph: { alignment: AlignmentType.LEFT }
+                }
+            }
+        },
+        sections: [{
+            properties: {
+                page: {
+                    margin: { top: 1200, bottom: 1200, left: 1200, right: 1200 }
+                }
+            },
+            children
+        }]
+    });
+
+    return await window.docx.Packer.toBlob(doc);
+}
+
+// Descargador de Ficha de Cumplimiento Documental
+async function downloadProviderComplianceDocx(prov) {
+    if (!prov) return;
+    const provName = prov.nombre_comercial || prov.nombre || 'PROVEEDOR';
+    const safeName = provName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    try {
+        if (!window.docx) {
+            throw new Error("Librería docx.js no disponible.");
+        }
+        const blob = await buildComplianceDocx(prov);
+        if (blob && blob.size > 1000) {
+            saveBlobAsFile(blob, `FICHA_CUMPLIMIENTO_${safeName}.docx`);
+        } else {
+            throw new Error("El documento generado está vacío.");
+        }
+    } catch (e) {
+        console.error("Error al generar Ficha de Cumplimiento:", e);
+        alert("Error al generar la Ficha de Cumplimiento: " + e.message);
+    }
 }
 
 // Descargar archivo Blob de forma segura y compatible con todos los navegadores
@@ -4227,6 +4880,7 @@ function renderDirectory() {
             <div class="directory-card-actions">
                 <div class="directory-actions-row">
                     <button class="btn btn-outline" data-dir-contract="${provName}" title="Descargar Borrador Word">📄 Borrador</button>
+                    <button class="btn btn-outline" data-dir-compliance="${provName}" title="Descargar Ficha de Cumplimiento (.docx)" style="color: #059669; border-color: rgba(16, 185, 129, 0.5);">📋 Ficha</button>
                     <button class="btn btn-outline" data-dir-rubricar="${provName}" title="${hasRubricado ? 'Ver/Descargar Contrato Rubricado' : 'Subir Contrato Rubricado por Legal'}" style="${hasRubricado ? 'color: #059669; border-color: rgba(16, 185, 129, 0.5);' : 'color: var(--primary);'}">
                         ${hasRubricado ? '📜 Ver Rubricado' : '📤 Subir Rubricado'}
                     </button>
@@ -4249,6 +4903,10 @@ function renderDirectory() {
         // Eventos de botones
         card.querySelector(`[data-dir-contract="${provName}"]`)?.addEventListener('click', () => {
             downloadContractForProvider(prov);
+        });
+
+        card.querySelector(`[data-dir-compliance="${provName}"]`)?.addEventListener('click', () => {
+            downloadProviderComplianceDocx(prov);
         });
 
         card.querySelector(`[data-dir-rubricar="${provName}"]`)?.addEventListener('click', () => {
@@ -4437,6 +5095,11 @@ function openExpedienteModal(prov) {
 
     if (dlBtn) {
         dlBtn.onclick = () => downloadContractForProvider(prov);
+    }
+
+    const dlCompBtn = document.getElementById('btn-expediente-download-compliance');
+    if (dlCompBtn) {
+        dlCompBtn.onclick = () => downloadProviderComplianceDocx(prov);
     }
 
     modal.classList.remove('hidden');

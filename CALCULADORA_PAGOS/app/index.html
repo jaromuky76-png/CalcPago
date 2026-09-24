@@ -596,6 +596,9 @@
                                         <button id="btn-download-contract-docx" class="btn btn-outline" style="color: #2563EB; border-color: #2563EB; font-weight: 600;">
                                             📥 Descargar Word (.docx)
                                         </button>
+                                        <button id="btn-wiz-download-compliance" class="btn btn-outline" style="color: #059669; border-color: #059669; font-weight: 600;">
+                                            📋 Ficha Cumplimiento (.docx)
+                                        </button>
                                         <button id="btn-print-contract" class="btn btn-outline" style="font-weight: 600;">
                                             🖨️ Imprimir / PDF
                                         </button>
@@ -646,6 +649,9 @@
                                     ⬅ Anterior
                                 </button>
                                 <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                                    <button id="btn-wiz-download-compliance-bottom" class="btn btn-outline" style="color: #059669; border-color: #059669; font-weight: 600;">
+                                        📋 Ficha de Cumplimiento (.docx)
+                                    </button>
                                     <button id="btn-wiz-draft-4" class="btn btn-save-draft">
                                         💾 Guardar Borrador
                                     </button>
@@ -808,10 +814,15 @@
                         <!-- Injected dynamically -->
                     </div>
                 </div>
-                <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 1rem;">
-                    <button id="btn-expediente-download-contract" class="btn btn-outline" style="color: #2563EB; border-color: #2563EB;">
-                        📥 Descargar Contrato (.docx)
-                    </button>
+                <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 1rem; flex-wrap: wrap; gap: 0.6rem;">
+                    <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+                        <button id="btn-expediente-download-contract" class="btn btn-outline" style="color: #2563EB; border-color: #2563EB;">
+                            📥 Descargar Contrato (.docx)
+                        </button>
+                        <button id="btn-expediente-download-compliance" class="btn btn-outline" style="color: #059669; border-color: #059669; font-weight: 600;">
+                            📋 Ficha de Cumplimiento (.docx)
+                        </button>
+                    </div>
                     <button id="btn-close-expediente-bottom" class="btn btn-primary" style="background: var(--primary); color: white; border: none;">
                         Cerrar Expediente
                     </button>

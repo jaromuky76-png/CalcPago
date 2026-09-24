@@ -1495,24 +1495,43 @@ body {
 .contract-signatures-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 3rem;
+    gap: 4rem;
     margin-top: 3.5rem;
-    padding-top: 1.5rem;
+    margin-bottom: 2rem;
     text-align: center;
 }
 
+.contract-sig-space {
+    height: 55px;
+}
+
 .contract-sig-line {
-    border-top: 1px solid currentColor;
-    padding-top: 0.5rem;
+    border-top: 1.5px solid currentColor;
+    padding-top: 0.6rem;
     font-weight: bold;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+}
+
+.contract-sig-name {
+    margin-top: 4px;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 0.98rem;
+}
+
+.contract-sig-sub {
+    font-size: 0.85rem;
+    color: #555555;
+    font-family: 'Times New Roman', Times, serif;
 }
 
 .contract-annex-table {
     width: 100%;
     border-collapse: collapse;
     margin: 1.5rem 0;
-    font-family: var(--font-sans);
-    font-size: 0.88rem;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 0.92rem;
 }
 
 .contract-annex-table th, 
