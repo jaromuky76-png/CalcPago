@@ -391,11 +391,17 @@
                                     <label for="wiz-direccion"><strong>Dirección Exacta para Notificaciones *</strong></label>
                                     <input type="text" id="wiz-direccion" class="custom-input" placeholder="Ej. Colonia 15 mayo, de la aguja 1c al este 2c al sur, Managua">
                                 </div>
+
+                                <div class="form-group span-2">
+                                    <label for="wiz-contacto-op"><strong>Contacto Operativo para Despacho de OTs</strong></label>
+                                    <input type="text" id="wiz-contacto-op" class="custom-input" placeholder="Ej. Ing. Coordinador de Cuadrilla - Tel: 8888-0000">
+                                    <small class="form-hint">Diferenciado del Representante Legal; persona a cargo de la recepción y ejecución técnica de órdenes de trabajo.</small>
+                                </div>
                             </div>
 
                             <div class="step-card-header" style="margin-top: 1.5rem; border-top: 1px solid var(--glass-border); padding-top: 1.2rem;">
                                 <h3>🏦 Datos Bancarios para Transferencia (SINSA Ventanilla)</h3>
-                                <p class="step-card-desc">Datos oficiales de cuenta para dispersión de pagos semanales de facturas.</p>
+                                <p class="step-card-desc">Datos oficiales de cuenta para dispersión de pagos de facturas. Debe cruzarse con la certificación bancaria física.</p>
                             </div>
 
                             <div class="form-grid">
@@ -417,7 +423,77 @@
 
                                 <div class="form-group span-2">
                                     <label for="wiz-titular"><strong>Titular de la Cuenta Bancaria *</strong></label>
-                                    <input type="text" id="wiz-titular" class="custom-input" placeholder="Nombre completo del titular">
+                                    <input type="text" id="wiz-titular" class="custom-input" placeholder="Nombre completo del titular acreditado">
+                                </div>
+                            </div>
+
+                            <div class="step-card-header" style="margin-top: 1.5rem; border-top: 1px solid var(--glass-border); padding-top: 1.2rem;">
+                                <h3>📍 Cobertura Territorial y Geocerca Operativa (Diferenciación Managua vs Foránea)</h3>
+                                <p class="step-card-desc">Define el ámbito geográfico contractual y el límite exento de cobro de transporte (geocerca).</p>
+                            </div>
+
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="wiz-tipo-cobertura"><strong>Tipo de Operación Territorial *</strong></label>
+                                    <select id="wiz-tipo-cobertura" class="custom-select">
+                                        <option value="MANAGUA" selected>Managua (Operación Urbana Estándar)</option>
+                                        <option value="FORANEA">Foránea (Operación Departamental Fuera de Managua)</option>
+                                        <option value="MIXTA">Mixta (Managua + Cobertura Departamental)</option>
+                                    </select>
+                                    <small class="form-hint">Para operaciones foráneas o mixtas se activará la variante contractual foránea con cláusula de consignación.</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-base-operativa"><strong>Ciudad / Base Operativa *</strong></label>
+                                    <input type="text" id="wiz-base-operativa" class="custom-input" placeholder="Ej. Managua, Chinandega, León, Estelí" value="Managua">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-departamentos"><strong>Departamentos / Municipios Autorizados</strong></label>
+                                    <input type="text" id="wiz-departamentos" class="custom-input" placeholder="Ej. León, Chinandega, Chichigalpa, Corinto" value="Managua">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-geocerca-km"><strong>Radio Urbano sin Cobro de Transporte (Km) *</strong></label>
+                                    <input type="number" id="wiz-geocerca-km" class="custom-input" value="14" min="0" step="1">
+                                    <small class="form-hint">Distancia desde la base operativa exenta de cobro de kilometraje (Managua: 14 km).</small>
+                                </div>
+                            </div>
+
+                            <div class="step-card-header" style="margin-top: 1.5rem; border-top: 1px solid var(--glass-border); padding-top: 1.2rem;">
+                                <h3>🤝 Condiciones Comerciales, Plazos de Pago y Garantías</h3>
+                                <p class="step-card-desc">Parámetros acordados en la negociación que se contrastarán contra la plantilla jurídica estándar.</p>
+                            </div>
+
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="wiz-condicion-pago"><strong>Condición y Plazo de Pago *</strong></label>
+                                    <select id="wiz-condicion-pago" class="custom-select">
+                                        <option value="SEMANAL" selected>Pago Semanal (Plantilla Managua Oficial)</option>
+                                        <option value="CREDITO_15_CALENDARIO">Crédito 15 días calendario tras radicación</option>
+                                        <option value="CREDITO_15_HABILES">Crédito 15 días hábiles tras radicación</option>
+                                        <option value="CREDITO_30_CALENDARIO">Crédito 30 días calendario</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-garantia-instalacion"><strong>Garantía Mano de Obra - Instalación (Meses) *</strong></label>
+                                    <input type="number" id="wiz-garantia-instalacion" class="custom-input" value="12" min="1" max="36">
+                                    <small class="form-hint">Plantilla estándar SINSA: 12 meses. Si se pactan 6 meses, se marcará como excepción negociada.</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-garantia-mantenimiento"><strong>Garantía - Mantenimiento Preventivo (Meses) *</strong></label>
+                                    <input type="number" id="wiz-garantia-mantenimiento" class="custom-input" value="1" min="1" max="12">
+                                    <small class="form-hint">Garantía sobre limpieza y calibración de equipos (estándar: 1 mes).</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="wiz-politica-uniformes"><strong>Política de Uniforme e Imagen Corporativa *</strong></label>
+                                    <select id="wiz-politica-uniformes" class="custom-select">
+                                        <option value="SINSA_OBLIGATORIO" selected>Uniforme Reglamentario SINSA Maestros (Prohibido Marca Propia)</option>
+                                        <option value="EXCEPCION_PROPIA_GAFETE">Excepción Autorizada: Uniforme Propio con Gafete Visible SINSA</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -557,12 +633,85 @@
                                         <span style="font-size: 1.6rem;">⛽</span>
                                         <div>
                                             <strong style="font-size: 0.95rem; color: var(--text-main);">Tarifa de Combustible por KM Fuera del Radio Urbano</strong>
-                                            <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">Aplica para visitas e instalaciones fuera del radio de 14 km de Managua según contrato.</p>
+                                            <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">Aplica para visitas e instalaciones fuera de la geocerca urbana pactada.</p>
                                         </div>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                                         <span style="font-weight: bold; color: var(--primary);">C$</span>
                                         <input type="number" id="wiz-fuel-rate" class="custom-input" value="12.00" step="0.50" style="width: 110px; text-align: right; font-weight: bold;">
+                                    </div>
+                                </div>
+
+                                <!-- SECCIÓN CONSIGNACIÓN DE MATERIALES (ANEXO II) -->
+                                <div class="consignacion-section-card" id="wiz-consignacion-wrapper" style="margin-top: 1.8rem; background: var(--bg-panel); border: 1px solid var(--glass-border); border-left: 4px solid #3B82F6; border-radius: 14px; padding: 1.2rem 1.4rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+                                        <div>
+                                            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                                <span style="font-size: 1.5rem;">📦</span>
+                                                <h4 style="margin: 0; color: #1E40AF; font-size: 1.05rem;">Consignación de Materiales para Operación Foránea (Anexo II)</h4>
+                                                <span class="badge-tag" style="background: rgba(59, 130, 246, 0.12); color: #2563EB; border-color: rgba(59, 130, 246, 0.3);">Requerido en Variante Foránea</span>
+                                            </div>
+                                            <p style="margin: 0.4rem 0 0 0; font-size: 0.84rem; color: var(--text-muted); max-width: 720px;">
+                                                Registro formal del inventario inicial entregado en custodia. Los totales se calculan con exactitud decimal y se vinculan a la cláusula contractual de consignación y al Anexo II.
+                                            </p>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                                            <label class="custom-checkbox-label" style="font-weight: 700; color: var(--text-main); font-size: 0.88rem;">
+                                                <input type="checkbox" id="wiz-enable-consignacion" checked>
+                                                <span>Habilitar Cláusula y Anexo de Consignación</span>
+                                            </label>
+                                            <button type="button" id="btn-add-wiz-material-row" class="btn btn-outline" style="font-size: 0.82rem; color: #2563EB; border-color: #2563EB;">
+                                                ➕ Añadir Ítem
+                                            </button>
+                                            <button type="button" id="btn-upload-wiz-materiales" class="btn btn-outline" style="font-size: 0.82rem;">
+                                                📥 Cargar Excel Materiales
+                                            </button>
+                                            <input type="file" id="input-wiz-materiales" accept=".xlsx, .xls" hidden>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tabla de Materiales en Consignación -->
+                                    <div class="table-scroll" style="max-height: 40vh; border-radius: 8px; border: 1px solid var(--glass-border);">
+                                        <table class="data-table" id="wiz-materiales-table">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 130px;">Código RMS</th>
+                                                    <th>Descripción del Material / Insumo</th>
+                                                    <th style="width: 90px; text-align: center;">Unidad</th>
+                                                    <th style="width: 100px; text-align: right;">Cantidad</th>
+                                                    <th style="width: 130px; text-align: right;">Costo Unit. (C$)</th>
+                                                    <th style="width: 130px; text-align: right;">Subtotal (C$)</th>
+                                                    <th style="width: 130px; text-align: right;">Total c/IVA (C$)</th>
+                                                    <th style="width: 60px; text-align: center;">Acción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="wiz-materiales-body">
+                                                <!-- Dynamic materials rows -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Tarjetas de Resumen Matemático de Consignación -->
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.8rem; margin-top: 1rem;">
+                                        <div style="background: var(--bg-panel-hover); padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid var(--glass-border);">
+                                            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Líneas de Materiales</div>
+                                            <div id="consignacion-total-items" style="font-size: 1.25rem; font-weight: 700; color: var(--text-main);">0 ítems</div>
+                                        </div>
+                                        <div style="background: var(--bg-panel-hover); padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid var(--glass-border);">
+                                            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Subtotal Neto</div>
+                                            <div id="consignacion-subtotal-val" style="font-size: 1.25rem; font-weight: 700; color: var(--text-main);">C$ 0.00</div>
+                                        </div>
+                                        <div style="background: var(--bg-panel-hover); padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid var(--glass-border);">
+                                            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">IVA (15%)</div>
+                                            <div id="consignacion-iva-val" style="font-size: 1.25rem; font-weight: 700; color: #64748B;">C$ 0.00</div>
+                                        </div>
+                                        <div style="background: rgba(37, 99, 235, 0.08); padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid rgba(37, 99, 235, 0.35);">
+                                            <div style="font-size: 0.75rem; color: #2563EB; text-transform: uppercase; font-weight: 700;">Valor Total en Cláusula</div>
+                                            <div id="consignacion-total-val" style="font-size: 1.35rem; font-weight: 800; color: #1E40AF;">C$ 0.00</div>
+                                        </div>
+                                    </div>
+                                    <div id="consignacion-total-words" style="margin-top: 0.6rem; font-size: 0.8rem; color: #475569; font-style: italic;">
+                                        Monto en letras: Cero córdobas netos
                                     </div>
                                 </div>
                             </div>
@@ -603,6 +752,68 @@
                                             🖨️ Imprimir / PDF
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Selector de Variante Contractual -->
+                            <div class="contract-variant-selector-card" style="margin-bottom: 1.2rem; background: var(--bg-panel); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.1rem 1.3rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                                    <div style="flex: 1; min-width: 280px;">
+                                        <label for="wiz-contract-variant" style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
+                                            <span>📑</span>
+                                            <span>Plantilla Jurídica y Variante Contractual *</span>
+                                        </label>
+                                        <p style="margin: 0.2rem 0 0.6rem 0; font-size: 0.82rem; color: var(--text-muted);">
+                                            Seleccione el modelo contractual según la zona de cobertura del contratista.
+                                        </p>
+                                        <select id="wiz-contract-variant" class="custom-select" style="font-weight: 600; font-size: 0.92rem;">
+                                            <option value="MANAGUA" selected>Plantilla Managua (Oficial v1.0) - Cobertura Urbana Estándar</option>
+                                            <option value="FORANEO">Plantilla Foránea (Propuesta v1.0-PROPUESTA) - Cobertura Departamental y Consignación</option>
+                                        </select>
+                                    </div>
+                                    <div id="variant-legal-badge-container">
+                                        <span class="badge-tag" id="variant-status-badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; border-color: rgba(16, 185, 129, 0.3); font-size: 0.82rem; padding: 0.4rem 0.8rem;">
+                                            ✓ Plantilla Oficial Aprobada
+                                        </span>
+                                    </div>
+                                </div>
+                                <div id="variant-legal-warning" class="hidden" style="margin-top: 0.8rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.82rem; color: #92400E;">
+                                    <strong>⚖️ Aviso Legal:</strong> La variante foránea incorpora cláusula de consignación, custodia de inventario y Anexo II valorizado. Hasta que Asesoría Legal emita su aprobación formal, este documento se rotulará en encabezados y pies como <em>"BORRADOR DE PROPUESTA TÉCNICO-COMERCIAL"</em>.
+                                </div>
+                            </div>
+
+                            <!-- Matriz de Validación Pre-Exportación y Cruce de Fuentes -->
+                            <div class="validation-matrix-wrapper" style="margin-bottom: 1.4rem; background: var(--bg-panel); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.1rem 1.3rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 0.8rem;">
+                                    <div>
+                                        <h4 style="margin: 0; font-size: 0.98rem; color: var(--primary); display: flex; align-items: center; gap: 0.5rem;">
+                                            <span>🔍</span>
+                                            <span>Matriz de Validación Pre-Exportación y Cruce de Documentos</span>
+                                        </h4>
+                                        <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);">
+                                            Cotejo entre documentos probatorios, acuerdos comerciales y las cláusulas del contrato. Impide clasificar como "Listo para firma" si existen discrepancias críticas.
+                                        </p>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <div id="matrix-kpi-badges" style="display: flex; gap: 0.4rem;">
+                                            <!-- Dynamic badge counters -->
+                                        </div>
+                                        <button type="button" id="btn-revalidate-matrix" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.7rem;">
+                                            🔄 Revalidar Cruce
+                                        </button>
+                                        <button type="button" id="btn-open-test-suite" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.7rem; color: #6366F1; border-color: #6366F1; font-weight: 600;" title="Abrir banco de pruebas y verificar regresión BAJO CERO">
+                                            🧪 Suite de Aceptación
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Contenedor de la Matriz -->
+                                <div id="wizard-validation-matrix-box" style="max-height: 280px; overflow-y: auto; border: 1px solid var(--glass-border); border-radius: 8px;">
+                                    <!-- Injected dynamically -->
+                                </div>
+                                <div id="matrix-blocking-alert" class="hidden" style="margin-top: 0.8rem; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 0.65rem 0.9rem; font-size: 0.82rem; color: #B91C1C; display: flex; align-items: center; gap: 0.6rem;">
+                                    <span style="font-size: 1.2rem;">⛔</span>
+                                    <span><strong>Firma Bloqueada:</strong> Se han detectado discrepancias o requisitos pendientes críticos. El documento solo puede descargarse como borrador de revisión con observaciones.</span>
                                 </div>
                             </div>
 
@@ -920,6 +1131,66 @@
                     <button id="btn-save-rubricar" class="btn btn-primary" style="background: var(--primary); color: white; border: none; font-weight: 600;">
                         💾 Guardar en Expediente
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay para Suite de Pruebas de Aceptación y Regresión -->
+        <div id="test-suite-modal-overlay" class="overlay hidden">
+            <div class="modal" style="max-width: 820px; width: 90%;">
+                <div class="modal-header">
+                    <div>
+                        <h3 style="color: #4F46E5; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <span>🧪</span>
+                            <span>Banco de Pruebas de Aceptación y Regresión Contractual</span>
+                        </h3>
+                        <p style="font-size: 0.84rem; color: var(--text-muted); margin-top: 4px;">
+                            Valida el generador contra casos de prueba aislados. El caso <strong>BAJO CERO</strong> actúa como regresión estricta comprobando la detección de las 7 discrepancias clave sin alterar otros expedientes.
+                        </p>
+                    </div>
+                    <button id="close-test-suite-modal" class="btn-icon">✖</button>
+                </div>
+                <div class="modal-body" style="padding: 1rem 0;">
+                    <!-- Botones de Acción de Pruebas -->
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center;">
+                        <button type="button" id="btn-run-all-tests" class="btn btn-primary" style="background: #4F46E5; color: white; border: none; font-weight: 600;">
+                            ▶️ Ejecutar Suite Completa (6 Casos)
+                        </button>
+                        <button type="button" id="btn-run-bajocero-test" class="btn btn-outline" style="color: #2563EB; border-color: #2563EB; font-weight: 600;">
+                            ❄️ Probar Caso BAJO CERO (7 Aserciones)
+                        </button>
+                        <button type="button" id="btn-clear-test-logs" class="btn btn-outline" style="font-size: 0.85rem;">
+                            🧹 Limpiar Resultados
+                        </button>
+                    </div>
+
+                    <!-- Resumen de Resultados -->
+                    <div id="test-suite-kpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; margin-bottom: 1rem;">
+                        <div style="background: var(--bg-panel-hover); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid var(--glass-border); text-align: center;">
+                            <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Casos Ejecutados</div>
+                            <div id="kpi-tests-total" style="font-size: 1.2rem; font-weight: 700; color: var(--text-main);">0</div>
+                        </div>
+                        <div style="background: rgba(16, 185, 129, 0.08); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3); text-align: center;">
+                            <div style="font-size: 0.72rem; color: #059669; text-transform: uppercase;">Conformes (Pass)</div>
+                            <div id="kpi-tests-passed" style="font-size: 1.2rem; font-weight: 700; color: #059669;">0</div>
+                        </div>
+                        <div style="background: rgba(239, 68, 68, 0.08); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3); text-align: center;">
+                            <div style="font-size: 0.72rem; color: #DC2626; text-transform: uppercase;">Fallidos (Fail)</div>
+                            <div id="kpi-tests-failed" style="font-size: 1.2rem; font-weight: 700; color: #DC2626;">0</div>
+                        </div>
+                        <div style="background: rgba(99, 102, 241, 0.08); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.3); text-align: center;">
+                            <div style="font-size: 0.72rem; color: #4F46E5; text-transform: uppercase;">Aserciones Evaluadas</div>
+                            <div id="kpi-assertions-total" style="font-size: 1.2rem; font-weight: 700; color: #4F46E5;">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Consola de Resultados de Aserciones -->
+                    <div id="test-suite-console" style="background: #0F172A; color: #F8FAFC; border-radius: 8px; padding: 1rem; font-family: var(--font-mono); font-size: 0.82rem; max-height: 48vh; overflow-y: auto; line-height: 1.5; border: 1px solid #1E293B;">
+                        <div style="color: #94A3B8;">> Seleccione una opción arriba para iniciar las pruebas de aceptación y regresión.</div>
+                    </div>
+                </div>
+                <div class="modal-actions" style="display: flex; justify-content: flex-end; border-top: 1px solid var(--glass-border); padding-top: 0.8rem;">
+                    <button id="btn-close-test-suite" class="btn btn-outline">Cerrar</button>
                 </div>
             </div>
         </div>

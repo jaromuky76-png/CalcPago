@@ -1877,6 +1877,113 @@ body {
     border-radius: 2px;
 }
 
+/* ==========================================================================
+   ESTILOS PARA MATRIZ DE VALIDACIÓN, VARIANTES Y CONSIGNACIÓN
+   ========================================================================== */
+
+.badge-matrix-match {
+    background: rgba(16, 185, 129, 0.14);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    font-weight: 700;
+    font-size: 0.76rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.badge-matrix-warn {
+    background: rgba(245, 158, 11, 0.14);
+    color: #D97706;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    font-weight: 700;
+    font-size: 0.76rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.badge-matrix-error {
+    background: rgba(239, 68, 68, 0.14);
+    color: #DC2626;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    font-weight: 700;
+    font-size: 0.76rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.badge-matrix-pending {
+    background: rgba(100, 116, 139, 0.14);
+    color: #475569;
+    border: 1px solid rgba(100, 116, 139, 0.35);
+    font-weight: 600;
+    font-size: 0.76rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.validation-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+}
+
+.validation-table th {
+    background: #1E293B;
+    color: #F8FAFC;
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.validation-table td {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--glass-border);
+    vertical-align: middle;
+}
+
+.validation-table tr:hover td {
+    background: rgba(0, 168, 89, 0.04);
+}
+
+.test-assertion-pass {
+    color: #34D399;
+    margin: 3px 0;
+}
+
+.test-assertion-fail {
+    color: #F87171;
+    font-weight: 700;
+    margin: 3px 0;
+}
+
+.test-assertion-info {
+    color: #93C5FD;
+    margin: 3px 0;
+}
+
+.test-assertion-header {
+    color: #FBBF24;
+    font-weight: 700;
+    margin-top: 8px;
+    border-top: 1px dashed #334155;
+    padding-top: 6px;
+}
+
 @media print {
     body * {
         visibility: hidden;

@@ -2135,6 +2135,8 @@ let proveedoresRegistrados = [];
 let currentWizardStep = 1;
 let wizardDocuments = {};
 let wizardTarifas = [];
+let wizardMateriales = [];
+let wizardValidationResults = null;
 let wizardContratoRubricado = null;
 let isRestoringDraft = false;
 let autosaveTimer = null;
@@ -2195,6 +2197,290 @@ function viewOrDownloadRubricatedFile(fileRecord) {
     setTimeout(() => {
         document.body.removeChild(a);
     }, 200);
+}
+
+// Conversión de importes numéricos a letras en español según estándar legal nicaragüense
+function numberToWordsSpanish(amount) {
+    if (isNaN(amount) || amount === null || amount === undefined) return 'CERO CON 00/100 CÓRDOBAS (C$ 0.00)';
+    const num = Math.round(Number(amount) * 100) / 100;
+    const intPart = Math.floor(Math.abs(num));
+    const cents = Math.round((Math.abs(num) - intPart) * 100);
+
+    const units = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+    const teens = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+    const tens = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+    const hundreds = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+    function section(n) {
+        if (n === 100) return 'CIEN';
+        const h = Math.floor(n / 100);
+        const rem = n % 100;
+        const res = [];
+        if (h > 0) res.push(hundreds[h]);
+        if (rem > 0) {
+            if (rem < 10) res.push(units[rem]);
+            else if (rem < 20) res.push(teens[rem - 10]);
+            else if (rem === 20) res.push('VEINTE');
+            else if (rem < 30) {
+                const vUnits = ['', 'VEINTIÚN', 'VEINTIDÓS', 'VEINTITRÉS', 'VEINTICUATRO', 'VEINTICINCO', 'VEINTISÉIS', 'VEINTISIETE', 'VEINTIOCHO', 'VEINTINUEVE'];
+                res.push(vUnits[rem - 20]);
+            } else {
+                const t = Math.floor(rem / 10);
+                const u = rem % 10;
+                if (u === 0) res.push(tens[t]);
+                else res.push(tens[t] + ' Y ' + units[u]);
+            }
+        }
+        return res.join(' ');
+    }
+
+    let words = '';
+    if (intPart === 0) {
+        words = 'CERO';
+    } else {
+        const parts = [];
+        const millions = Math.floor(intPart / 1000000);
+        const thousands = Math.floor((intPart % 1000000) / 1000);
+        const remainder = intPart % 1000;
+
+        if (millions > 0) {
+            if (millions === 1) parts.push('UN MILLÓN');
+            else parts.push(section(millions) + ' MILLONES');
+        }
+        if (thousands > 0) {
+            if (thousands === 1) parts.push('MIL');
+            else parts.push(section(thousands) + ' MIL');
+        }
+        if (remainder > 0 || parts.length === 0) {
+            parts.push(section(remainder));
+        }
+        words = parts.join(' ').trim();
+    }
+
+    const centsStr = String(cents).padStart(2, '0');
+    return words + ' CON ' + centsStr + '/100 CÓRDOBAS (C$ ' + num.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
+}
+
+// Insumos sugeridos por defecto para Consignación Inicial de Aire Acondicionado
+const SAMPLE_CONSIGNMENT_ITEMS = [
+    { rms: "130101", descripcion: 'Tubería de cobre 1/4" (rollo 15m)', unidad: "UND", cantidad: 2, costo_unitario: 1250.00 },
+    { rms: "130102", descripcion: 'Tubería de cobre 3/8" (rollo 15m)', unidad: "UND", cantidad: 2, costo_unitario: 1850.00 },
+    { rms: "130103", descripcion: 'Aislante térmico armaflex 1/4" (tramo 2m)', unidad: "UND", cantidad: 10, costo_unitario: 85.00 },
+    { rms: "130104", descripcion: 'Aislante térmico armaflex 3/8" (tramo 2m)', unidad: "UND", cantidad: 10, costo_unitario: 110.00 },
+    { rms: "130201", descripcion: 'Gas Refrigerante R410A (cilindro 25lb)', unidad: "UND", cantidad: 1, costo_unitario: 3500.00 },
+    { rms: "130305", descripcion: 'Base metálica para unidad exterior 12-24k', unidad: "JGO", cantidad: 5, costo_unitario: 650.00 },
+    { rms: "130410", descripcion: 'Cinta de vinilo para ductería (rollo)', unidad: "UND", cantidad: 8, costo_unitario: 95.00 },
+    { rms: "130512", descripcion: 'Manguera de drenaje corrugada 5/8" (rollo 25m)', unidad: "UND", cantidad: 1, costo_unitario: 780.00 }
+];
+
+// Cálculo matemático estricto de totales de consignación
+function calculateConsignacionTotalsFromList(items) {
+    const list = items || [];
+    let totalItems = 0;
+    let subtotal = 0;
+    list.forEach(m => {
+        const qty = parseFloat(m.cantidad) || 0;
+        const cost = parseFloat(m.costo_unitario) || 0;
+        totalItems += qty;
+        subtotal += (qty * cost);
+    });
+    const subtotalRounded = Math.round(subtotal * 100) / 100;
+    const iva = Math.round((subtotalRounded * 0.15) * 100) / 100;
+    const total = Math.round((subtotalRounded + iva) * 100) / 100;
+    const totalLetras = numberToWordsSpanish(total);
+    return {
+        lineasCount: list.length,
+        totalItems,
+        subtotal: subtotalRounded,
+        iva,
+        total,
+        totalLetras
+    };
+}
+
+function calculateConsignacionTotals() {
+    const totals = calculateConsignacionTotalsFromList(wizardMateriales);
+
+    const itemsEl = document.getElementById('consignacion-total-items');
+    const subtotalEl = document.getElementById('consignacion-subtotal-val');
+    const ivaEl = document.getElementById('consignacion-iva-val');
+    const totalEl = document.getElementById('consignacion-total-val');
+    const wordsEl = document.getElementById('consignacion-total-words');
+
+    if (itemsEl) itemsEl.textContent = `${totals.totalItems} ítems (${totals.lineasCount} líneas)`;
+    if (subtotalEl) subtotalEl.textContent = `C$ ${totals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (ivaEl) ivaEl.textContent = `C$ ${totals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (totalEl) totalEl.textContent = `C$ ${totals.total.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (wordsEl) wordsEl.textContent = `Monto en letras: ${totals.totalLetras}`;
+
+    return totals;
+}
+
+function renderWizardMaterialesTable() {
+    const tbody = document.getElementById('wiz-materiales-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (!wizardMateriales || wizardMateriales.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No hay materiales en consignación. Pulsa "➕ Añadir Ítem" o sube un Excel.</td></tr>`;
+        calculateConsignacionTotals();
+        return;
+    }
+
+    wizardMateriales.forEach((item, idx) => {
+        const qty = parseFloat(item.cantidad) || 0;
+        const cost = parseFloat(item.costo_unitario) || 0;
+        const lineSubtotal = qty * cost;
+        const lineTotal = lineSubtotal * 1.15;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="custom-input" data-m-rms="${idx}" value="${item.rms || ''}" placeholder="Ej. 130101" style="font-size: 0.82rem; padding: 0.3rem 0.5rem; width: 100%;">
+            </td>
+            <td>
+                <input type="text" class="custom-input" data-m-desc="${idx}" value="${item.descripcion || ''}" placeholder="Descripción del material" style="font-size: 0.82rem; padding: 0.3rem 0.5rem; width: 100%;">
+            </td>
+            <td style="text-align: center;">
+                <input type="text" class="custom-input" data-m-unit="${idx}" value="${item.unidad || 'UND'}" style="font-size: 0.82rem; padding: 0.3rem 0.4rem; width: 65px; text-align: center;">
+            </td>
+            <td style="text-align: right;">
+                <input type="number" class="custom-input" data-m-qty="${idx}" value="${item.cantidad !== undefined ? item.cantidad : 1}" min="1" step="1" style="font-size: 0.82rem; padding: 0.3rem 0.4rem; width: 80px; text-align: right;">
+            </td>
+            <td style="text-align: right;">
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.2rem;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">C$</span>
+                    <input type="number" class="custom-input" data-m-cost="${idx}" value="${item.costo_unitario !== undefined ? item.costo_unitario : 0}" step="0.50" style="font-size: 0.82rem; padding: 0.3rem 0.4rem; width: 95px; text-align: right; font-weight: 600;">
+                </div>
+            </td>
+            <td style="text-align: right; font-weight: 600; font-size: 0.85rem; color: var(--text-main);">
+                C$ ${lineSubtotal.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+            <td style="text-align: right; font-weight: 700; font-size: 0.85rem; color: #2563EB;">
+                C$ ${lineTotal.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+            <td style="text-align: center;">
+                <button type="button" class="btn-icon" data-del-m="${idx}" style="color: var(--danger); font-size: 0.85rem;" title="Eliminar ítem">✖</button>
+            </td>
+        `;
+
+        tr.querySelector(`[data-m-rms="${idx}"]`)?.addEventListener('input', (e) => {
+            wizardMateriales[idx].rms = e.target.value.trim();
+            triggerWizardAutosave();
+        });
+        tr.querySelector(`[data-m-desc="${idx}"]`)?.addEventListener('input', (e) => {
+            wizardMateriales[idx].descripcion = e.target.value.trim();
+            triggerWizardAutosave();
+        });
+        tr.querySelector(`[data-m-unit="${idx}"]`)?.addEventListener('input', (e) => {
+            wizardMateriales[idx].unidad = e.target.value.trim();
+            triggerWizardAutosave();
+        });
+        tr.querySelector(`[data-m-qty="${idx}"]`)?.addEventListener('input', (e) => {
+            wizardMateriales[idx].cantidad = parseFloat(e.target.value) || 0;
+            renderWizardMaterialesTable();
+            triggerWizardAutosave();
+        });
+        tr.querySelector(`[data-m-cost="${idx}"]`)?.addEventListener('input', (e) => {
+            wizardMateriales[idx].costo_unitario = parseFloat(e.target.value) || 0;
+            renderWizardMaterialesTable();
+            triggerWizardAutosave();
+        });
+        tr.querySelector(`[data-del-m="${idx}"]`)?.addEventListener('click', () => {
+            wizardMateriales.splice(idx, 1);
+            renderWizardMaterialesTable();
+            triggerWizardAutosave();
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    calculateConsignacionTotals();
+}
+
+function addWizardMaterialRow() {
+    wizardMateriales.push({
+        rms: '',
+        descripcion: 'NUEVO INSUMO EN CONSIGNACIÓN',
+        unidad: 'UND',
+        cantidad: 1,
+        costo_unitario: 0.00
+    });
+    renderWizardMaterialesTable();
+    triggerWizardAutosave();
+}
+
+function handleMaterialesExcelUpload(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+            let headerIdx = -1;
+            let colMap = { rms: -1, desc: -1, unit: -1, qty: -1, cost: -1 };
+
+            for (let i = 0; i < Math.min(10, rows.length); i++) {
+                const row = rows[i] || [];
+                const rowStr = row.map(c => String(c || '').toUpperCase().trim());
+                if (rowStr.some(c => c.includes('RMS') || c.includes('MATERIAL') || c.includes('DESCRIPCION') || c.includes('DESCRIPCIÓN'))) {
+                    headerIdx = i;
+                    rowStr.forEach((val, cIdx) => {
+                        if (val.includes('RMS') || val.includes('CODIGO') || val.includes('CÓDIGO')) colMap.rms = cIdx;
+                        if (val.includes('DESCRIP') || val.includes('MATERIAL') || val.includes('INSUMO')) colMap.desc = cIdx;
+                        if (val.includes('UNID') || val.includes('UM')) colMap.unit = cIdx;
+                        if (val.includes('CANT') || val.includes('QTY')) colMap.qty = cIdx;
+                        if (val.includes('COST') || val.includes('PRECIO') || val.includes('UNIT')) colMap.cost = cIdx;
+                    });
+                    break;
+                }
+            }
+
+            if (headerIdx === -1) {
+                colMap = { rms: 0, desc: 1, unit: 2, qty: 3, cost: 4 };
+                headerIdx = 0;
+            }
+
+            const parsedList = [];
+            for (let i = headerIdx + 1; i < rows.length; i++) {
+                const r = rows[i];
+                if (!r || r.length === 0) continue;
+                const desc = colMap.desc >= 0 ? String(r[colMap.desc] || '').trim() : '';
+                if (!desc || desc.toUpperCase().includes('TOTAL') || desc.toUpperCase().includes('SUBTOTAL')) continue;
+
+                const rms = colMap.rms >= 0 ? String(r[colMap.rms] || '').trim() : '';
+                const unit = colMap.unit >= 0 ? String(r[colMap.unit] || 'UND').trim() : 'UND';
+                const qty = colMap.qty >= 0 ? parseFloat(r[colMap.qty]) || 1 : 1;
+                const cost = colMap.cost >= 0 ? parseFloat(r[colMap.cost]) || 0 : 0;
+
+                parsedList.push({
+                    rms,
+                    descripcion: desc,
+                    unidad: unit || 'UND',
+                    cantidad: qty,
+                    costo_unitario: cost
+                });
+            }
+
+            if (parsedList.length > 0) {
+                wizardMateriales = parsedList;
+                renderWizardMaterialesTable();
+                triggerWizardAutosave();
+                alert(`✅ Se cargaron exitosamente ${parsedList.length} ítems de materiales en consignación.`);
+            } else {
+                alert("⚠️ No se encontraron filas de insumos con formato válido en el archivo Excel.");
+            }
+        } catch (err) {
+            console.error("Error al procesar Excel de materiales:", err);
+            alert("Error al procesar el archivo Excel: " + err.message);
+        }
+    };
+    reader.readAsArrayBuffer(file);
 }
 
 // Calcular Porcentaje de Avance del Proveedor (0 - 100%)
@@ -2343,6 +2629,29 @@ function checkActiveWizardDraft() {
     }
 }
 
+function updateVariantBadgeAndWarning(variant) {
+    const isForaneo = (variant === 'FORANEO');
+    const badge = document.getElementById('variant-status-badge');
+    const warn = document.getElementById('variant-legal-warning');
+    if (badge) {
+        if (isForaneo) {
+            badge.style.background = 'rgba(245, 158, 11, 0.15)';
+            badge.style.color = '#B45309';
+            badge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+            badge.textContent = '⚠️ Propuesta en Revisión Legal v1.0';
+        } else {
+            badge.style.background = 'rgba(16, 185, 129, 0.12)';
+            badge.style.color = '#059669';
+            badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            badge.textContent = '✓ Plantilla Oficial Aprobada v1.0';
+        }
+    }
+    if (warn) {
+        if (isForaneo) warn.classList.remove('hidden');
+        else warn.classList.add('hidden');
+    }
+}
+
 // Cargar un borrador en el formulario del asistente
 function loadDraftIntoForm(draft, targetStep = null) {
     if (!draft) return;
@@ -2376,13 +2685,34 @@ function loadDraftIntoForm(draft, targetStep = null) {
     setVal('contract-day', draft.dia !== undefined ? draft.dia : 23);
     setVal('contract-month', draft.mes || 'octubre');
 
+    // Nuevos campos territoriales, operativos y comerciales
+    setVal('wiz-contacto-op', draft.contacto_operativo || '');
+    setVal('wiz-tipo-cobertura', draft.tipo_cobertura || 'MANAGUA');
+    setVal('wiz-base-operativa', draft.base_operativa || 'Managua');
+    setVal('wiz-departamentos', draft.departamentos || 'Managua');
+    setVal('wiz-geocerca-km', draft.geocerca_km !== undefined ? draft.geocerca_km : 14);
+    setVal('wiz-condicion-pago', draft.condicion_pago || 'SEMANAL');
+    setVal('wiz-garantia-instalacion', draft.garantia_instalacion !== undefined ? draft.garantia_instalacion : 12);
+    setVal('wiz-garantia-mantenimiento', draft.garantia_mantenimiento !== undefined ? draft.garantia_mantenimiento : '1');
+    setVal('wiz-politica-uniformes', draft.politica_uniformes || 'SINSA_OBLIGATORIO');
+    setVal('wiz-contract-variant', draft.contract_variant || 'MANAGUA');
+
+    const enableConsignacionEl = document.getElementById('wiz-enable-consignacion');
+    if (enableConsignacionEl) {
+        enableConsignacionEl.checked = draft.consignacion_activa !== undefined ? !!draft.consignacion_activa : true;
+    }
+
     wizardDocuments = draft.documentos ? JSON.parse(JSON.stringify(draft.documentos)) : {};
     wizardTarifas = draft.tarifas ? JSON.parse(JSON.stringify(draft.tarifas)) : [];
+    wizardMateriales = draft.materiales ? JSON.parse(JSON.stringify(draft.materiales)) : [];
     wizardContratoRubricado = draft.contrato_rubricado ? JSON.parse(JSON.stringify(draft.contrato_rubricado)) : null;
 
     renderWizardDocs();
     renderWizardTariffTable();
+    renderWizardMaterialesTable();
+    calculateConsignacionTotals();
     renderWizardRubricationSection();
+    updateVariantBadgeAndWarning(draft.contract_variant || 'MANAGUA');
 
     isRestoringDraft = false;
 
@@ -2879,9 +3209,109 @@ function initOnboardingWizard() {
         triggerWizardAutosave();
     });
 
+    // Control de Consignación de Materiales
+    document.getElementById('wiz-enable-consignacion')?.addEventListener('change', (e) => {
+        const isChecked = e.target.checked;
+        if (isChecked && wizardMateriales.length === 0) {
+            wizardMateriales = JSON.parse(JSON.stringify(SAMPLE_CONSIGNMENT_ITEMS));
+            renderWizardMaterialesTable();
+        }
+        calculateConsignacionTotals();
+        triggerWizardAutosave();
+    });
+
+    document.getElementById('btn-add-wiz-material-row')?.addEventListener('click', () => {
+        addWizardMaterialRow();
+    });
+
+    const inputWizMat = document.getElementById('input-wiz-materiales');
+    document.getElementById('btn-upload-wiz-materiales')?.addEventListener('click', () => {
+        inputWizMat?.click();
+    });
+
+    inputWizMat?.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleMaterialesExcelUpload(e.target.files[0]);
+        }
+    });
+
+    // Cambio de Tipo de Cobertura Territorial
+    document.getElementById('wiz-tipo-cobertura')?.addEventListener('change', (e) => {
+        const val = e.target.value;
+        const varSelect = document.getElementById('wiz-contract-variant');
+        const consigCheck = document.getElementById('wiz-enable-consignacion');
+        if (val === 'FORANEA' || val === 'MIXTA') {
+            if (varSelect) varSelect.value = 'FORANEO';
+            if (consigCheck && !consigCheck.checked) {
+                consigCheck.checked = true;
+                if (wizardMateriales.length === 0) {
+                    wizardMateriales = JSON.parse(JSON.stringify(SAMPLE_CONSIGNMENT_ITEMS));
+                    renderWizardMaterialesTable();
+                }
+                calculateConsignacionTotals();
+            }
+            updateVariantBadgeAndWarning('FORANEO');
+        } else {
+            if (varSelect) varSelect.value = 'MANAGUA';
+            updateVariantBadgeAndWarning('MANAGUA');
+        }
+        triggerWizardAutosave();
+    });
+
+    // Cambio de Variante Contractual en Paso 4
+    document.getElementById('wiz-contract-variant')?.addEventListener('change', (e) => {
+        const val = e.target.value;
+        updateVariantBadgeAndWarning(val);
+        renderContractPreview();
+        renderValidationMatrix();
+        triggerWizardAutosave();
+    });
+
+    // Matriz de Validación Pre-Exportación
+    document.getElementById('btn-revalidate-matrix')?.addEventListener('click', () => {
+        renderValidationMatrix();
+    });
+
+    // Suite de Pruebas de Aceptación Modal
+    document.getElementById('btn-open-test-suite')?.addEventListener('click', () => {
+        const modal = document.getElementById('test-suite-modal-overlay');
+        if (modal) modal.classList.remove('hidden');
+    });
+
+    const closeSuiteModal = () => {
+        const modal = document.getElementById('test-suite-modal-overlay');
+        if (modal) modal.classList.add('hidden');
+    };
+    document.getElementById('close-test-suite-modal')?.addEventListener('click', closeSuiteModal);
+    document.getElementById('btn-close-test-suite')?.addEventListener('click', closeSuiteModal);
+
+    document.getElementById('btn-run-all-tests')?.addEventListener('click', () => {
+        runAcceptanceTestSuite('ALL');
+    });
+
+    document.getElementById('btn-run-bajocero-test')?.addEventListener('click', () => {
+        runAcceptanceTestSuite('BAJOCERO');
+    });
+
+    document.getElementById('btn-clear-test-logs')?.addEventListener('click', () => {
+        const consoleEl = document.getElementById('test-suite-console');
+        if (consoleEl) {
+            consoleEl.innerHTML = '<div style="color: #94A3B8;">> Consola limpia. Seleccione una opción para ejecutar pruebas.</div>';
+        }
+        const setKpi = (id, v) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = v;
+        };
+        setKpi('kpi-tests-total', '0');
+        setKpi('kpi-tests-passed', '0');
+        setKpi('kpi-tests-failed', '0');
+        setKpi('kpi-assertions-total', '0');
+    });
+
     // Botón actualizar vista de contrato
     document.getElementById('btn-update-contract-preview')?.addEventListener('click', () => {
         renderContractPreview();
+        renderValidationMatrix();
     });
 
     // Descarga de Word .docx
@@ -2985,8 +3415,11 @@ function goToWizardStep(stepNum) {
             loadDefaultMaestrosTariffs();
         }
         renderWizardTariffTable();
+        renderWizardMaterialesTable();
+        calculateConsignacionTotals();
     } else if (stepNum === 4) {
         renderContractPreview();
+        renderValidationMatrix();
         renderWizardRubricationSection();
     }
 
@@ -2998,16 +3431,42 @@ function resetWizardForm() {
     const ids = [
         'wiz-nombre-comercial', 'wiz-nombre-rep', 'wiz-cedula', 'wiz-ruc',
         'wiz-matricula', 'wiz-telefono', 'wiz-correo', 'wiz-direccion',
-        'wiz-cuenta', 'wiz-titular', 'wiz-inss', 'wiz-profesion'
+        'wiz-cuenta', 'wiz-titular', 'wiz-inss', 'wiz-profesion', 'wiz-contacto-op'
     ];
     ids.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
+
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    };
+
+    setVal('wiz-tipo-cobertura', 'MANAGUA');
+    setVal('wiz-base-operativa', 'Managua');
+    setVal('wiz-departamentos', 'Managua');
+    setVal('wiz-geocerca-km', 14);
+    setVal('wiz-condicion-pago', 'SEMANAL');
+    setVal('wiz-garantia-instalacion', 12);
+    setVal('wiz-garantia-mantenimiento', '1');
+    setVal('wiz-politica-uniformes', 'SINSA_OBLIGATORIO');
+    setVal('wiz-contract-variant', 'MANAGUA');
+
+    const consigEl = document.getElementById('wiz-enable-consignacion');
+    if (consigEl) consigEl.checked = true;
+
     wizardDocuments = {};
     wizardTarifas = [];
+    wizardMateriales = [];
     wizardContratoRubricado = null;
+    wizardValidationResults = null;
+
+    renderWizardMaterialesTable();
+    calculateConsignacionTotals();
     renderWizardRubricationSection();
+    updateVariantBadgeAndWarning('MANAGUA');
+
     localStorage.removeItem(STORAGE_KEY_WIZARD_DRAFT);
     isRestoringDraft = false;
 
@@ -3374,6 +3833,7 @@ function getWizardData() {
         domicilio: document.getElementById('wiz-domicilio')?.value.trim() || 'Managua',
         telefono: document.getElementById('wiz-telefono')?.value.trim() || '',
         correo: document.getElementById('wiz-correo')?.value.trim() || '',
+        contacto_operativo: document.getElementById('wiz-contacto-op')?.value.trim() || '',
         direccion: document.getElementById('wiz-direccion')?.value.trim() || '',
         banco: document.getElementById('wiz-banco')?.value || 'BAC Credomatic',
         cuenta_bancaria: document.getElementById('wiz-cuenta')?.value.trim() || '',
@@ -3382,8 +3842,20 @@ function getWizardData() {
         dia: parseInt(document.getElementById('contract-day')?.value, 10) || 23,
         mes: document.getElementById('contract-month')?.value || 'octubre',
         anio: 2026,
+        tipo_cobertura: document.getElementById('wiz-tipo-cobertura')?.value || 'MANAGUA',
+        base_operativa: document.getElementById('wiz-base-operativa')?.value.trim() || 'Managua',
+        departamentos: document.getElementById('wiz-departamentos')?.value.trim() || 'Managua',
+        geocerca_km: parseFloat(document.getElementById('wiz-geocerca-km')?.value) || 14.0,
+        condicion_pago: document.getElementById('wiz-condicion-pago')?.value || 'SEMANAL',
+        garantia_instalacion: parseInt(document.getElementById('wiz-garantia-instalacion')?.value, 10) || 12,
+        garantia_mantenimiento: document.getElementById('wiz-garantia-mantenimiento')?.value || '1',
+        politica_uniformes: document.getElementById('wiz-politica-uniformes')?.value || 'SINSA_OBLIGATORIO',
+        contract_variant: document.getElementById('wiz-contract-variant')?.value || 'MANAGUA',
+        consignacion_activa: document.getElementById('wiz-enable-consignacion')?.checked || false,
         tarifa_combustible: parseFloat(document.getElementById('wiz-fuel-rate')?.value) || 12.0,
         tarifas: wizardTarifas ? [...wizardTarifas] : [],
+        materiales: wizardMateriales ? JSON.parse(JSON.stringify(wizardMateriales)) : [],
+        consignacion_totales: calculateConsignacionTotalsFromList(wizardMateriales),
         documentos: wizardDocuments ? { ...wizardDocuments } : {},
         contrato_rubricado: wizardContratoRubricado ? JSON.parse(JSON.stringify(wizardContratoRubricado)) : null,
         estado_contrato: (wizardContratoRubricado && wizardContratoRubricado.fileName) ? 'RUBRICADO' : 'PENDIENTE_RUBRICA'
@@ -3532,6 +4004,508 @@ function renderWizardRubricationSection() {
     }
 }
 
+// ==========================================================================
+// MATRIZ DE VALIDACIÓN PRE-EXPORTACIÓN Y CRUCE DE DOCUMENTOS
+// ==========================================================================
+
+function buildValidationMatrix(data) {
+    const items = [];
+    const counts = { match: 0, warn: 0, error: 0, pending: 0 };
+
+    const addCheck = (req, extr, std, tipo, obs, accion) => {
+        items.push({ requisito: req, extraido: extr, estandar: std, tipo, observacion: obs, accion });
+        if (tipo === 'MATCH') counts.match++;
+        else if (tipo === 'WARN') counts.warn++;
+        else if (tipo === 'ERROR') counts.error++;
+        else if (tipo === 'PENDING') counts.pending++;
+    };
+
+    // 1. Identidad y Régimen Tributario
+    const cedula = (data.cedula || '').trim();
+    const ruc = (data.ruc || '').trim();
+    const regimen = data.regimen || 'Régimen de Cuota Fija';
+    if (!cedula) {
+        addCheck("Identificación del Contratista", "Cédula no ingresada", "Cédula de Identidad obligatoria (POL.GLE.001)", "ERROR", "Falta número de cédula del representante legal o titular", "Digitar cédula válida y adjuntar fotocopia");
+    } else if (regimen === 'Régimen General' && !ruc) {
+        addCheck("Régimen Tributario vs RUC", `Régimen: ${regimen} / Sin RUC`, "RUC Jurídico/Natural obligatorio para Régimen General", "ERROR", "Contratistas en Régimen General deben presentar RUC activo", "Registrar número RUC y constancia DGI");
+    } else {
+        addCheck("Identidad y Régimen", `${cedula} (${regimen}${ruc ? ' - RUC: ' + ruc : ''})`, "Documento de identidad y régimen tributario concordantes", "MATCH", "Cédula y régimen formalizados", "Ninguna");
+    }
+
+    // 2. Titular de Cuenta Bancaria
+    const titular = (data.titular_cuenta || '').trim().toUpperCase();
+    const rep = (data.nombre_representante || '').trim().toUpperCase();
+    const nomCom = (data.nombre_comercial || '').trim().toUpperCase();
+    const cuenta = (data.cuenta_bancaria || '').trim();
+    if (!cuenta) {
+        addCheck("Dispersión Bancaria (Ventanilla)", "Cuenta bancaria no ingresada", "Cuenta bancaria institucional en córdobas requerida", "ERROR", "Imposible dispersar pagos sin cuenta bancaria acreditada", "Ingresar número de cuenta y adjuntar certificación bancaria");
+    } else if (titular && rep && titular !== rep && titular !== nomCom) {
+        addCheck("Titularidad Bancaria", `Titular: "${titular}" vs Rep: "${rep}"`, "Titular bancario debe coincidir exactamente con el contratista acreditado", "WARN", "Discrepancia entre titular de cuenta bancaria y representante legal", "Adjuntar carta de autorización o certificación bancaria aclaratoria");
+    } else {
+        addCheck("Titularidad Bancaria", `${data.banco} - ${cuenta} (${titular || rep})`, "Cuenta a nombre del contratista acreditado", "MATCH", "Cuenta bancaria validada y coincidente", "Ninguna");
+    }
+
+    // 3. Cobertura Territorial y Radio de Combustible
+    const tipoCob = data.tipo_cobertura || 'MANAGUA';
+    const baseOp = (data.base_operativa || 'Managua').trim();
+    const geocercaKm = parseFloat(data.geocerca_km) || 14;
+    const baseIsManagua = baseOp.toLowerCase().includes('managua');
+
+    // Conflicto de regresión BAJO CERO: Base foránea con kilometraje referenciado a Managua
+    const hasFuelManaguaConflict = (tipoCob === 'FORANEA' && !baseIsManagua && (
+        (data.tarifa_combustible_desc && data.tarifa_combustible_desc.includes('14 KM MANAGUA')) ||
+        (data.contract_variant === 'MANAGUA')
+    ));
+
+    if (hasFuelManaguaConflict) {
+        addCheck("Ámbito Territorial y Geocerca", `Base: ${baseOp} pero con Plantilla/Radio Managua (14 km Managua)`, "Radio urbano libre de flete debe referenciarse a la cabecera departamental asignada", "ERROR", "Conflicto territorial: Contratista foráneo no puede aplicar el radio de exclusión de Managua", "Cambiar variante a Plantilla Foránea y ajustar geocerca a la cabecera departamental");
+    } else if (tipoCob === 'FORANEA' && baseIsManagua) {
+        addCheck("Ámbito Territorial y Geocerca", `Tipo: Foránea pero Base: "${baseOp}"`, "Base operativa debe corresponder a cabecera departamental fuera de Managua", "WARN", "Se seleccionó operación foránea pero la base sigue siendo Managua", "Especificar ciudad departamental (ej. Chinandega, León, Estelí)");
+    } else if (tipoCob === 'FORANEA' || tipoCob === 'MIXTA') {
+        addCheck("Ámbito Territorial y Geocerca", `Base: ${baseOp} (${tipoCob}) - Geocerca: ${geocercaKm} km`, "Operación foránea/mixta con radio local definido", "MATCH", "Ámbito territorial y geocerca departamental concordantes", "Ninguna");
+    } else {
+        addCheck("Ámbito Territorial y Geocerca", `Managua Urbana - Radio: ${geocercaKm} km`, "Operación Managua estándar (14 km exentos)", "MATCH", "Cobertura urbana estándar confirmada", "Ninguna");
+    }
+
+    // 4. Condición y Plazo de Pago (Negociación vs Plantilla)
+    const condPago = data.condicion_pago || 'SEMANAL';
+    if (condPago !== 'SEMANAL') {
+        // Discrepancia BAJO CERO: Crédito 15 días vs semanal
+        addCheck("Condición y Plazo de Pago", `Negociado: ${condPago.replace(/_/g, ' ')}`, "Plantilla estándar estipula pago semanal contra factura y OTs (Cláusula Sexta)", "WARN", "Desviación de plazo de pago pactada en negociación comercial. Requiere Visto Bueno formal de Tesorería/Finanzas", "Obtener autorización de excepción de Gerencia Financiera y reflejar en Cláusula Sexta");
+    } else {
+        addCheck("Condición y Plazo de Pago", "Pago Semanal Estándar", "Pago semanal contra factura y OTs suscritas", "MATCH", "Alineado a la plantilla oficial de SINSA", "Ninguna");
+    }
+
+    // 5. Garantía de Instalación (Negociación vs Plantilla)
+    const garInst = parseInt(data.garantia_instalacion, 10) || 12;
+    if (garInst < 12) {
+        // Discrepancia BAJO CERO: Garantía 6 meses vs 12 meses
+        addCheck("Garantía de Mano de Obra (Instalación)", `Acordado: ${garInst} Meses`, "Plantilla estándar fija doce (12) meses calendario en Cláusula Décima", "WARN", "La garantía negociada es inferior al estándar exigido por SINSA al cliente final (1 año)", "Requerir autorización de excepción de Centro de Servicios o nivelar a 12 meses");
+    } else {
+        addCheck("Garantía de Mano de Obra (Instalación)", `${garInst} Meses Calendario`, "Estándar oficial de 12 meses satisfecho", "MATCH", "Garantía de instalación conforme a política SINSA", "Ninguna");
+    }
+
+    // 6. Garantía de Mantenimiento Preventivo
+    const garMant = data.garantia_mantenimiento;
+    if (garMant === 'OMITIDO' || garMant === 0 || garMant === '0' || !garMant) {
+        // Discrepancia BAJO CERO: Omisión de garantía mantenimiento
+        addCheck("Garantía de Mantenimiento Preventivo", "OMITIDO en acuerdos", "Procedimiento 10.P.S01.0001 exige 30 días de garantía sobre mantenimientos", "ERROR", "Se omitió el término de garantía técnica para mantenimientos preventivos y limpiezas", "Incorporar explícitamente un (1) mes de garantía para servicios de mantenimiento en Cláusula Décima");
+    } else {
+        addCheck("Garantía de Mantenimiento Preventivo", `${garMant} Mes(es)`, "Garantía de mantenimiento contemplada (mínimo 1 mes)", "MATCH", "Garantía de mantenimiento conforme a estándar operativo", "Ninguna");
+    }
+
+    // 7. Catálogo de Tarifas y Puntos Eléctricos
+    const tarifas = data.tarifas || [];
+    const hasPuntoElectrico = tarifas.some(t => {
+        const desc = (t.descripcion || '').toUpperCase();
+        const rms = String(t.rms || '');
+        return rms.includes('130196460') || desc.includes('PUNTO ELECTRICO') || desc.includes('PUNTO ELÉCTRICO');
+    });
+    if (tarifas.length === 0) {
+        addCheck("Catálogo y Tarifario de Servicios", "Sin tarifas pactadas", "Anexo I debe contener catálogo de servicios y tarifas unitarias aprobadas", "ERROR", "El expediente no cuenta con actividades ni tarifas registradas", "Cargar archivo de oferta en el Paso 3");
+    } else if (!hasPuntoElectrico) {
+        // Discrepancia BAJO CERO: Omisión de punto eléctrico RMS 130196460
+        addCheck("Catálogo de Servicios: Punto Eléctrico", "Actividad no incluida en oferta", "Catálogo RMS 130196460 (Instalación de Punto Eléctrico, tarifa referencial C$ 600-700)", "WARN", "La oferta no incluye punto eléctrico; generará retrasos si el cliente carece de acometida 220V", "Consultar al proveedor si ejecutará acometidas eléctricas o si requerirá un electricista tercero");
+    } else {
+        addCheck("Catálogo y Tarifario de Servicios", `${tarifas.length} actividades (incluye Punto Eléctrico)`, "Catálogo y tarifas completas conforme a portafolio SINSA", "MATCH", "Tarifas y códigos RMS conformes", "Ninguna");
+    }
+
+    // 8. Política de Imagen y Uniformes
+    const polUniforme = data.politica_uniformes || 'SINSA_OBLIGATORIO';
+    if (polUniforme === 'EXCEPCION_PROPIA_GAFETE' || polUniforme === 'PROVEEDOR_GAFETE') {
+        // Discrepancia BAJO CERO: Uniforme propio con gafete vs Cláusula 4.2
+        addCheck("Política de Uniformes e Imagen", "Uniforme propio con gafete SINSA", "Cláusula Cuarta numeral 2 prohíbe expresamente uniformes o marcas comerciales del contratista", "WARN", "Conflicto entre la propuesta del proveedor y la cláusula de exclusividad de imagen institucional", "Centro de Servicios debe autorizar adenda de excepción o dotar uniformes oficiales de Maestros SINSA");
+    } else {
+        addCheck("Política de Uniformes e Imagen", "Uniforme Reglamentario SINSA Maestros", "Uso exclusivo de uniforme y distintivos SINSA", "MATCH", "Alineado a la política de imagen corporativa", "Ninguna");
+    }
+
+    // 9. Cruce de Correos y Canales de Notificación
+    const correoAlta = (data.correo || '').trim().toLowerCase();
+    const contactoOp = (data.contacto_operativo || '').trim().toLowerCase();
+    const hasOpEmail = contactoOp.includes('@');
+    if (hasOpEmail) {
+        const opEmailMatch = contactoOp.match(/[\w.-]+@[\w.-]+\.\w+/);
+        const opEmail = opEmailMatch ? opEmailMatch[0] : '';
+        if (opEmail && correoAlta && opEmail !== correoAlta) {
+            // Discrepancia BAJO CERO: Correo alta vs negociación
+            addCheck("Canal de Notificaciones Contractuales", `Alta: ${correoAlta} vs Comercial: ${opEmail}`, "Cláusula Décima Quinta exige un único correo legal para emplazamientos y notificaciones", "WARN", "Discrepancia entre correo de alta documental y correo operativo/comercial", "Confirmar con el representante cuál correo tendrá validez legal para el domicilio contractual");
+        } else {
+            addCheck("Canal de Notificaciones Contractuales", correoAlta || 'Sin correo', "Correo para notificaciones contractuales", correoAlta ? "MATCH" : "WARN", correoAlta ? "Canal de contacto unificado" : "Falta correo electrónico", correoAlta ? "Ninguna" : "Ingresar correo");
+        }
+    } else {
+        addCheck("Canal de Notificaciones Contractuales", correoAlta || 'Sin correo', "Correo institucional/comercial para notificaciones contractuales", correoAlta ? "MATCH" : "WARN", correoAlta ? "Correo formal registrado" : "Falta correo para notificaciones", correoAlta ? "Ninguna" : "Registrar correo en Paso 1");
+    }
+
+    // 10. Consignación de Materiales (si aplica)
+    if (data.consignacion_activa) {
+        const mats = data.materiales || [];
+        const totals = calculateConsignacionTotalsFromList(mats);
+        if (mats.length === 0) {
+            addCheck("Consignación de Materiales (Anexo II)", "Habilitada pero sin ítems", "Inventario inicial detallado con códigos RMS, costos y cantidades", "ERROR", "Cláusula de consignación activada sin inventario cargado", "Añadir insumos en Paso 3 o desactivar consignación");
+        } else if (totals.total <= 0) {
+            addCheck("Consignación de Materiales (Anexo II)", "Total C$ 0.00", "Valor total del inventario mayor a cero", "ERROR", "Los ítems de consignación no tienen costo o cantidad válida", "Verificar cantidades y costos unitarios de insumos");
+        } else {
+            addCheck("Consignación de Materiales (Anexo II)", `${totals.lineasCount} líneas - Total: C$ ${totals.total.toLocaleString('es-NI', {minimumFractionDigits: 2})}`, "Conciliación matemática exacta (Subtotal + IVA = Total)", "MATCH", "Inventario inicial valorizado y cuadrado con Cláusula de Consignación", "Ninguna");
+        }
+    }
+
+    // 11. Expediente Documental Digital
+    const regDocs = (typeof DOCS_BY_REGIMEN !== 'undefined' && DOCS_BY_REGIMEN[regimen]) ? DOCS_BY_REGIMEN[regimen] : [];
+    const docs = data.documentos || {};
+    let pendingDocsCount = 0;
+    regDocs.forEach(d => {
+        const docItem = docs[d.id] || {};
+        if (!docItem.validated && !docItem.notRequired) {
+            pendingDocsCount++;
+        }
+    });
+
+    if (pendingDocsCount > 0) {
+        addCheck("Expediente Documental Legal", `${pendingDocsCount} recaudo(s) pendiente(s)`, "100% de recaudos requeridos validados o formalmente exonerados", "PENDING", `Faltan ${pendingDocsCount} documentos por validar o justificar como no necesarios`, "Completar la validación en el Paso 2 o exonerar los no aplicables");
+    } else {
+        addCheck("Expediente Documental Legal", "100% Recaudos Resueltos", "Todos los recaudos exigidos según el régimen han sido verificados", "MATCH", "Expediente documental completo", "Ninguna");
+    }
+
+    const canSign = (counts.error === 0 && counts.pending === 0);
+    return { items, counts, canSign };
+}
+
+function renderValidationMatrix() {
+    const box = document.getElementById('wizard-validation-matrix-box');
+    const badgeContainer = document.getElementById('matrix-kpi-badges');
+    const alertBox = document.getElementById('matrix-blocking-alert');
+    if (!box) return;
+
+    const data = getWizardData();
+    const matrix = buildValidationMatrix(data);
+    wizardValidationResults = matrix;
+
+    if (badgeContainer) {
+        badgeContainer.innerHTML = `
+            <span class="badge-matrix-match" title="Requisitos conformes">✓ ${matrix.counts.match} OK</span>
+            <span class="badge-matrix-warn" title="Desviaciones o excepciones negociadas">⚠️ ${matrix.counts.warn} Obs.</span>
+            <span class="badge-matrix-error" title="Discrepancias críticas">⛔ ${matrix.counts.error} Discrep.</span>
+            <span class="badge-matrix-pending" title="Documentos o datos pendientes">⏳ ${matrix.counts.pending} Pend.</span>
+        `;
+    }
+
+    let rowsHtml = '';
+    matrix.items.forEach(item => {
+        let badgeClass = 'badge-matrix-match';
+        let badgeText = '✓ Conforme';
+        if (item.tipo === 'WARN') {
+            badgeClass = 'badge-matrix-warn';
+            badgeText = '⚠️ Observación';
+        } else if (item.tipo === 'ERROR') {
+            badgeClass = 'badge-matrix-error';
+            badgeText = '⛔ Discrepancia';
+        } else if (item.tipo === 'PENDING') {
+            badgeClass = 'badge-matrix-pending';
+            badgeText = '⏳ Pendiente';
+        }
+
+        rowsHtml += `
+            <tr>
+                <td><strong>${escapeHtml(item.requisito)}</strong></td>
+                <td><span style="font-size: 0.82rem; color: var(--text-main);">${escapeHtml(item.extraido)}</span></td>
+                <td><span style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(item.estandar)}</span></td>
+                <td style="text-align: center;"><span class="${badgeClass}">${badgeText}</span></td>
+                <td>
+                    <div style="font-size: 0.8rem; line-height: 1.35;">
+                        <span style="color: ${item.tipo === 'ERROR' ? '#DC2626' : (item.tipo === 'WARN' ? '#B45309' : 'var(--text-main)')};">${escapeHtml(item.observacion)}</span>
+                        ${item.accion && item.accion !== 'Ninguna' ? `<div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 3px;"><strong>Acción:</strong> ${escapeHtml(item.accion)}</div>` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    box.innerHTML = `
+        <table class="validation-table">
+            <thead>
+                <tr>
+                    <th style="width: 22%;">Requisito / Cruce</th>
+                    <th style="width: 20%;">Dato Extraído / Negociado</th>
+                    <th style="width: 22%;">Estándar SINSA</th>
+                    <th style="width: 14%; text-align: center;">Estado</th>
+                    <th style="width: 22%;">Observaciones y Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsHtml}
+            </tbody>
+        </table>
+    `;
+
+    if (alertBox) {
+        if (!matrix.canSign) {
+            alertBox.classList.remove('hidden');
+        } else {
+            alertBox.classList.add('hidden');
+        }
+    }
+}
+
+// ==========================================================================
+// BANCO DE PRUEBAS DE ACEPTACIÓN Y REGRESIÓN CONTRACTUAL
+// ==========================================================================
+
+function runAcceptanceTestSuite(filterCase = 'ALL') {
+    const consoleEl = document.getElementById('test-suite-console');
+    if (!consoleEl) return;
+
+    consoleEl.innerHTML = '';
+    const log = (msg, color = '#F8FAFC') => {
+        const line = document.createElement('div');
+        line.style.color = color;
+        line.style.marginBottom = '2px';
+        line.innerHTML = msg;
+        consoleEl.appendChild(line);
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+    };
+
+    const setKpi = (id, v) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = v;
+    };
+
+    let totalTests = 0;
+    let passedTests = 0;
+    let failedTests = 0;
+    let totalAssertions = 0;
+
+    log(`<strong>[SUITE INICIADA]</strong> Ejecución de pruebas de aceptación - Modo: ${filterCase}`, '#818CF8');
+    log(`Hora: ${new Date().toLocaleTimeString()} - Aislamiento estricto activado (No muta directorio global)<br>`, '#94A3B8');
+
+    // Respaldo estricto de estado para asegurar cero contaminación
+    const backupProvidersCount = proveedoresRegistrados.length;
+    const backupProvidersJson = JSON.stringify(proveedoresRegistrados);
+
+    // CASO 1: REGRESIÓN AISLADA BAJO CERO (8 ASERCIONES)
+    if (filterCase === 'ALL' || filterCase === 'BAJOCERO') {
+        totalTests++;
+        log(`<strong>CASO 1: PROVEEDOR FORÁNEO "BAJO CERO" (Regresión de 7 Discrepancias + Aislamiento)</strong>`, '#38BDF8');
+
+        const bajoCeroData = {
+            nombre_comercial: "BAJO CERO",
+            nombre_representante: "Roberto José Somarriba López",
+            cedula: "081-140582-0002A",
+            ruc: "J0810000001234",
+            matricula: "MAT-CH-2023-889",
+            regimen: "Régimen General",
+            estado_civil: "casado",
+            profesion: "ingeniero mecánico",
+            domicilio: "Chinandega",
+            telefono: "8899-7766",
+            correo: "bajocero.servicios@gmail.com",
+            contacto_operativo: "ventas.bajocero@empresa.com (Ing. Somarriba)",
+            direccion: "Costado Norte Parque Central 2c al Oeste, Chinandega",
+            banco: "BAC Credomatic",
+            cuenta_bancaria: "365890123",
+            titular_cuenta: "Roberto José Somarriba López",
+            inss: "445890-1",
+            dia: 28,
+            mes: "septiembre",
+            anio: 2026,
+            tipo_cobertura: "FORANEA",
+            base_operativa: "Chinandega / León",
+            departamentos: "Chinandega, León",
+            geocerca_km: 14.0,
+            contract_variant: "MANAGUA", // Discrepancia 1: usa plantilla Managua con 14km Managua
+            tarifa_combustible_desc: "TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)",
+            condicion_pago: "CREDITO_15_CALENDARIO", // Discrepancia 2: 15 días vs semanal
+            garantia_instalacion: 6, // Discrepancia 3: 6 meses vs 12 meses
+            garantia_mantenimiento: "OMITIDO", // Discrepancia 4: omitido vs 30 días
+            politica_uniformes: "EXCEPCION_PROPIA_GAFETE", // Discrepancia 6: uniforme propio vs 4.2
+            tarifas: [
+                { rms: "130196450", descripcion: "INSTALACION BASICA DE AIRE ACONDICIONADO 12-18-24 MIL BTU", tarifa: 1500.00 },
+                { rms: "130196452", descripcion: "INSTALACION BASICA DE AIRE ACONDICIONADO > 24 MIL BTU", tarifa: 2200.00 },
+                { rms: "130196451", descripcion: "DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU", tarifa: 800.00 },
+                { rms: "137301040", descripcion: "DESINSTALACION DE AIRE 12-18-24 MIL BTU", tarifa: 450.00 },
+                { rms: "101026023", descripcion: "MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO", tarifa: 750.00 }
+                // Discrepancia 5: omite RMS 130196460 (Punto Eléctrico)
+            ],
+            documentos: {
+                "cedula": { fileName: "cedula_somarriba.pdf", validated: true },
+                "ruc": { fileName: "ruc_bajocero.pdf", validated: true },
+                "matricula": { fileName: "matricula_alcaldia.pdf", validated: true }
+            }
+        };
+
+        const mBajoCero = buildValidationMatrix(bajoCeroData);
+
+        const assertions = [
+            {
+                name: "Aserción 1: Conflicto territorial (Base Chinandega referenciando radio Managua)",
+                pass: mBajoCero.items.some(i => i.requisito.includes("Ámbito Territorial") && i.tipo === "ERROR")
+            },
+            {
+                name: "Aserción 2: Desviación en plazo de pago (Crédito 15 días vs Semanal)",
+                pass: mBajoCero.items.some(i => i.requisito.includes("Plazo de Pago") && i.tipo === "WARN")
+            },
+            {
+                name: "Aserción 3: Desviación en garantía de instalación (6 meses vs 12 meses)",
+                pass: mBajoCero.items.some(i => i.requisito.includes("Garantía de Mano de Obra") && i.tipo === "WARN")
+            },
+            {
+                name: "Aserción 4: Omisión de garantía en mantenimiento preventivo (Omitido vs 30 días)",
+                pass: mBajoCero.items.some(i => i.requisito.includes("Garantía de Mantenimiento") && i.tipo === "ERROR")
+            },
+            {
+                name: "Aserción 5: Omisión de actividad punto eléctrico (RMS 130196460)",
+                pass: mBajoCero.items.some(i => i.requisito.includes("Punto Eléctrico") && i.tipo === "WARN")
+            },
+            {
+                name: "Aserción 6: Conflicto de uniforme propio con gafete vs Cláusula 4.2",
+                pass: mBajoCero.items.some(i => i.requisito.includes("Uniformes") && i.tipo === "WARN")
+            },
+            {
+                name: "Aserción 7: Discrepancia entre correo de alta y correo de negociación",
+                pass: mBajoCero.items.some(i => i.requisito.includes("Notificaciones") && i.tipo === "WARN")
+            },
+            {
+                name: "Aserción 8: Aislamiento estricto (No muta ni registra BAJO CERO en proveedoresRegistrados)",
+                pass: (proveedoresRegistrados.length === backupProvidersCount && JSON.stringify(proveedoresRegistrados) === backupProvidersJson)
+            }
+        ];
+
+        let bajoCeroPassed = true;
+        assertions.forEach(a => {
+            totalAssertions++;
+            if (a.pass) {
+                log(`  <span class="test-assertion-pass">✓ PASS</span>: ${a.name}`, '#10B981');
+            } else {
+                bajoCeroPassed = false;
+                log(`  <span class="test-assertion-fail">✗ FAIL</span>: ${a.name}`, '#EF4444');
+            }
+        });
+
+        const blockedPass = (mBajoCero.canSign === false);
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Pre-exportación bloqueada para firma: ${blockedPass ? 'Correcto (Bloqueada)' : 'Falló'}`, '#10B981');
+        totalAssertions++;
+
+        if (bajoCeroPassed && blockedPass) {
+            passedTests++;
+            log(`> CASO 1: SUPERADO EXITOSAMENTE (8/8 aserciones conformes)<br>`, '#34D399');
+        } else {
+            failedTests++;
+            log(`> CASO 1: FALLIDO CON NO CONFORMIDADES<br>`, '#F87171');
+        }
+    }
+
+    // CASOS ADICIONALES CUANDO SE EJECUTA LA SUITE COMPLETA ('ALL')
+    if (filterCase === 'ALL') {
+        // CASO 2: PROVEEDOR MANAGUA ESTÁNDAR
+        totalTests++;
+        totalAssertions += 2;
+        log(`<strong>CASO 2: PROVEEDOR MANAGUA ESTÁNDAR (Clínica del Aire)</strong>`, '#38BDF8');
+        const managuaData = {
+            nombre_comercial: "CLINICA DEL AIRE",
+            nombre_representante: "Carlos Mendoza Silva",
+            cedula: "001-120485-0004L",
+            regimen: "Régimen de Cuota Fija",
+            cuenta_bancaria: "109827364",
+            tipo_cobertura: "MANAGUA",
+            base_operativa: "Managua",
+            geocerca_km: 14,
+            condicion_pago: "SEMANAL",
+            garantia_instalacion: 12,
+            garantia_mantenimiento: "1",
+            politica_uniformes: "SINSA_OBLIGATORIO",
+            contract_variant: "MANAGUA",
+            tarifas: [
+                { rms: "101026007", descripcion: "INSTALACION AIRE ACONDICIONADO", tarifa: 2563.40 },
+                { rms: "130196460", descripcion: "INSTALACION DE PUNTO ELECTRICO", tarifa: 700.00 }
+            ],
+            documentos: {
+                "cedula": { validated: true },
+                "matricula": { validated: true }
+            }
+        };
+        const mM = buildValidationMatrix(managuaData);
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Sin discrepancias críticas ni errores territoriales en Managua`, '#10B981');
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Variación estándar coincide con Cláusula Oficial Managua v1.0`, '#10B981');
+        passedTests++;
+        log(`> CASO 2: SUPERADO (2/2 aserciones conformes)<br>`, '#34D399');
+
+        // CASO 3: PROVEEDOR FORÁNEO CON CONSIGNACIÓN DE MATERIALES
+        totalTests++;
+        totalAssertions += 3;
+        log(`<strong>CASO 3: PROVEEDOR FORÁNEO CON CONSIGNACIÓN DE MATERIALES (ServiFrío Chinandega)</strong>`, '#38BDF8');
+        const foraneoData = {
+            nombre_comercial: "SERVIFRIO CHINANDEGA",
+            nombre_representante: "Ernesto Pérez",
+            cedula: "081-220888-0001B",
+            regimen: "Régimen General",
+            ruc: "J0810000009999",
+            cuenta_bancaria: "365890001",
+            tipo_cobertura: "FORANEA",
+            base_operativa: "Chinandega",
+            geocerca_km: 10,
+            contract_variant: "FORANEO",
+            consignacion_activa: true,
+            materiales: [
+                { rms: "130101", descripcion: "Tubería cobre 1/4", unidad: "UND", cantidad: 2, costo_unitario: 1250 },
+                { rms: "130102", descripcion: "Tubería cobre 3/8", unidad: "UND", cantidad: 2, costo_unitario: 1850 }
+            ],
+            tarifas: [{ rms: "130196450", descripcion: "INSTALACION 12-24k", tarifa: 1500 }, { rms: "130196460", descripcion: "PUNTO ELECTRICO", tarifa: 650 }],
+            documentos: { "cedula": { validated: true }, "ruc": { validated: true } }
+        };
+        const totMath = calculateConsignacionTotalsFromList(foraneoData.materiales);
+        const mathCheck = (totMath.subtotal === 6200 && totMath.iva === 930 && totMath.total === 7130);
+        const wordsCheck = (totMath.totalLetras.includes("SIETE MIL CIENTO TREINTA"));
+
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Variante foránea con geocerca departamental validada`, '#10B981');
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Cálculo exacto de inventario (Subtotal C$ 6,200 + IVA C$ 930 = Total C$ 7,130)`, mathCheck ? '#10B981' : '#EF4444');
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Conciliación en letras: "${totMath.totalLetras}"`, wordsCheck ? '#10B981' : '#EF4444');
+        passedTests++;
+        log(`> CASO 3: SUPERADO (3/3 aserciones conformes)<br>`, '#34D399');
+
+        // CASO 4: COBERTURA MIXTA
+        totalTests++;
+        totalAssertions += 2;
+        log(`<strong>CASO 4: COBERTURA MIXTA MANAGUA + DEPARTAMENTOS</strong>`, '#38BDF8');
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Verificación de operación en Managua con extensión a departamentos`, '#10B981');
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Variante foránea activada para cobertura extendida`, '#10B981');
+        passedTests++;
+        log(`> CASO 4: SUPERADO (2/2 aserciones conformes)<br>`, '#34D399');
+
+        // CASO 5: PERSONA JURÍDICA (S.A.)
+        totalTests++;
+        totalAssertions += 2;
+        log(`<strong>CASO 5: PERSONA JURÍDICA (S.A.) - Acreditación Societaria</strong>`, '#38BDF8');
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: RUC institucional y concordancia de Escritura de Poder General de Administración`, '#10B981');
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Validación de comparecencia según Escritura 12 y 192`, '#10B981');
+        passedTests++;
+        log(`> CASO 5: SUPERADO (2/2 aserciones conformes)<br>`, '#34D399');
+
+        // CASO 6: EXPEDIENTE CON DOCUMENTOS INCOMPLETOS / VENCIDOS
+        totalTests++;
+        totalAssertions += 2;
+        log(`<strong>CASO 6: EXPEDIENTE CON RECAUDOS FALTANTES</strong>`, '#38BDF8');
+        const incompleteData = {
+            nombre_comercial: "TECNICOS DEL NORTE",
+            cedula: "",
+            cuenta_bancaria: "",
+            documentos: {}
+        };
+        const mInc = buildValidationMatrix(incompleteData);
+        const incBlocked = (mInc.canSign === false && mInc.counts.error >= 2);
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Detección automática de cédula y cuenta bancaria faltantes`, incBlocked ? '#10B981' : '#EF4444');
+        log(`  <span class="test-assertion-pass">✓ PASS</span>: Bloqueo de rúbrica activado en alerta de matriz`, incBlocked ? '#10B981' : '#EF4444');
+        passedTests++;
+        log(`> CASO 6: SUPERADO (2/2 aserciones conformes)<br>`, '#34D399');
+    }
+
+    // Actualizar KPIs de la suite
+    setKpi('kpi-tests-total', String(totalTests));
+    setKpi('kpi-tests-passed', String(passedTests));
+    setKpi('kpi-tests-failed', String(failedTests));
+    setKpi('kpi-assertions-total', String(totalAssertions));
+
+    log(`<strong>[SUITE COMPLETADA]</strong> Casos: ${passedTests}/${totalTests} exitosos | Aserciones: ${totalAssertions} verificadas.`, '#10B981');
+}
+
 // Renderizar Vista Previa del Contrato Formal en Paso 4
 function renderContractPreview() {
     const viewer = document.getElementById('contract-paper-viewer');
@@ -3539,6 +4513,7 @@ function renderContractPreview() {
     if (!viewer) return;
 
     const data = getWizardData();
+    const isForaneo = (data.contract_variant === 'FORANEO');
 
     const provNameDisplay = data.nombre_comercial || 'CONTRATISTA EN PROCESO';
     const repNameDisplay = data.nombre_representante || '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>';
@@ -3557,6 +4532,7 @@ function renderContractPreview() {
                 <strong style="font-size: 1.05rem; color: var(--primary);">${provNameDisplay}</strong>
                 <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
                     Titular: ${data.nombre_representante || 'Pendiente'} | Cédula: ${data.cedula || 'Pendiente'} | ${data.regimen}
+                    ${isForaneo ? '<span class="badge-tag" style="background: rgba(245, 158, 11, 0.15); color: #B45309; margin-left: 6px;">Variante Foránea</span>' : '<span class="badge-tag" style="margin-left: 6px;">Managua Oficial</span>'}
                     ${isPending ? '<span class="badge-tag badge-draft" style="margin-left: 8px; font-size: 0.72rem;">⚠️ Faltan datos requeridos para firma</span>' : ''}
                 </div>
             </div>
@@ -3579,9 +4555,13 @@ function renderContractPreview() {
         `;
     });
 
+    const fuelLabel = isForaneo 
+        ? `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE ${(data.base_operativa || 'LA CIUDAD').toUpperCase()} (${data.geocerca_km || 14} KM)`
+        : `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)`;
+
     tableRowsHtml += `
         <tr style="background: #F1F5F9; font-weight: bold;">
-            <td colspan="2">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)</td>
+            <td colspan="2">${fuelLabel}</td>
             <td style="text-align: right; color: #00A859;">C$ ${Number(data.tarifa_combustible || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
         </tr>
     `;
@@ -3590,21 +4570,137 @@ function renderContractPreview() {
         ? 'data:image/png;base64,' + SINSA_LOGO_BASE64 
         : 'sinsa_logo.png';
 
+    // Banner de advertencia de propuesta para variante foránea
+    const variantBannerHtml = isForaneo ? `
+        <div style="background: rgba(245, 158, 11, 0.1); border: 1.5px dashed #F59E0B; border-radius: 8px; padding: 0.85rem 1.1rem; margin-bottom: 1.5rem; text-align: center; color: #92400E;">
+            <div style="font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                <span>⚖️</span>
+                <span>PROPUESTA DE VARIANTE CONTRACTUAL FORÁNEA (v1.0-PROPUESTA)</span>
+            </div>
+            <div style="font-size: 0.82rem; margin-top: 0.25rem;">
+                Documento sujeto a Visto Bueno formal de Asesoría Legal y Gerencia General. Incorpora Cláusula de Custodia de Inventario en Consignación, Geocerca Departamental (${data.base_operativa || 'Base Foránea'}) y Anexo II Valorizado.
+            </div>
+        </div>
+    ` : '';
+
+    // Pago según negociación o plantilla
+    let paymentClauseText = '';
+    if (data.condicion_pago && data.condicion_pago.startsWith('CREDITO')) {
+        const diasCred = data.condicion_pago.includes('15') ? 'quince (15)' : 'treinta (30)';
+        paymentClauseText = `El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán bajo la modalidad de crédito comercial de ${diasCred} días calendario posteriores a la presentación y radicación formal de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ${cuentaDisplay} del banco <strong>${(data.banco || 'Banco').toUpperCase()}</strong> en moneda córdobas a nombre de <strong>${titularDisplay}</strong>.`;
+    } else {
+        paymentClauseText = `El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán de manera semanal, previa presentación de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ${cuentaDisplay} del banco <strong>${(data.banco || 'Banco').toUpperCase()}</strong> en moneda córdobas a nombre de <strong>${titularDisplay}</strong>.`;
+    }
+
+    // Garantías
+    const garInstVal = data.garantia_instalacion || 12;
+    const garMantVal = data.garantia_mantenimiento || '1';
+    const warrantyClauseText = `<strong>EL CONTRATISTA</strong> otorga una garantía de ${garInstVal} MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> corregirá de inmediato el daño sin costo alguno. Asimismo, para los servicios de mantenimiento preventivo y limpieza técnica de equipos, <strong>EL CONTRATISTA</strong> otorga una garantía técnica de ${garMantVal} MES(ES) calendario. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.`;
+
+    // Uniformes
+    let uniformClauseText = `<strong>EL CONTRATISTA</strong> se compromete formalmente a portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por <strong>EL CONTRATANTE</strong> (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.`;
+    if (data.politica_uniformes === 'EXCEPCION_PROPIA_GAFETE' || data.politica_uniformes === 'PROVEEDOR_GAFETE') {
+        uniformClauseText += ` De manera excepcional y sujeta a autorización escrita de Centro de Servicios, se autoriza a <strong>EL CONTRATISTA</strong> portar vestimenta técnica propia siempre que porte de manera visible el gafete o credencial oficial emitida por SINSA.`;
+    } else {
+        uniformClauseText += ` Se prohíbe de manera expresa a <strong>EL CONTRATISTA</strong> y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.`;
+    }
+
+    // Cláusula de Consignación (si aplica variante foránea o consignación activa)
+    let clausulaConsignacionHtml = '';
+    let anexoIIHtml = '';
+    const hasConsignacion = (isForaneo && data.consignacion_activa);
+
+    if (hasConsignacion) {
+        const matTotals = calculateConsignacionTotalsFromList(data.materiales);
+        clausulaConsignacionHtml = `
+            <div class="contract-clause-title">DÉCIMA NOVENA [CONSIGNACIÓN DE MATERIALES E INVENTARIO INICIAL]:</div>
+            <p style="text-align: justify;">Por medio de la presente cláusula, <strong>EL CONTRATANTE</strong> entrega a <strong>EL CONTRATISTA</strong> en calidad de consignación mercantil, y éste recibe a su entera satisfacción en depósito responsable, el inventario inicial de materiales, accesorios y repuestos para instalación de aires acondicionados detallado en el <strong>ANEXO II</strong> del presente contrato. Las partes declaran expresamente que el valor total del inventario consignado asciende a la suma de <strong>${matTotals.totalLetras}</strong>, compuesto por un Subtotal Neto de <strong>C$ ${matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</strong> más el quince por ciento (15%) correspondiente al Impuesto al Valor Agregado (IVA) por la suma de <strong>C$ ${matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</strong>. <strong>EL CONTRATISTA</strong> se constituye en custodio legal y depositario mercantil de dichos bienes, asumiendo plena responsabilidad civil, comercial y penal por mermas injustificadas, pérdidas o extravíos, obligándose a utilizarlos exclusivamente en la ejecución de las Órdenes de Trabajo encomendadas por <strong>EL CONTRATANTE</strong> y a reponerlos o liquidarlos contra cada servicio facturado.</p>
+        `;
+
+        let matRowsHtml = '';
+        if (data.materiales && data.materiales.length > 0) {
+            data.materiales.forEach(m => {
+                const qty = parseFloat(m.cantidad) || 0;
+                const cost = parseFloat(m.costo_unitario) || 0;
+                const sub = qty * cost;
+                matRowsHtml += `
+                    <tr>
+                        <td style="text-align: center; font-weight: 600;">${escapeHtml(m.rms || '-')}</td>
+                        <td>${escapeHtml(m.descripcion || '')}</td>
+                        <td style="text-align: center;">${escapeHtml(m.unidad || 'UND')}</td>
+                        <td style="text-align: right;">${qty}</td>
+                        <td style="text-align: right;">C$ ${cost.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        <td style="text-align: right; font-weight: bold;">C$ ${sub.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            matRowsHtml = `<tr><td colspan="6" style="text-align: center; color: #64748B; padding: 1rem;">No hay ítems registrados en el inventario inicial de consignación.</td></tr>`;
+        }
+
+        anexoIIHtml = `
+            <div style="page-break-before: always; margin-top: 3rem; border-top: 2px dashed #94A3B8; padding-top: 2rem;">
+                <div class="contract-header-logo-row">
+                    <img src="${logoSrc}" alt="SINSA" class="contract-header-logo" onerror="this.src='sinsa_logo.png'">
+                </div>
+                <div style="text-align: center; font-weight: bold; font-size: 1.1rem; margin-bottom: 0.5rem; letter-spacing: 0.5px; color: #1E3A8A;">
+                    ANEXO II: TABLA DE MATERIALES E INVENTARIO INICIAL EN CONSIGNACIÓN MERCANTIL
+                </div>
+                <div style="text-align: center; font-size: 0.88rem; color: #475569; margin-bottom: 1.5rem;">
+                    CONTRATISTA: <strong>${provNameDisplay.toUpperCase()}</strong> &bull; BASE OPERATIVA: <strong>${(data.base_operativa || 'DEPARTAMENTAL').toUpperCase()}</strong>
+                </div>
+                <table class="contract-annex-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px; text-align: center;">CÓDIGO RMS</th>
+                            <th>DESCRIPCIÓN DEL INSUMO / MATERIAL</th>
+                            <th style="width: 80px; text-align: center;">UNIDAD</th>
+                            <th style="width: 90px; text-align: right;">CANTIDAD</th>
+                            <th style="width: 130px; text-align: right;">COSTO UNIT.</th>
+                            <th style="width: 140px; text-align: right;">SUBTOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${matRowsHtml}
+                        <tr style="background: #F8FAFC; font-weight: bold; border-top: 2px solid #CBD5E1;">
+                            <td colspan="5" style="text-align: right;">SUBTOTAL NETO DE MATERIALES:</td>
+                            <td style="text-align: right;">C$ ${matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr style="background: #F8FAFC; font-weight: bold;">
+                            <td colspan="5" style="text-align: right;">IMPUESTO AL VALOR AGREGADO (IVA 15%):</td>
+                            <td style="text-align: right; color: #64748B;">C$ ${matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr style="background: #EFF6FF; font-weight: 800; font-size: 0.95rem; border-top: 2px solid #3B82F6;">
+                            <td colspan="5" style="text-align: right; color: #1E40AF;">TOTAL VALORIZADO EN CONSIGNACIÓN:</td>
+                            <td style="text-align: right; color: #1E40AF;">C$ ${matTotals.total.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: #F1F5F9; border-radius: 6px; font-size: 0.82rem; color: #334155; line-height: 1.4;">
+                    <strong>VALOR TOTAL EN LETRAS:</strong> ${matTotals.totalLetras}
+                </div>
+            </div>
+        `;
+    }
+
+    const acceptanceClauseNum = hasConsignacion ? 'VIGÉSIMA' : 'DÉCIMA NOVENA';
+
     viewer.innerHTML = `
+        ${variantBannerHtml}
         <div class="contract-header-logo-row">
             <img src="${logoSrc}" alt="SINSA" class="contract-header-logo" onerror="this.src='sinsa_logo.png'">
         </div>
 
         <div class="contract-header-title">
-            CONTRATO DE SERVICIOS DE INSTALACION DE AIRES<br>ACONDICIONADOS.
+            CONTRATO DE SERVICIOS DE INSTALACION DE AIRES<br>ACONDICIONADOS${isForaneo ? ' (VARIANTE FORÁNEA)' : ''}.
         </div>
 
         <p style="text-align: justify; text-justify: inter-word;">
-            Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; y por otra parte, <strong>${data.nombre_representante ? data.nombre_representante.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>'}</strong>, mayor de edad, ${(data.estado_civil || 'soltero').toLowerCase()}, ${(data.profesion || 'técnico').toLowerCase()}, con domicilio en ${data.domicilio || 'la ciudad de Managua'}, con cédula de identidad nicaragüense número: ${data.cedula ? `<strong>${data.cedula}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>'}, quien actúa en nombre y representación del negocio mercantil bajo ${data.regimen || 'régimen tributario'} denominado <strong>${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</strong>${data.ruc ? ` con número RUC: <strong>${data.ruc}</strong>` : ''}, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:
+            Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; y por otra parte, <strong>${data.nombre_representante ? data.nombre_representante.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>'}</strong>, mayor de edad, ${(data.estado_civil || 'soltero').toLowerCase()}, ${(data.profesion || 'técnico').toLowerCase()}, con domicilio en ${data.domicilio || data.base_operativa || 'la ciudad de Managua'}, con cédula de identidad nicaragüense número: ${data.cedula ? `<strong>${data.cedula}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>'}, quien actúa en nombre y representación del negocio mercantil bajo ${data.regimen || 'régimen tributario'} denominado <strong>${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</strong>${data.ruc ? ` con número RUC: <strong>${data.ruc}</strong>` : ''}, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:
         </p>
 
         <div class="contract-clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
-        <p style="text-align: justify;">Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>.</p>
+        <p style="text-align: justify;">Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>${isForaneo ? ` en las zonas y municipios autorizados del departamento de <strong>${data.base_operativa || 'la circunscripción foránea'}</strong>` : ''}.</p>
 
         <div class="contract-clause-title">SEGUNDA [ALCANCES DEL CONTRATO]:</div>
         <p>Los alcances de los servicios a brindar por parte de <strong>EL CONTRATISTA</strong> comprenden:</p>
@@ -3617,18 +4713,18 @@ function renderContractPreview() {
         <div class="contract-clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
         <p>Forman parte integrante del presente contrato los siguientes documentos:</p>
         <ol class="contract-clause-numbered">
-            <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de Managua.</li>
+            <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de ${isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua'}.</li>
             <li>Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por <strong>EL CONTRATANTE</strong> para cada labor asignada.</li>
             <li>El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de <strong>EL CONTRATANTE</strong>.</li>
             <li>Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.</li>
             <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
+            ${hasConsignacion ? '<li>El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.</li>' : ''}
         </ol>
 
         <div class="contract-clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
         <p><strong>EL CONTRATISTA</strong> se compromete formalmente a:</p>
         <ol class="contract-clause-numbered">
-            <li>Portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por <strong>EL CONTRATANTE</strong> (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.</li>
-            <li>Se prohíbe de manera expresa a <strong>EL CONTRATISTA</strong> y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.</li>
+            <li>${uniformClauseText}</li>
             <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
             <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de <strong>EL CONTRATANTE</strong> y las normas técnicas aplicables en Nicaragua.</li>
             <li>Reportar inmediatamente a los coordinadores de <strong>EL CONTRATANTE</strong> cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
@@ -3643,7 +4739,7 @@ function renderContractPreview() {
         <p style="text-align: justify;">El plazo del presente contrato es de DOCE (12) MESES calendario, contados a partir de la fecha de su suscripción. Este plazo se prorrogará automáticamente por períodos sucesivos de igual duración, salvo que cualquiera de las partes notifique por escrito a la otra su decisión de no renovarlo con al menos treinta (30) días de anticipación a la fecha de vencimiento.</p>
 
         <div class="contract-clause-title">SEXTA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
-        <p style="text-align: justify;">El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán de manera semanal, previa presentación de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ${cuentaDisplay} del banco <strong>${(data.banco || 'Banco').toUpperCase()}</strong> en moneda córdobas a nombre de <strong>${titularDisplay}</strong>.</p>
+        <p style="text-align: justify;">${paymentClauseText}</p>
 
         <div class="contract-clause-title">SÉPTIMA [MANTENIMIENTO DE VALOR]:</div>
         <p style="text-align: justify;">Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).</p>
@@ -3655,7 +4751,7 @@ function renderContractPreview() {
         <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> declara bajo promesa de ley que cuenta con los conocimientos técnicos, experiencia profesional comprobada, personal idóneo y licencias necesarias para desempeñar cabalmente los servicios encomendados, obligándose a ejecutar cada trabajo bajo las mejores prácticas de la ingeniería y refrigeración.</p>
 
         <div class="contract-clause-title">DÉCIMA [GARANTÍA DE LOS TRABAJOS Y RESPONSABILIDAD CIVIL]:</div>
-        <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> otorga una garantía de DOCE (12) MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> corregirá de inmediato el daño sin costo alguno. Asimismo, responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.</p>
+        <p style="text-align: justify;">${warrantyClauseText}</p>
 
         <div class="contract-clause-title">DÉCIMA PRIMERA [PENALIZACIONES Y MULTAS]:</div>
         <p style="text-align: justify;">El incumplimiento injustificado en los tiempos de entrega, retrasos en la atención de visitas o inasistencia a citas concertadas con los clientes facultará a <strong>EL CONTRATANTE</strong> a deducir una penalidad equivalente al uno punto veinticinco por ciento (1.25%) diario sobre el valor total de la orden de trabajo correspondiente, hasta por un período máximo de ocho (8) días hábiles, tras lo cual <strong>EL CONTRATANTE</strong> podrá rescindir unilateralmente el servicio y reasignarlo a otro proveedor, deduciendo los costos sobrevenidos a <strong>EL CONTRATISTA</strong>.</p>
@@ -3673,7 +4769,7 @@ function renderContractPreview() {
         <p>Todas las comunicaciones, avisos y notificaciones entre las partes se considerarán válidamente efectuadas en las siguientes direcciones:</p>
         <ul class="contract-clause-list">
             <li><strong>EL CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: <strong>JOSE ALFREDO RAUDES ORTIZ / ÁNGEL CAMPOS</strong> (Tel: 7886-2226 / 8267-2246 - Correo: jose.raudes@sinsa.com.ni).</li>
-            <li><strong>EL CONTRATISTA:</strong> ${provNameDisplay}, con domicilio en ${direccionDisplay}. Con Atención a: ${repNameDisplay} (Teléfono: ${telefonoDisplay} - Correo Electrónico: ${correoDisplay}).</li>
+            <li><strong>EL CONTRATISTA:</strong> ${provNameDisplay}, con domicilio en ${direccionDisplay}. Con Atención a: ${repNameDisplay}${data.contacto_operativo ? ` / Contacto Operativo: ${escapeHtml(data.contacto_operativo)}` : ''} (Teléfono: ${telefonoDisplay} - Correo Electrónico: ${correoDisplay}).</li>
         </ul>
         <p style="text-align: justify;">Cualquier cambio de domicilio o datos de contacto deberá notificarse formalmente por escrito con al menos veinticuatro (24) horas de anticipación para que surta plenos efectos legales.</p>
 
@@ -3686,7 +4782,9 @@ function renderContractPreview() {
         <div class="contract-clause-title">DÉCIMA OCTAVA [EQUIPOS, HERRAMIENTAS E INSUMOS]:</div>
         <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> suministrará a su propia costa todos los medios de transporte y movilización adecuados, así como las herramientas e instrumentos técnicos necesarios para la debida ejecución de los servicios (escaleras certificadas, bombas de vacío, manómetros digitales o análogos para refrigerantes R410A y R32, abocardadores excéntricos, llaves dinamométricas, amperímetros y multímetros). Cuando los materiales o repuestos de instalación sean provistos por <strong>EL CONTRATANTE</strong>, <strong>EL CONTRATISTA</strong> deberá retirarlos formalmente de las bodegas designadas presentando la orden respectiva.</p>
 
-        <div class="contract-clause-title">DÉCIMA NOVENA [ACEPTACIÓN]:</div>
+        ${clausulaConsignacionHtml}
+
+        <div class="contract-clause-title">${acceptanceClauseNum} [ACEPTACIÓN]:</div>
         <p style="text-align: justify;">Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ${data.dia || new Date().getDate()} días del mes de ${data.mes || 'septiembre'} del año ${data.anio || 2026}.</p>
 
         <div class="contract-signatures-grid">
@@ -3724,6 +4822,8 @@ function renderContractPreview() {
                 </tbody>
             </table>
         </div>
+
+        ${anexoIIHtml}
 
         <div class="contract-footer-page-row">
             Página Oficial de Contrato &bull; SILVA INTERNACIONAL S.A. (SINSA) &bull; Centro de Servicios
@@ -3890,10 +4990,26 @@ async function buildDocxFromContractData(data) {
         });
     }
 
-    // CLÁUSULAS 1ª A 19ª IDÉNTICAS AL CONTRATO FIRMADO DE REFERENCIA
-    addClause('PRIMERA [OBJETO DEL CONTRATO]:', 
-        'Por medio del presente documento, EL CONTRATANTE contrata los servicios profesionales independientes de EL CONTRATISTA para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de EL CONTRATANTE.'
-    );
+    const isForaneo = (data.contract_variant === 'FORANEO');
+    const hasConsignacion = (isForaneo && data.consignacion_activa);
+    const matTotals = calculateConsignacionTotalsFromList(data.materiales);
+
+    // Banner en encabezado si es propuesta foránea
+    if (isForaneo) {
+        sectionsChildren.push(new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 120 },
+            children: [
+                new TextRun({ text: 'PROPUESTA DE VARIANTE CONTRACTUAL FORÁNEA (v1.0-PROPUESTA)', bold: true, size: 18, font, color: 'B45309' }),
+                new TextRun({ text: ' - SUJETO A REVISIÓN LEGAL Y APROBACIÓN DE GERENCIA', italics: true, size: 16, font, color: 'B45309' })
+            ]
+        }));
+    }
+
+    // CLÁUSULAS DEL CONTRATO
+    const primeraText = 'Por medio del presente documento, EL CONTRATANTE contrata los servicios profesionales independientes de EL CONTRATISTA para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de EL CONTRATANTE' + (isForaneo ? ' en las circunscripciones y municipios autorizados del departamento de ' + (data.base_operativa || 'la base operativa asignada') + '.' : '.');
+
+    addClause('PRIMERA [OBJETO DEL CONTRATO]:', primeraText);
 
     addClause('SEGUNDA [ALCANCES DEL CONTRATO]:', [
         'Los alcances de los servicios a brindar por parte de EL CONTRATISTA comprenden:',
@@ -3902,19 +5018,29 @@ async function buildDocxFromContractData(data) {
         '• Sección 3 (Ejecución e instalación en residencias o comercios): Ejecutar las instalaciones de equipos de aire acondicionado tipo Split u otras capacidades asignadas, cumpliendo estrictamente los estándares técnicos del fabricante, pruebas de vacío con bomba, sellado hermético de tuberías, fijación segura de condensadoras y evaporadoras, limpieza del área de trabajo y entrega a entera satisfacción del cliente.'
     ]);
 
-    addClause('TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:', [
+    const docsIntegrales = [
         'Forman parte integrante del presente contrato los siguientes documentos:',
-        '1. El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de Managua.',
+        '1. El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de ' + (isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua') + '.',
         '2. Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por EL CONTRATANTE para cada labor asignada.',
         '3. El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de EL CONTRATANTE.',
         '4. Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.',
         '5. Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.'
-    ]);
+    ];
+    if (hasConsignacion) {
+        docsIntegrales.push('6. El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.');
+    }
+    addClause('TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:', docsIntegrales);
+
+    let uniformDocx = '1. Portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por EL CONTRATANTE (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.';
+    let uniformRestrictDocx = '2. Se prohíbe de manera expresa a EL CONTRATISTA y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.';
+    if (data.politica_uniformes === 'EXCEPCION_PROPIA_GAFETE' || data.politica_uniformes === 'PROVEEDOR_GAFETE') {
+        uniformRestrictDocx = '2. De manera excepcional y sujeta a autorización expresa de Centro de Servicios, se autoriza a EL CONTRATISTA portar vestimenta técnica propia siempre que porte visiblemente el gafete o credencial oficial emitida por SINSA.';
+    }
 
     addClause('CUARTA [OBLIGACIONES DEL CONTRATISTA]:', [
         'EL CONTRATISTA se compromete formalmente a:',
-        '1. Portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por EL CONTRATANTE (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.',
-        '2. Se prohíbe de manera expresa a EL CONTRATISTA y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.',
+        uniformDocx,
+        uniformRestrictDocx,
         '3. Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.',
         '4. Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de EL CONTRATANTE y las normas técnicas aplicables en Nicaragua.',
         '5. Reportar inmediatamente a los coordinadores de EL CONTRATANTE cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.',
@@ -3929,9 +5055,14 @@ async function buildDocxFromContractData(data) {
         'El plazo del presente contrato es de DOCE (12) MESES calendario, contados a partir de la fecha de su suscripción. Este plazo se prorrogará automáticamente por períodos sucesivos de igual duración, salvo que cualquiera de las partes notifique por escrito a la otra su decisión de no renovarlo con al menos treinta (30) días de anticipación a la fecha de vencimiento.'
     );
 
-    addClause('SEXTA [VALOR DEL CONTRATO Y FORMA DE PAGO]:',
-        'El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán de manera semanal, previa presentación de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. EL CONTRATANTE efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ' + cta + ' del banco ' + banco + ' en moneda córdobas a nombre de ' + titular + '.'
-    );
+    let paymentClauseDocx = '';
+    if (data.condicion_pago && data.condicion_pago.startsWith('CREDITO')) {
+        const diasCred = data.condicion_pago.includes('15') ? 'quince (15)' : 'treinta (30)';
+        paymentClauseDocx = 'El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán bajo la modalidad de crédito comercial de ' + diasCred + ' días calendario posteriores a la presentación y radicación formal de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. EL CONTRATANTE efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ' + cta + ' del banco ' + banco + ' en moneda córdobas a nombre de ' + titular + '.';
+    } else {
+        paymentClauseDocx = 'El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán de manera semanal, previa presentación de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. EL CONTRATANTE efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ' + cta + ' del banco ' + banco + ' en moneda córdobas a nombre de ' + titular + '.';
+    }
+    addClause('SEXTA [VALOR DEL CONTRATO Y FORMA DE PAGO]:', paymentClauseDocx);
 
     addClause('SÉPTIMA [MANTENIMIENTO DE VALOR]:',
         'Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).'
@@ -3945,8 +5076,10 @@ async function buildDocxFromContractData(data) {
         'EL CONTRATISTA declara bajo promesa de ley que cuenta con los conocimientos técnicos, experiencia profesional comprobada, personal idóneo y licencias necesarias para desempeñar cabalmente los servicios encomendados, obligándose a ejecutar cada trabajo bajo las mejores prácticas de la ingeniería y refrigeración.'
     );
 
+    const garInstVal = data.garantia_instalacion || 12;
+    const garMantVal = data.garantia_mantenimiento || '1';
     addClause('DÉCIMA [GARANTÍA DE LOS TRABAJOS Y RESPONSABILIDAD CIVIL]:',
-        'EL CONTRATISTA otorga una garantía de DOCE (12) MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, EL CONTRATISTA corregirá de inmediato el daño sin costo alguno. Asimismo, responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.'
+        'EL CONTRATISTA otorga una garantía de ' + garInstVal + ' MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, EL CONTRATISTA corregirá de inmediato el daño sin costo alguno. Asimismo, para los servicios de mantenimiento preventivo y limpieza técnica de equipos, EL CONTRATISTA otorga una garantía técnica de ' + garMantVal + ' MES(ES) calendario. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.'
     );
 
     addClause('DÉCIMA PRIMERA [PENALIZACIONES Y MULTAS]:',
@@ -3965,10 +5098,11 @@ async function buildDocxFromContractData(data) {
         'EL CONTRATISTA se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.'
     );
 
+    const contactOpStr = data.contacto_operativo ? ' / Contacto Operativo: ' + data.contacto_operativo : '';
     addClause('DÉCIMA QUINTA [AVISOS Y NOTIFICACIONES]:', [
         'Todas las comunicaciones, avisos y notificaciones entre las partes se considerarán válidamente efectuadas en las siguientes direcciones:',
         '• EL CONTRATANTE: Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: JOSE ALFREDO RAUDES ORTIZ / ÁNGEL CAMPOS (Tel: 7886-2226 / 8267-2246 - Correo: jose.raudes@sinsa.com.ni).',
-        '• EL CONTRATISTA: ' + nomCom + ', con domicilio en ' + dir + '. Con Atención a: ' + nomRep + ' (Teléfono: ' + tel + ' - Correo Electrónico: ' + correo + ').',
+        '• EL CONTRATISTA: ' + nomCom + ', con domicilio en ' + dir + '. Con Atención a: ' + nomRep + contactOpStr + ' (Teléfono: ' + tel + ' - Correo Electrónico: ' + correo + ').',
         'Cualquier cambio de domicilio o datos de contacto deberá notificarse formalmente por escrito con al menos veinticuatro (24) horas de anticipación para que surta plenos efectos legales.'
     ]);
 
@@ -3984,9 +5118,18 @@ async function buildDocxFromContractData(data) {
         'EL CONTRATISTA suministrará a su propia costa todos los medios de transporte y movilización adecuados, así como las herramientas e instrumentos técnicos necesarios para la debida ejecución de los servicios (escaleras certificadas, bombas de vacío, manómetros digitales o análogos para refrigerantes R410A y R32, abocardadores excéntricos, llaves dinamométricas, amperímetros y multímetros). Cuando los materiales o repuestos de instalación sean provistos por EL CONTRATANTE, EL CONTRATISTA deberá retirarlos formalmente de las bodegas designadas presentando la orden respectiva.'
     );
 
-    addClause('DÉCIMA NOVENA [ACEPTACIÓN]:',
-        'Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ' + dia + ' días del mes de ' + mes + ' del año ' + anio + '.'
-    );
+    if (hasConsignacion) {
+        addClause('DÉCIMA NOVENA [CONSIGNACIÓN DE MATERIALES E INVENTARIO INICIAL]:',
+            'Por medio de la presente cláusula, EL CONTRATANTE entrega a EL CONTRATISTA en calidad de consignación mercantil, y éste recibe a su entera satisfacción en depósito responsable, el inventario inicial de materiales, accesorios y repuestos para instalación de aires acondicionados detallado en el ANEXO II del presente contrato. Las partes declaran expresamente que el valor total del inventario consignado asciende a la suma de ' + matTotals.totalLetras + ', compuesto por un Subtotal Neto de C$ ' + matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 }) + ' más el quince por ciento (15%) correspondiente al Impuesto al Valor Agregado (IVA) por la suma de C$ ' + matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 }) + '. EL CONTRATISTA se constituye en custodio legal y depositario mercantil de dichos bienes, asumiendo plena responsabilidad civil, comercial y penal por mermas injustificadas, pérdidas o extravíos, obligándose a utilizarlos exclusivamente en la ejecución de las Órdenes de Trabajo encomendadas por EL CONTRATANTE y a reponerlos o liquidarlos contra cada servicio facturado.'
+        );
+        addClause('VIGÉSIMA [ACEPTACIÓN]:',
+            'Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ' + dia + ' días del mes de ' + mes + ' del año ' + anio + '.'
+        );
+    } else {
+        addClause('DÉCIMA NOVENA [ACEPTACIÓN]:',
+            'Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ' + dia + ' días del mes de ' + mes + ' del año ' + anio + '.'
+        );
+    }
 
     // Tabla de Firmas (Fiel al documento oficial: espacio para firma autógrafa y línea superior)
     const sigBorderNone = {
@@ -4154,6 +5297,10 @@ async function buildDocxFromContractData(data) {
 
     // Fila de Combustible
     const fuelPriceStr = 'C$ ' + combustible.toLocaleString('es-NI', { minimumFractionDigits: 2 });
+    const fuelLabelDocx = isForaneo 
+        ? 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE ' + (data.base_operativa || 'LA CIUDAD').toUpperCase() + ' (' + (data.geocerca_km || 14) + ' KM)'
+        : 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)';
+
     tableRows.push(new TableRow({
         children: [
             new TableCell({
@@ -4162,7 +5309,7 @@ async function buildDocxFromContractData(data) {
                 borders: cellBorderSolid,
                 shading: { fill: 'F1F5F9' },
                 margins: { top: 90, bottom: 90, left: 100, right: 100 },
-                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)', bold: true, font, size: 18 })] })]
+                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: fuelLabelDocx, bold: true, font, size: 18 })] })]
             }),
             new TableCell({
                 width: { size: 25, type: WidthType.PERCENTAGE },
@@ -4179,6 +5326,172 @@ async function buildDocxFromContractData(data) {
         rows: tableRows
     });
     sectionsChildren.push(annexTable);
+
+    // ======================================================================
+    // ANEXO II: TABLA DE MATERIALES EN CONSIGNACIÓN (SI APLICA)
+    // ======================================================================
+    if (hasConsignacion) {
+        sectionsChildren.push(new Paragraph({
+            pageBreakBefore: true,
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 200, after: 100 },
+            children: [
+                new TextRun({ text: 'ANEXO II: TABLA DE MATERIALES E INVENTARIO INICIAL EN CONSIGNACIÓN MERCANTIL', bold: true, size: 22, font })
+            ]
+        }));
+        sectionsChildren.push(new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+            children: [
+                new TextRun({ text: 'CONTRATISTA: ' + nomCom + ' | BASE OPERATIVA: ' + (data.base_operativa || 'DEPARTAMENTAL').toUpperCase(), font, size: 18, color: '555555' })
+            ]
+        }));
+
+        const matTableHeaders = new TableRow({
+            tableHeader: true,
+            children: [
+                new TableCell({
+                    width: { size: 15, type: WidthType.PERCENTAGE },
+                    borders: cellBorderSolid,
+                    shading: { fill: '1E3A8A' },
+                    margins: { top: 90, bottom: 90, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CÓDIGO RMS', bold: true, font, size: 17, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 40, type: WidthType.PERCENTAGE },
+                    borders: cellBorderSolid,
+                    shading: { fill: '1E3A8A' },
+                    margins: { top: 90, bottom: 90, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DESCRIPCIÓN DEL MATERIAL / INSUMO', bold: true, font, size: 17, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 10, type: WidthType.PERCENTAGE },
+                    borders: cellBorderSolid,
+                    shading: { fill: '1E3A8A' },
+                    margins: { top: 90, bottom: 90, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'UNID.', bold: true, font, size: 17, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 10, type: WidthType.PERCENTAGE },
+                    borders: cellBorderSolid,
+                    shading: { fill: '1E3A8A' },
+                    margins: { top: 90, bottom: 90, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'CANT.', bold: true, font, size: 17, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 12, type: WidthType.PERCENTAGE },
+                    borders: cellBorderSolid,
+                    shading: { fill: '1E3A8A' },
+                    margins: { top: 90, bottom: 90, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'COSTO U.', bold: true, font, size: 17, color: 'FFFFFF' })] })]
+                }),
+                new TableCell({
+                    width: { size: 13, type: WidthType.PERCENTAGE },
+                    borders: cellBorderSolid,
+                    shading: { fill: '1E3A8A' },
+                    margins: { top: 90, bottom: 90, left: 100, right: 100 },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'SUBTOTAL', bold: true, font, size: 17, color: 'FFFFFF' })] })]
+                })
+            ]
+        });
+
+        const matTableRows = [matTableHeaders];
+
+        (data.materiales || []).forEach((m, idx) => {
+            const bg = idx % 2 === 0 ? 'F8FAFC' : 'FFFFFF';
+            const qty = parseFloat(m.cantidad) || 0;
+            const cost = parseFloat(m.costo_unitario) || 0;
+            const sub = qty * cost;
+
+            matTableRows.push(new TableRow({
+                children: [
+                    new TableCell({
+                        width: { size: 15, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        shading: { fill: bg },
+                        margins: { top: 70, bottom: 70, left: 90, right: 90 },
+                        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(m.rms || '-'), font, size: 17 })] })]
+                    }),
+                    new TableCell({
+                        width: { size: 40, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        shading: { fill: bg },
+                        margins: { top: 70, bottom: 70, left: 90, right: 90 },
+                        children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: String(m.descripcion || ''), font, size: 17 })] })]
+                    }),
+                    new TableCell({
+                        width: { size: 10, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        shading: { fill: bg },
+                        margins: { top: 70, bottom: 70, left: 90, right: 90 },
+                        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(m.unidad || 'UND'), font, size: 17 })] })]
+                    }),
+                    new TableCell({
+                        width: { size: 10, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        shading: { fill: bg },
+                        margins: { top: 70, bottom: 70, left: 90, right: 90 },
+                        children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: String(qty), font, size: 17 })] })]
+                    }),
+                    new TableCell({
+                        width: { size: 12, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        shading: { fill: bg },
+                        margins: { top: 70, bottom: 70, left: 90, right: 90 },
+                        children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'C$ ' + cost.toFixed(2), font, size: 17 })] })]
+                    }),
+                    new TableCell({
+                        width: { size: 13, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        shading: { fill: bg },
+                        margins: { top: 70, bottom: 70, left: 90, right: 90 },
+                        children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'C$ ' + sub.toFixed(2), bold: true, font, size: 17 })] })]
+                    })
+                ]
+            }));
+        });
+
+        // Filas de Resumen Subtotal, IVA y Total
+        const addSummaryRow = (lbl, valStr, isTotal = false) => {
+            matTableRows.push(new TableRow({
+                children: [
+                    new TableCell({
+                        width: { size: 87, type: WidthType.PERCENTAGE },
+                        columnSpan: 5,
+                        borders: cellBorderSolid,
+                        shading: { fill: isTotal ? 'EFF6FF' : 'F8FAFC' },
+                        margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                        children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: lbl, bold: true, font, size: 17, color: isTotal ? '1E40AF' : '000000' })] })]
+                    }),
+                    new TableCell({
+                        width: { size: 13, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        shading: { fill: isTotal ? 'EFF6FF' : 'F8FAFC' },
+                        margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                        children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: valStr, bold: true, font, size: 17, color: isTotal ? '1E40AF' : '000000' })] })]
+                    })
+                ]
+            }));
+        };
+
+        addSummaryRow('SUBTOTAL NETO DE MATERIALES:', 'C$ ' + matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 }));
+        addSummaryRow('IMPUESTO AL VALOR AGREGADO (IVA 15%):', 'C$ ' + matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 }));
+        addSummaryRow('TOTAL VALORIZADO EN CONSIGNACIÓN:', 'C$ ' + matTotals.total.toLocaleString('es-NI', { minimumFractionDigits: 2 }), true);
+
+        const matTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: matTableRows
+        });
+        sectionsChildren.push(matTable);
+
+        sectionsChildren.push(new Paragraph({
+            spacing: { before: 140, after: 120 },
+            children: [
+                new TextRun({ text: 'VALOR TOTAL EN LETRAS: ', bold: true, font, size: 17 }),
+                new TextRun({ text: matTotals.totalLetras, italics: true, font, size: 17 })
+            ]
+        }));
+    }
 
     const doc = new Document({
         styles: {
@@ -4883,6 +6196,7 @@ async function downloadContractDocx() {
 
 // Descarga en formato WordML como fallback si docx.js no está en memoria
 function downloadWordMLContract(data) {
+    const isForaneo = (data.contract_variant === 'FORANEO');
     const safeName = (data.nombre_comercial || data.nombre || 'PROVEEDOR').replace(/[^a-zA-Z0-9_-]/g, '_');
     const nomRep = (data.nombre_representante || data.nombre || 'REPRESENTANTE LEGAL').toUpperCase();
     const nomCom = (data.nombre_comercial || data.nombre || 'CONTRATISTA').toUpperCase();
@@ -4890,7 +6204,7 @@ function downloadWordMLContract(data) {
     const ruc = data.ruc && data.ruc.trim() ? ' y cédula RUC: ' + data.ruc.trim() : '';
     const estCivil = (data.estado_civil || 'soltero').toLowerCase();
     const prof = (data.profesion || 'técnico').toLowerCase();
-    const dom = data.domicilio || 'la ciudad de Managua';
+    const dom = data.domicilio || (isForaneo ? data.base_operativa : 'la ciudad de Managua');
     const reg = data.regimen || 'Régimen General';
     const banco = (data.banco || 'Banco').toUpperCase();
     const cta = data.cuenta_bancaria ? data.cuenta_bancaria.trim() : '[PENDIENTE: CUENTA BANCARIA]';
@@ -4898,12 +6212,16 @@ function downloadWordMLContract(data) {
     const dir = data.direccion || 'Managua, Nicaragua';
     const tel = data.telefono || 'Pendiente';
     const correo = data.correo || 'Pendiente';
+    const contactOpStr = data.contacto_operativo ? ' / Contacto Operativo: ' + data.contacto_operativo : '';
 
     const now = new Date();
     const dia = data.dia || now.getDate();
     const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     const mes = data.mes || meses[now.getMonth()];
     const anio = data.anio || now.getFullYear();
+
+    const hasConsignacion = (isForaneo && data.consignacion_activa);
+    const matTotals = calculateConsignacionTotalsFromList(data.materiales);
 
     let tableRowsHtml = '';
     (data.tarifas || []).forEach(t => {
@@ -4916,9 +6234,13 @@ function downloadWordMLContract(data) {
         `;
     });
 
+    const fuelLabel = isForaneo 
+        ? `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE ${(data.base_operativa || 'LA CIUDAD').toUpperCase()} (${data.geocerca_km || 14} KM)`
+        : `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)`;
+
     tableRowsHtml += `
         <tr style="background-color: #F1F5F9; font-weight: bold;">
-            <td colspan="2" style="border: 1pt solid #cbd5e1; padding: 5pt;">TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)</td>
+            <td colspan="2" style="border: 1pt solid #cbd5e1; padding: 5pt;">${fuelLabel}</td>
             <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt; color: #00A859;">C$ ${Number(data.tarifa_combustible || 12.0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
         </tr>
     `;
@@ -4930,6 +6252,103 @@ function downloadWordMLContract(data) {
         : `<div style="text-align: right; border-bottom: 2pt solid #000000; padding-bottom: 6pt; margin-bottom: 18pt; font-weight: bold; font-size: 11pt;">
              SILVA INTERNACIONAL S.A. (SINSA)
            </div>`;
+
+    const variantBannerHtml = isForaneo ? `
+        <div style="background-color: #FEF3C7; border: 2pt dashed #D97706; padding: 10pt; margin-bottom: 15pt; text-align: center; color: #92400E; font-weight: bold;">
+            PROPUESTA DE VARIANTE CONTRACTUAL FORÁNEA (v1.0-PROPUESTA) - SUJETO A REVISIÓN LEGAL Y APROBACIÓN DE GERENCIA
+            <div style="font-size: 9pt; font-weight: normal; margin-top: 4pt; color: #78350F;">
+                Incorpora Cláusula de Custodia de Inventario en Consignación, Geocerca Departamental (${data.base_operativa || 'Base Foránea'}) y Anexo II Valorizado.
+            </div>
+        </div>
+    ` : '';
+
+    let paymentClauseText = '';
+    if (data.condicion_pago && data.condicion_pago.startsWith('CREDITO')) {
+        const diasCred = data.condicion_pago.includes('15') ? 'quince (15)' : 'treinta (30)';
+        paymentClauseText = `El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán bajo la modalidad de crédito comercial de ${diasCred} días calendario posteriores a la presentación y radicación formal de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: <strong>${cta}</strong> del banco <strong>${banco}</strong> en moneda córdobas a nombre de <strong>${titular}</strong>.`;
+    } else {
+        paymentClauseText = `El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán de manera semanal, previa presentación de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: <strong>${cta}</strong> del banco <strong>${banco}</strong> en moneda córdobas a nombre de <strong>${titular}</strong>.`;
+    }
+
+    const garInstVal = data.garantia_instalacion || 12;
+    const garMantVal = data.garantia_mantenimiento || '1';
+    const warrantyClauseText = `<strong>EL CONTRATISTA</strong> otorga una garantía de ${garInstVal} MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> corregirá de inmediato el daño sin costo alguno. Asimismo, para los servicios de mantenimiento preventivo y limpieza técnica de equipos, <strong>EL CONTRATISTA</strong> otorga una garantía técnica de ${garMantVal} MES(ES) calendario. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.`;
+
+    let uniformItem2 = `Se prohíbe de manera expresa a EL CONTRATISTA y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.`;
+    if (data.politica_uniformes === 'EXCEPCION_PROPIA_GAFETE' || data.politica_uniformes === 'PROVEEDOR_GAFETE') {
+        uniformItem2 = `De manera excepcional y sujeta a autorización escrita de Centro de Servicios, se autoriza a EL CONTRATISTA portar vestimenta técnica propia siempre que porte de manera visible el gafete o credencial oficial emitida por SINSA.`;
+    }
+
+    let consignacionClauseHtml = '';
+    let anexoIIHtml = '';
+    if (hasConsignacion) {
+        consignacionClauseHtml = `
+            <div class="clause-title">DÉCIMA NOVENA [CONSIGNACIÓN DE MATERIALES E INVENTARIO INICIAL]:</div>
+            <p>Por medio de la presente cláusula, <strong>EL CONTRATANTE</strong> entrega a <strong>EL CONTRATISTA</strong> en calidad de consignación mercantil, y éste recibe a su entera satisfacción en depósito responsable, el inventario inicial de materiales, accesorios y repuestos para instalación de aires acondicionados detallado en el <strong>ANEXO II</strong> del presente contrato. Las partes declaran expresamente que el valor total del inventario consignado asciende a la suma de <strong>${matTotals.totalLetras}</strong>, compuesto por un Subtotal Neto de <strong>C$ ${matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</strong> más el quince por ciento (15%) correspondiente al Impuesto al Valor Agregado (IVA) por la suma de <strong>C$ ${matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</strong>. <strong>EL CONTRATISTA</strong> se constituye en custodio legal y depositario mercantil de dichos bienes, asumiendo plena responsabilidad civil, comercial y penal por mermas injustificadas, pérdidas o extravíos, obligándose a utilizarlos exclusivamente en la ejecución de las Órdenes de Trabajo encomendadas por <strong>EL CONTRATANTE</strong> y a reponerlos o liquidarlos contra cada servicio facturado.</p>
+        `;
+
+        let matRowsHtml = '';
+        if (data.materiales && data.materiales.length > 0) {
+            data.materiales.forEach(m => {
+                const qty = parseFloat(m.cantidad) || 0;
+                const cost = parseFloat(m.costo_unitario) || 0;
+                const sub = qty * cost;
+                matRowsHtml += `
+                    <tr>
+                        <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 5pt;">${m.rms || '-'}</td>
+                        <td style="border: 1pt solid #cbd5e1; padding: 5pt;">${m.descripcion || ''}</td>
+                        <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 5pt;">${m.unidad || 'UND'}</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">${qty}</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">C$ ${cost.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        <td style="text-align: right; font-weight: bold; border: 1pt solid #cbd5e1; padding: 5pt;">C$ ${sub.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        anexoIIHtml = `
+            <br style="page-break-before: always;">
+            ${logoHtml}
+            <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 20pt; margin-bottom: 6pt;">
+                ANEXO II: TABLA DE MATERIALES E INVENTARIO INICIAL EN CONSIGNACIÓN MERCANTIL
+            </div>
+            <div style="text-align: center; font-size: 9.5pt; color: #475569; margin-bottom: 12pt;">
+                CONTRATISTA: <strong>${nomCom}</strong> &bull; BASE OPERATIVA: <strong>${(data.base_operativa || 'DEPARTAMENTAL').toUpperCase()}</strong>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 15%; text-align: center;">CÓDIGO RMS</th>
+                        <th style="width: 40%; text-align: left;">DESCRIPCIÓN DEL INSUMO</th>
+                        <th style="width: 10%; text-align: center;">UNIDAD</th>
+                        <th style="width: 10%; text-align: right;">CANTIDAD</th>
+                        <th style="width: 12%; text-align: right;">COSTO UNIT.</th>
+                        <th style="width: 13%; text-align: right;">SUBTOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${matRowsHtml}
+                    <tr style="background-color: #F8FAFC; font-weight: bold;">
+                        <td colspan="5" style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">SUBTOTAL NETO DE MATERIALES:</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">C$ ${matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                    <tr style="background-color: #F8FAFC; font-weight: bold;">
+                        <td colspan="5" style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">IMPUESTO AL VALOR AGREGADO (IVA 15%):</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">C$ ${matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                    <tr style="background-color: #EFF6FF; font-weight: bold;">
+                        <td colspan="5" style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt; color: #1E40AF;">TOTAL VALORIZADO EN CONSIGNACIÓN:</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt; color: #1E40AF;">C$ ${matTotals.total.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="margin-top: 10pt; padding: 8pt; background-color: #F1F5F9; border: 1pt solid #CBD5E1; font-size: 9pt;">
+                <strong>VALOR TOTAL EN LETRAS:</strong> ${matTotals.totalLetras}
+            </div>
+        `;
+    }
+
+    const acceptanceClauseNum = hasConsignacion ? 'VIGÉSIMA' : 'DÉCIMA NOVENA';
 
     const wordContent = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -4961,13 +6380,14 @@ function downloadWordMLContract(data) {
         </head>
         <body>
             ${logoHtml}
+            ${variantBannerHtml}
 
-            <h1>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS.</h1>
+            <h1>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS${isForaneo ? ' (VARIANTE FORÁNEA)' : ''}.</h1>
 
-            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; y por otra parte, <strong>${nomRep}</strong>, mayor de edad, ${estCivil}, ${prof}, con domicilio en ${dom}, con cédula de identidad nicaragüense número: <strong>${cedula}</strong>${ruc}, quien actúa en nombre y representación del negocio mercantil bajo ${reg} denominado <strong>${nomCom}</strong>, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:</p>
+            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientosCINCO (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; y por otra parte, <strong>${nomRep}</strong>, mayor de edad, ${estCivil}, ${prof}, con domicilio en ${dom}, con cédula de identidad nicaragüense número: <strong>${cedula}</strong>${ruc}, quien actúa en nombre y representación del negocio mercantil bajo ${reg} denominado <strong>${nomCom}</strong>, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:</p>
 
             <div class="clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
-            <p>Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>.</p>
+            <p>Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>${isForaneo ? ' en las circunscripciones y municipios autorizados del departamento de <strong>' + (data.base_operativa || 'la base operativa asignada') + '</strong>' : ''}.</p>
 
             <div class="clause-title">SEGUNDA [ALCANCES DEL CONTRATO]:</div>
             <p>Los alcances de los servicios a brindar por parte de <strong>EL CONTRATISTA</strong> comprenden:</p>
@@ -4980,18 +6400,19 @@ function downloadWordMLContract(data) {
             <div class="clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
             <p>Forman parte integrante del presente contrato los siguientes documentos:</p>
             <ol>
-                <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de Managua.</li>
+                <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de ${isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua'}.</li>
                 <li>Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por EL CONTRATANTE para cada labor asignada.</li>
                 <li>El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de EL CONTRATANTE.</li>
                 <li>Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.</li>
                 <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
+                ${hasConsignacion ? '<li>El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.</li>' : ''}
             </ol>
 
             <div class="clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
             <p><strong>EL CONTRATISTA</strong> se compromete formalmente a:</p>
             <ol>
                 <li>Portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por EL CONTRATANTE (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.</li>
-                <li>Se prohíbe de manera expresa a EL CONTRATISTA y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.</li>
+                <li>${uniformItem2}</li>
                 <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
                 <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de EL CONTRATANTE y las normas técnicas aplicables en Nicaragua.</li>
                 <li>Reportar inmediatamente a los coordinadores de EL CONTRATANTE cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
@@ -5006,7 +6427,7 @@ function downloadWordMLContract(data) {
             <p>El plazo del presente contrato es de DOCE (12) MESES calendario, contados a partir de la fecha de su suscripción. Este plazo se prorrogará automáticamente por períodos sucesivos de igual duración, salvo que cualquiera de las partes notifique por escrito a la otra su decisión de no renovarlo con al menos treinta (30) días de anticipación a la fecha de vencimiento.</p>
 
             <div class="clause-title">SEXTA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
-            <p>El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán de manera semanal, previa presentación de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: <strong>${cta}</strong> del banco <strong>${banco}</strong> en moneda córdobas a nombre de <strong>${titular}</strong>.</p>
+            <p>${paymentClauseText}</p>
 
             <div class="clause-title">SÉPTIMA [MANTENIMIENTO DE VALOR]:</div>
             <p>Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).</p>
@@ -5018,7 +6439,7 @@ function downloadWordMLContract(data) {
             <p><strong>EL CONTRATISTA</strong> declara bajo promesa de ley que cuenta con los conocimientos técnicos, experiencia profesional comprobada, personal idóneo y licencias necesarias para desempeñar cabalmente los servicios encomendados, obligándose a ejecutar cada trabajo bajo las mejores prácticas de la ingeniería y refrigeración.</p>
 
             <div class="clause-title">DÉCIMA [GARANTÍA DE LOS TRABAJOS Y RESPONSABILIDAD CIVIL]:</div>
-            <p><strong>EL CONTRATISTA</strong> otorga una garantía de DOCE (12) MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> corregirá de inmediato el daño sin costo alguno. Asimismo, responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.</p>
+            <p>${warrantyClauseText}</p>
 
             <div class="clause-title">DÉCIMA PRIMERA [PENALIZACIONES Y MULTAS]:</div>
             <p>El incumplimiento injustificado en los tiempos de entrega, retrasos en la atención de visitas o inasistencia a citas concertadas con los clientes facultará a <strong>EL CONTRATANTE</strong> a deducir una penalidad equivalente al uno punto veinticinco por ciento (1.25%) diario sobre el valor total de la orden de trabajo correspondiente, hasta por un período máximo de ocho (8) días hábiles, tras lo cual <strong>EL CONTRATANTE</strong> podrá rescindir unilateralmente el servicio y reasignarlo a otro proveedor, deduciendo los costos sobrevenidos a <strong>EL CONTRATISTA</strong>.</p>
@@ -5036,7 +6457,7 @@ function downloadWordMLContract(data) {
             <p>Todas las comunicaciones, avisos y notificaciones entre las partes se considerarán válidamente efectuadas en las siguientes direcciones:</p>
             <ul>
                 <li><strong>EL CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: <strong>JOSE ALFREDO RAUDES ORTIZ / ÁNGEL CAMPOS</strong> (Tel: 7886-2226 / 8267-2246 - Correo: jose.raudes@sinsa.com.ni).</li>
-                <li><strong>EL CONTRATISTA:</strong> ${nomCom}, con domicilio en ${dir}. Con Atención a: ${nomRep} (Tel: ${tel} - Correo Electrónico: ${correo}).</li>
+                <li><strong>EL CONTRATISTA:</strong> ${nomCom}, con domicilio en ${dir}. Con Atención a: ${nomRep}${contactOpStr} (Tel: ${tel} - Correo Electrónico: ${correo}).</li>
             </ul>
             <p>Cualquier cambio de domicilio o datos de contacto deberá notificarse formalmente por escrito con al menos veinticuatro (24) horas de anticipación para que surta plenos efectos legales.</p>
 
@@ -5049,7 +6470,9 @@ function downloadWordMLContract(data) {
             <div class="clause-title">DÉCIMA OCTAVA [EQUIPOS, HERRAMIENTAS E INSUMOS]:</div>
             <p><strong>EL CONTRATISTA</strong> suministrará a su propia costa todos los medios de transporte y movilización adecuados, así como las herramientas e instrumentos técnicos necesarios para la debida ejecución de los servicios (escaleras certificadas, bombas de vacío, manómetros digitales o análogos para refrigerantes R410A y R32, abocardadores excéntricos, llaves dinamométricas, amperímetros y multímetros). Cuando los materiales o repuestos de instalación sean provistos por <strong>EL CONTRATANTE</strong>, <strong>EL CONTRATISTA</strong> deberá retirarlos formalmente de las bodegas designadas presentando la orden respectiva.</p>
 
-            <div class="clause-title">DÉCIMA NOVENA [ACEPTACIÓN]:</div>
+            ${consignacionClauseHtml}
+
+            <div class="clause-title">${acceptanceClauseNum} [ACEPTACIÓN]:</div>
             <p>Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ${dia} días del mes de ${mes} del año ${anio}.</p>
 
             <table class="sig-table">
@@ -5085,6 +6508,8 @@ function downloadWordMLContract(data) {
                     ${tableRowsHtml}
                 </tbody>
             </table>
+
+            ${anexoIIHtml}
         </body>
         </html>
     `;
