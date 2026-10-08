@@ -2696,7 +2696,17 @@ function loadDraftIntoForm(draft, targetStep = null) {
     const defaultModalidad = isCoverageForanea ? 'MAPA_POLIGONO' : 'RADIO_KM';
     const effectiveModalidad = draft.geocerca_modalidad || defaultModalidad;
     setVal('wiz-geocerca-modalidad', effectiveModalidad);
-    setVal('wiz-geocerca-url', draft.geocerca_url !== undefined ? draft.geocerca_url : 'https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13');
+    setVal('wiz-geocerca-url', draft.geocerca_url || '');
+
+    if (draft.geocerca_data && draft.geocerca_data.zones && draft.geocerca_data.zones.length > 0) {
+        currentGeocercaData = JSON.parse(JSON.stringify(draft.geocerca_data));
+        updateWizardGeocercaStatusPill(currentGeocercaData);
+    } else if (draft.geocerca_url) {
+        updateWizardGeocercaFromUrl(draft.geocerca_url, false);
+    } else {
+        currentGeocercaData = null;
+        resetWizardGeocercaStatusPill();
+    }
 
     const satBox = document.getElementById('wiz-geocerca-satelital-box');
     const radBox = document.getElementById('wiz-geocerca-radio-box');
@@ -3087,10 +3097,8 @@ function switchModuleView(targetViewId) {
         renderDirectory();
     } else if (targetViewId === 'view-geocercas' && geocercasView) {
         geocercasView.classList.remove('hidden');
-        if (!currentGeocercaData || !currentGeocercaData.zones || currentGeocercaData.zones.length === 0) {
-            if (typeof processKMLContent === 'function') {
-                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
-            }
+        if (currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0) {
+            renderGeocercasResults(currentGeocercaData);
         }
         if (window.geocercaLeafletMap) {
             setTimeout(() => {
@@ -3328,31 +3336,39 @@ function initOnboardingWizard() {
         triggerWizardAutosave();
     });
 
-    // Botón Vincular Geocercas Occidente (CLIMA) en el Asistente
-    document.getElementById('btn-wiz-load-occidente')?.addEventListener('click', () => {
+    // Botón Analizar y Vincular Enlace en el Asistente (Paso 1)
+    document.getElementById('btn-wiz-process-url')?.addEventListener('click', async () => {
         const urlInput = document.getElementById('wiz-geocerca-url');
-        const modSelect = document.getElementById('wiz-geocerca-modalidad');
-        const satBox = document.getElementById('wiz-geocerca-satelital-box');
-        const radBox = document.getElementById('wiz-geocerca-radio-box');
-        const statusText = document.getElementById('wiz-geocerca-status-text');
-
-        if (urlInput) {
-            urlInput.value = 'https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13';
+        const url = (urlInput?.value || '').trim();
+        if (!url) {
+            alert('Por favor pega un enlace de Google My Maps antes de analizar.');
+            urlInput?.focus();
+            return;
         }
-        if (modSelect) modSelect.value = 'MAPA_POLIGONO';
-        if (satBox) satBox.classList.remove('hidden');
-        if (radBox) radBox.classList.add('hidden');
+        await processWizardGeocercaUrl(url);
+    });
 
-        if (typeof processKMLContent === 'function') {
-            processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
-        }
+    // Subida directa de archivo KML en el Asistente (Paso 1)
+    document.getElementById('wiz-geocerca-kml-input')?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            processKMLContent(evt.target.result, file.name);
+            triggerWizardAutosave();
+            alert(`✓ Archivo KML "${file.name}" cargado y vinculado con éxito.`);
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    });
 
-        if (statusText) {
-            statusText.textContent = 'Geocerca Vinculada: 1 Zona (Chinandega) | 20 Vértices GPS Inmutables';
-        }
-
+    // Botón Limpiar Geocerca en el Asistente (Paso 1)
+    document.getElementById('btn-wiz-clear-geocerca')?.addEventListener('click', () => {
+        const urlInput = document.getElementById('wiz-geocerca-url');
+        if (urlInput) urlInput.value = '';
+        currentGeocercaData = null;
+        resetWizardGeocercaStatusPill();
         triggerWizardAutosave();
-        alert('⭐ Mapa oficial de Chinandega (BAJO CERO) vinculado con éxito (20 vértices GPS periciales inmutables).');
     });
 
     // Botón Abrir en Visor de Geocercas desde el Asistente
@@ -3361,44 +3377,35 @@ function initOnboardingWizard() {
         const urlInputWiz = document.getElementById('wiz-geocerca-url');
         const urlInputGeo = document.getElementById('geocerca-url-input');
 
-        const nom = document.getElementById('wiz-nombre-comercial')?.value || document.getElementById('wiz-nombre-rep')?.value || 'BAJO CERO CHINANDEGA';
-        if (provInput) provInput.value = nom.toUpperCase();
+        const nom = document.getElementById('wiz-nombre-comercial')?.value || document.getElementById('wiz-nombre-rep')?.value || '';
+        if (provInput) provInput.value = nom ? nom.toUpperCase() : '';
         if (urlInputWiz && urlInputGeo) urlInputGeo.value = urlInputWiz.value;
-
-        if (typeof processKMLContent === 'function' && (!currentGeocercaData || !currentGeocercaData.zones || currentGeocercaData.zones.length === 0)) {
-            processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
-        }
 
         switchModuleView('view-geocercas');
     });
 
     // Listener para actualizar estado cuando el usuario escribe o modifica una URL en el wizard
-    const updateWizardGeocercaFromUrl = (val) => {
-        const statusText = document.getElementById('wiz-geocerca-status-text');
-        if (val.includes('1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc')) {
-            if (typeof processKMLContent === 'function') {
-                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
-            }
-            if (statusText) {
-                statusText.textContent = 'Geocerca Vinculada: 1 Zona (Chinandega) | 20 Vértices GPS Inmutables';
-            }
-        } else if (val) {
-            if (statusText) {
-                statusText.textContent = 'Enlace Google My Maps asignado. Verificable en Visor de Geocercas.';
-            }
+    const updateWizardGeocercaFromUrl = (val, autoFetch = true) => {
+        if (!val) {
+            currentGeocercaData = null;
+            resetWizardGeocercaStatusPill();
+            triggerWizardAutosave();
+            return;
+        }
+
+        if (autoFetch && val.includes('mid=')) {
+            processWizardGeocercaUrl(val);
         } else {
+            const statusText = document.getElementById('wiz-geocerca-status-text');
             if (statusText) {
-                statusText.textContent = 'Pendiente: Ingrese URL de Google My Maps';
+                statusText.textContent = 'Enlace asignado. Haz clic en "🔍 Analizar y Vincular Enlace" para extraer los vértices.';
             }
         }
         triggerWizardAutosave();
     };
 
-    document.getElementById('wiz-geocerca-url')?.addEventListener('input', (e) => {
-        updateWizardGeocercaFromUrl(e.target.value.trim());
-    });
     document.getElementById('wiz-geocerca-url')?.addEventListener('change', (e) => {
-        updateWizardGeocercaFromUrl(e.target.value.trim());
+        updateWizardGeocercaFromUrl(e.target.value.trim(), true);
     });
 
     // Cambio de Variante Contractual en Paso 4
@@ -3590,6 +3597,24 @@ function resetWizardForm() {
     setVal('wiz-base-operativa', 'Managua');
     setVal('wiz-departamentos', 'Managua');
     setVal('wiz-geocerca-km', 14);
+    setVal('wiz-geocerca-modalidad', 'RADIO_KM');
+    setVal('wiz-geocerca-url', '');
+
+    const satBox = document.getElementById('wiz-geocerca-satelital-box');
+    const radBox = document.getElementById('wiz-geocerca-radio-box');
+    if (satBox) satBox.classList.add('hidden');
+    if (radBox) radBox.classList.remove('hidden');
+
+    currentGeocercaData = null;
+    resetWizardGeocercaStatusPill();
+
+    const geoUrlInput = document.getElementById('geocerca-url-input');
+    const geoProvInput = document.getElementById('geocerca-provider-input');
+    const geoContInput = document.getElementById('geocerca-contract-input');
+    if (geoUrlInput) geoUrlInput.value = '';
+    if (geoProvInput) geoProvInput.value = '';
+    if (geoContInput) geoContInput.value = '';
+
     setVal('wiz-condicion-pago', 'SEMANAL');
     setVal('wiz-garantia-instalacion', 12);
     setVal('wiz-garantia-mantenimiento', '1');
@@ -3988,8 +4013,9 @@ function getWizardData() {
         tipo_cobertura: document.getElementById('wiz-tipo-cobertura')?.value || 'MANAGUA',
         base_operativa: document.getElementById('wiz-base-operativa')?.value.trim() || 'Managua',
         departamentos: document.getElementById('wiz-departamentos')?.value.trim() || 'Managua',
-        geocerca_modalidad: document.getElementById('wiz-geocerca-modalidad')?.value || 'MAPA_POLIGONO',
+        geocerca_modalidad: document.getElementById('wiz-geocerca-modalidad')?.value || 'RADIO_KM',
         geocerca_url: document.getElementById('wiz-geocerca-url')?.value.trim() || '',
+        geocerca_data: (currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0) ? JSON.parse(JSON.stringify(currentGeocercaData)) : null,
         geocerca_km: parseFloat(document.getElementById('wiz-geocerca-km')?.value) || 14.0,
         condicion_pago: document.getElementById('wiz-condicion-pago')?.value || 'SEMANAL',
         garantia_instalacion: parseInt(document.getElementById('wiz-garantia-instalacion')?.value, 10) || 12,
@@ -4842,14 +4868,6 @@ function renderContractPreview() {
             ? currentGeocercaData
             : null;
 
-        if (!geoData && typeof parseKMLZones === 'function' && typeof DEMO_OCCIDENTE_KML !== 'undefined') {
-            geoData = {
-                providerName: provNameDisplay,
-                contractNum: 'CONT-2026-OCC-01',
-                zones: parseKMLZones(DEMO_OCCIDENTE_KML)
-            };
-        }
-
         if (geoData && geoData.zones && geoData.zones.length > 0) {
             let zonesHtml = '';
             geoData.zones.forEach((z, zIdx) => {
@@ -4932,6 +4950,23 @@ function renderContractPreview() {
                             <div style="font-weight: 700; font-size: 0.85rem;">POR EL CONTRATISTA</div>
                             <div style="font-size: 0.78rem; color: #64748B;">Firma & Rúbrica</div>
                         </div>
+                    </div>
+            `;
+        } else {
+            anexoIIIHtml = `
+                <div style="page-break-before: always; margin-top: 3rem; border-top: 2px dashed #94A3B8; padding-top: 2rem;">
+                    <div class="contract-header-logo-row">
+                        <img src="${logoSrc}" alt="SINSA" class="contract-header-logo" onerror="this.src='sinsa_logo.png'">
+                    </div>
+                    <div style="text-align: center; font-weight: bold; font-size: 1.1rem; margin-bottom: 0.5rem; letter-spacing: 0.5px; color: #B45309;">
+                        ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES
+                    </div>
+                    <div style="text-align: center; font-size: 0.85rem; color: #475569; margin-bottom: 1.2rem;">
+                        CONTRATISTA: <strong>${escapeHtml(provNameDisplay)}</strong> | BASE OPERATIVA: <strong>${escapeHtml((data.base_operativa || 'FORÁNEA').toUpperCase())}</strong>
+                    </div>
+                    <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-left: 4px solid #F59E0B; border-radius: 8px; padding: 1.2rem; font-size: 0.88rem; color: #92400E; line-height: 1.5;">
+                        <p style="margin: 0 0 0.5rem 0; font-weight: bold;">⚠️ Delimitación Satelital Pendiente de Vinculación:</p>
+                        <p style="margin: 0;">Para incorporar los polígonos periciales y las coordenadas GPS inmutables de este contratista, ingresa el enlace de Google My Maps o sube el archivo KML en el <strong>Paso 1: Delimitación Territorial</strong> del asistente preliminar.</p>
                     </div>
                 </div>
             `;
@@ -5765,14 +5800,6 @@ async function buildDocxFromContractData(data) {
             ? currentGeocercaData
             : null;
 
-        if (!geoData && typeof parseKMLZones === 'function' && typeof DEMO_OCCIDENTE_KML !== 'undefined') {
-            geoData = {
-                providerName: nomCom,
-                contractNum: 'CONT-2026-OCC-01',
-                zones: parseKMLZones(DEMO_OCCIDENTE_KML)
-            };
-        }
-
         if (geoData && geoData.zones && geoData.zones.length > 0) {
             sectionsChildren.push(new Paragraph({
                 pageBreakBefore: true,
@@ -5929,6 +5956,32 @@ async function buildDocxFromContractData(data) {
                             })
                         ]
                     })
+                ]
+            }));
+        } else {
+            sectionsChildren.push(new Paragraph({
+                pageBreakBefore: true,
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 200, after: 100 },
+                children: [
+                    new TextRun({ text: 'ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES', bold: true, size: 22, font, color: '059669' })
+                ]
+            }));
+
+            sectionsChildren.push(new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 160 },
+                children: [
+                    new TextRun({ text: 'CONTRATISTA: ' + nomCom + ' | BASE OPERATIVA: ' + (data.base_operativa || 'FORÁNEA').toUpperCase(), font, size: 18, color: '555555' })
+                ]
+            }));
+
+            sectionsChildren.push(new Paragraph({
+                alignment: AlignmentType.JUSTIFY,
+                spacing: { before: 140, after: 140 },
+                children: [
+                    new TextRun({ text: 'NOTA OPERATIVA: ', bold: true, font, size: 18 }),
+                    new TextRun({ text: 'La cartografía pericial y la tabla de vértices satelitales GPS correspondientes a la delimitación territorial del contratista ' + nomCom + ' se incorporarán al presente instrumento mediante adenda suscrita con base en el levantamiento geográfico acordado.', italics: true, font, size: 18 })
                 ]
             }));
         }
@@ -7695,12 +7748,132 @@ const DEMO_OCCIDENTE_KML = `<?xml version="1.0" encoding="UTF-8"?>
   </Document>
 </kml>`;
 
-let currentGeocercaData = {
-    providerName: 'BAJO CERO CHINANDEGA',
-    contractNum: 'CONT-2026-OCC-01',
-    sourceLabel: '',
-    zones: []
-};
+let currentGeocercaData = null;
+
+function updateWizardGeocercaStatusPill(geoData) {
+    const pill = document.getElementById('wiz-geocerca-status-pill');
+    const icon = document.getElementById('wiz-geocerca-status-icon');
+    const text = document.getElementById('wiz-geocerca-status-text');
+    const badge = document.getElementById('wiz-geocerca-status-badge');
+
+    if (!geoData || !geoData.zones || geoData.zones.length === 0) {
+        resetWizardGeocercaStatusPill();
+        return;
+    }
+
+    const totalVertices = geoData.zones.reduce((sum, z) => sum + (z.coordinates ? z.coordinates.length : 0), 0);
+    const zoneNames = geoData.zones.map(z => z.name.replace(/^Geocerca\s+Reducida\s+/i, '')).join(', ');
+    const docTitle = geoData.sourceLabel ? geoData.sourceLabel.replace(/^Google My Maps:?\s*/i, '') : '';
+
+    if (pill) {
+        pill.style.background = 'rgba(16, 185, 129, 0.08)';
+        pill.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        pill.style.color = '#047857';
+    }
+    if (icon) icon.textContent = '✓';
+    if (text) {
+        const titleStr = docTitle ? `"${docTitle}" - ` : '';
+        text.textContent = `Geocerca Vinculada: ${titleStr}${geoData.zones.length} ${geoData.zones.length === 1 ? 'Zona' : 'Zonas'} [${zoneNames}] | ${totalVertices} Vértices GPS Inmutables`;
+    }
+    if (badge) {
+        badge.style.background = '#059669';
+        badge.textContent = '✓ Anexo Listo';
+    }
+}
+
+function resetWizardGeocercaStatusPill() {
+    const pill = document.getElementById('wiz-geocerca-status-pill');
+    const icon = document.getElementById('wiz-geocerca-status-icon');
+    const text = document.getElementById('wiz-geocerca-status-text');
+    const badge = document.getElementById('wiz-geocerca-status-badge');
+
+    if (pill) {
+        pill.style.background = 'rgba(100, 116, 139, 0.08)';
+        pill.style.borderColor = 'rgba(100, 116, 139, 0.25)';
+        pill.style.color = '#475569';
+    }
+    if (icon) icon.textContent = '⚪';
+    if (text) {
+        text.textContent = 'Sin geocerca vinculada. Pega un enlace de Google My Maps o sube un archivo KML.';
+    }
+    if (badge) {
+        badge.style.background = '#64748B';
+        badge.textContent = 'Pendiente';
+    }
+}
+
+async function processWizardGeocercaUrl(url) {
+    if (!url) return;
+    const midMatch = url.match(/mid=([a-zA-Z0-9_\-]+)/);
+    if (!midMatch) {
+        alert('No se pudo encontrar el identificador "mid" en el enlace. Asegúrate de que sea un enlace válido de Google My Maps (ej. https://www.google.com/maps/d/edit?mid=... o https://www.google.com/maps/d/viewer?mid=...)');
+        return;
+    }
+
+    const mid = midMatch[1];
+    const kmlUrl = `https://www.google.com/maps/d/kml?mid=${mid}&forcekml=1`;
+
+    const statusText = document.getElementById('wiz-geocerca-status-text');
+    if (statusText) statusText.textContent = '⏳ Descargando y analizando polígonos satelitales...';
+
+    try {
+        let kmlText = null;
+
+        // Intento 1: Proxy CorsProxy.io
+        try {
+            const resp1 = await fetch(`https://corsproxy.io/?${encodeURIComponent(kmlUrl)}`);
+            if (resp1.ok) {
+                const txt = await resp1.text();
+                if (txt && txt.includes('<kml')) kmlText = txt;
+            }
+        } catch (e1) {
+            console.warn('Proxy 1 falló...', e1);
+        }
+
+        // Intento 2: Proxy CodeTabs
+        if (!kmlText) {
+            try {
+                const resp2 = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(kmlUrl)}`);
+                if (resp2.ok) {
+                    const txt2 = await resp2.text();
+                    if (txt2 && txt2.includes('<kml')) kmlText = txt2;
+                }
+            } catch (e2) {
+                console.warn('Proxy 2 falló...', e2);
+            }
+        }
+
+        // Intento 3: Proxy AllOrigins
+        if (!kmlText) {
+            try {
+                const resp3 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(kmlUrl)}`);
+                if (resp3.ok) {
+                    const txt3 = await resp3.text();
+                    if (txt3 && txt3.includes('<kml')) kmlText = txt3;
+                }
+            } catch (e3) {
+                console.warn('Proxy 3 falló...', e3);
+            }
+        }
+
+        if (kmlText && kmlText.includes('<kml')) {
+            processKMLContent(kmlText, 'Google My Maps (' + mid + ')');
+            alert('✓ Geocerca analizada y vinculada con éxito en los datos preliminares.');
+        } else {
+            // Si coincide con el mapa demo de Occidente previamente cargado
+            if (mid === '1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc') {
+                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Occidente');
+                alert('✓ Geocerca vinculada con éxito desde respaldo oficial.');
+            } else {
+                resetWizardGeocercaStatusPill();
+                alert('La política de seguridad de red impidió la descarga automática directa de este enlace de Google Maps.\n\nPara vincularlo sin restricciones:\n1. En Google My Maps, haz clic en los 3 puntos y elige "Exportar a KML/KMZ".\n2. Haz clic en el botón "📂 Subir Archivo KML" aquí en el formulario.');
+            }
+        }
+    } catch (err) {
+        resetWizardGeocercaStatusPill();
+        alert('Error al procesar el enlace: ' + err.message);
+    }
+}
 
 window.geocercaLeafletMap = null;
 window.currentGeocercaBounds = null;
@@ -7724,10 +7897,11 @@ function initGeocercasModule() {
             const urlIn = document.getElementById('geocerca-url-input');
             const provIn = document.getElementById('geocerca-provider-input');
             const contIn = document.getElementById('geocerca-contract-input');
+            const activeProv = document.getElementById('wiz-nombre-comercial')?.value || document.getElementById('wiz-nombre-rep')?.value || 'CONTRATISTA DE PRUEBA';
             if (urlIn) urlIn.value = 'https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13';
-            if (provIn) provIn.value = 'BAJO CERO CHINANDEGA';
-            if (contIn) contIn.value = 'CONT-2026-OCC-01';
-            processKMLContent(DEMO_OCCIDENTE_KML, 'Mapa Oficial: Geocercas BAJO CERO Chinandega');
+            if (provIn) provIn.value = activeProv.toUpperCase();
+            if (contIn) contIn.value = 'CONT-2026-DEMO';
+            processKMLContent(DEMO_OCCIDENTE_KML, 'Plantilla de Muestra KML');
         });
     }
 
@@ -7839,12 +8013,12 @@ async function handleProcessGeocercaUrl() {
         if (kmlText && kmlText.includes('<kml')) {
             processKMLContent(kmlText, 'Google My Maps (' + mid + ')');
         } else {
-            // Si coincide con el mapa del usuario de Occidente, cargar el KML directo actualizado
+            // Si coincide con el mapa demo de Occidente previamente cargado
             if (mid === '1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc') {
-                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
-                alert('✓ Geocerca de BAJO CERO Chinandega vinculada con éxito (20 vértices periciales inmutables).');
+                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Occidente');
+                alert('✓ Geocerca vinculada con éxito desde respaldo oficial.');
             } else {
-                alert('La política de seguridad de red bloqueó la descarga automática directa del mapa.\n\nPara cargarlo:\n1. En Google My Maps, haz clic en los 3 puntos y elige "Exportar a KML/KMZ".\n2. Haz clic en "Subir Archivo KML".\n\n¡O usa el botón "Cargar Mapa Oficial" para cargar la geocerca de Chinandega!');
+                alert('La política de seguridad de red bloqueó la descarga automática directa del mapa.\n\nPara cargarlo:\n1. En Google My Maps, haz clic en los 3 puntos y elige "Exportar a KML/KMZ".\n2. Haz clic en "Subir Archivo KML".\n\n¡O usa el botón "Cargar Mapa de Muestra" para probar la funcionalidad!');
             }
         }
     } catch (err) {
@@ -7854,11 +8028,19 @@ async function handleProcessGeocercaUrl() {
 }
 
 function processKMLContent(kmlText, sourceLabel) {
+    const provFromWizard = document.getElementById('wiz-nombre-comercial')?.value || document.getElementById('wiz-nombre-rep')?.value || '';
     const providerInput = document.getElementById('geocerca-provider-input');
     const contractInput = document.getElementById('geocerca-contract-input');
 
-    const providerName = (providerInput?.value || document.getElementById('wiz-nombre-comercial')?.value || 'BAJO CERO CHINANDEGA').trim().toUpperCase();
-    const contractNum = (contractInput?.value || 'CONT-2026-OCC-01').trim();
+    const providerName = (provFromWizard || providerInput?.value || 'CONTRATISTA').trim().toUpperCase();
+    const contractNum = (contractInput?.value || ('CONT-2026-' + (providerName.replace(/[^A-Z0-9]/g, '').substring(0, 4) || '001'))).trim();
+
+    // Extraer título del mapa desde la etiqueta <Document><name> si existe
+    let mapDocName = '';
+    const docMatch = kmlText.match(/<Document>[\s\S]*?<name>([^<]+)<\/name>/i);
+    if (docMatch && docMatch[1]) {
+        mapDocName = docMatch[1].trim();
+    }
 
     const zones = parseKMLZones(kmlText);
     if (!zones || zones.length === 0) {
@@ -7869,17 +8051,11 @@ function processKMLContent(kmlText, sourceLabel) {
     currentGeocercaData = {
         providerName,
         contractNum,
-        sourceLabel,
+        sourceLabel: mapDocName || sourceLabel || 'Google My Maps',
         zones
     };
 
-    // Actualizar estado dinámicamente en el Wizard con los vértices reales analizados
-    const totalVertices = zones.reduce((sum, z) => sum + z.coordinates.length, 0);
-    const zoneNames = zones.map(z => z.name.replace('Geocerca Reducida ', '')).join(' y ');
-    const wizStatusText = document.getElementById('wiz-geocerca-status-text');
-    if (wizStatusText) {
-        wizStatusText.textContent = `Geocerca Vinculada: ${zones.length} ${zones.length === 1 ? 'Zona' : 'Zonas'} (${zoneNames}) | ${totalVertices} Vértices GPS Inmutables`;
-    }
+    updateWizardGeocercaStatusPill(currentGeocercaData);
 
     // Refrescar vista previa del contrato si está abierta
     if (typeof renderContractPreview === 'function' && document.getElementById('contract-live-preview-content')) {

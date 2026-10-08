@@ -476,22 +476,29 @@
                                         🔗 Enlace de Google My Maps de la Geocerca Negociada:
                                     </label>
                                     <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                                        <button type="button" id="btn-wiz-load-occidente" class="btn btn-outline" style="font-size: 0.78rem; padding: 0.3rem 0.6rem; color: #2563EB; border-color: #2563EB; font-weight: 600;" title="Vincular automáticamente el mapa oficial de Occidente (Chinandega)">
-                                            ⭐ Vincular Geocerca Occidente (Chinandega)
+                                        <button type="button" id="btn-wiz-process-url" class="btn btn-primary" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; font-weight: 700;" title="Descargar y extraer los vértices periciales de este enlace">
+                                            🔍 Analizar y Vincular Enlace
                                         </button>
-                                        <button type="button" id="btn-wiz-open-geocercas-view" class="btn btn-outline" style="font-size: 0.78rem; padding: 0.3rem 0.6rem;" title="Abrir el visor cartográfico pericial completo">
-                                            🗺️ Abrir en Visor de Geocercas
+                                        <label for="wiz-geocerca-kml-input" class="btn btn-outline" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; cursor: pointer; margin: 0; font-weight: 600;" title="Subir archivo .kml o .kmz exportado de Google Maps">
+                                            📂 Subir Archivo KML
+                                        </label>
+                                        <input type="file" id="wiz-geocerca-kml-input" accept=".kml,.xml" hidden>
+                                        <button type="button" id="btn-wiz-open-geocercas-view" class="btn btn-outline" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;" title="Abrir el visor cartográfico pericial interactivo">
+                                            🗺️ Ver Mapa
+                                        </button>
+                                        <button type="button" id="btn-wiz-clear-geocerca" class="btn btn-outline" style="font-size: 0.78rem; padding: 0.35rem 0.6rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.4);" title="Limpiar geocerca actual">
+                                            🗑️
                                         </button>
                                     </div>
                                 </div>
-                                <input type="text" id="wiz-geocerca-url" class="custom-input" placeholder="https://www.google.com/maps/d/edit?mid=... o https://www.google.com/maps/d/viewer?mid=..." style="width: 100%; margin-bottom: 0.6rem;" value="https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13">
+                                <input type="text" id="wiz-geocerca-url" class="custom-input" placeholder="Pega aquí el enlace del mapa (ej. https://www.google.com/maps/d/edit?mid=... o https://www.google.com/maps/d/viewer?mid=...)" style="width: 100%; margin-bottom: 0.6rem;" value="">
                                 
-                                <div id="wiz-geocerca-status-pill" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.5rem 0.8rem; font-size: 0.82rem; color: #047857;">
+                                <div id="wiz-geocerca-status-pill" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; background: rgba(100, 116, 139, 0.08); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: 6px; padding: 0.5rem 0.8rem; font-size: 0.82rem; color: #475569;">
                                     <div style="display: flex; align-items: center; gap: 0.4rem;">
-                                        <span>✓</span>
-                                        <strong id="wiz-geocerca-status-text">Geocerca Vinculada: 1 Zona (Chinandega) | 20 Vértices GPS Inmutables</strong>
+                                        <span id="wiz-geocerca-status-icon">⚪</span>
+                                        <strong id="wiz-geocerca-status-text">Sin geocerca vinculada. Pega un enlace de Google My Maps o sube un archivo KML.</strong>
                                     </div>
-                                    <span style="font-size: 0.76rem; background: #059669; color: white; padding: 2px 7px; border-radius: 12px; font-weight: 600;">Anexo Contractual Listo</span>
+                                    <span id="wiz-geocerca-status-badge" style="font-size: 0.76rem; background: #64748B; color: white; padding: 2px 8px; border-radius: 12px; font-weight: 600;">Pendiente</span>
                                 </div>
                             </div>
 
@@ -1001,21 +1008,21 @@
                                 <label for="geocerca-url-input">
                                     <strong>Enlace de Google My Maps:</strong>
                                 </label>
-                                <input type="text" id="geocerca-url-input" class="custom-input" placeholder="https://www.google.com/maps/d/edit?mid=... o https://www.google.com/maps/d/viewer?mid=..." value="https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13">
+                                <input type="text" id="geocerca-url-input" class="custom-input" placeholder="https://www.google.com/maps/d/edit?mid=... o https://www.google.com/maps/d/viewer?mid=..." value="">
                             </div>
 
                             <div class="form-group">
                                 <label for="geocerca-provider-input">
                                     <strong>Proveedor Contratado:</strong>
                                 </label>
-                                <input type="text" id="geocerca-provider-input" class="custom-input" placeholder="Ej. BAJO CERO / CLIMA OCCIDENTE" value="BAJO CERO CHINANDEGA">
+                                <input type="text" id="geocerca-provider-input" class="custom-input" placeholder="Ej. Ingrese nombre del contratista" value="">
                             </div>
 
                             <div class="form-group">
                                 <label for="geocerca-contract-input">
                                     <strong>Nº Contrato / Referencia:</strong>
                                 </label>
-                                <input type="text" id="geocerca-contract-input" class="custom-input" placeholder="Ej. CONT-2026-OCC-01" value="CONT-2026-OCC-01">
+                                <input type="text" id="geocerca-contract-input" class="custom-input" placeholder="Ej. CONT-2026-001" value="">
                             </div>
                         </div>
 
@@ -1025,8 +1032,8 @@
                                 <span>🌐</span> Procesar Enlace de Google Maps
                             </button>
 
-                            <button id="btn-load-demo-occidente" class="btn btn-outline" style="color: #2563EB; border-color: #2563EB; font-weight: 600; padding: 0.65rem 1.2rem; display: flex; align-items: center; gap: 0.4rem;" title="Carga inmediata de la Geocerca de Chinandega (BAJO CERO)">
-                                <span>⭐</span> Cargar Mapa Oficial (BAJO CERO Chinandega)
+                            <button id="btn-load-demo-occidente" class="btn btn-outline" style="color: #2563EB; border-color: #2563EB; font-weight: 600; padding: 0.65rem 1.2rem; display: flex; align-items: center; gap: 0.4rem;" title="Carga una plantilla de muestra para pruebas">
+                                <span>⭐</span> Cargar Mapa de Muestra (Demo)
                             </button>
 
                             <label for="geocerca-kml-file-input" class="btn btn-outline" style="cursor: pointer; margin: 0; padding: 0.65rem 1.2rem; display: flex; align-items: center; gap: 0.4rem;" title="Sube un archivo .kml o .kmz exportado de Google Maps">
