@@ -1245,7 +1245,7 @@
 
         <!-- Overlay for Expediente Digital -->
         <div id="expediente-modal-overlay" class="overlay hidden">
-            <div class="modal large-modal" style="max-width: 750px;">
+            <div class="modal large-modal expediente-modal-window">
                 <div class="modal-header">
                     <div>
                         <h3 id="expediente-title" style="color: var(--primary);">📁 Expediente Digital del Proveedor</h3>
@@ -1253,11 +1253,11 @@
                     </div>
                     <button id="close-expediente" class="btn-icon">✖</button>
                 </div>
-                <div class="modal-body" style="padding: 1rem 0;">
-                    <div id="expediente-info-bar" style="background: var(--bg-panel-hover); padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.88rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                <div class="modal-body">
+                    <div id="expediente-info-bar" class="expediente-info-bar-grid">
                         <!-- Injected dynamically -->
                     </div>
-                    <div class="docs-checklist-container" id="expediente-docs-list">
+                    <div id="expediente-docs-list" class="expediente-docs-grid">
                         <!-- Injected dynamically -->
                     </div>
                 </div>
