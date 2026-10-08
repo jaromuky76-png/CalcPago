@@ -7556,6 +7556,7 @@ function renderDirectory() {
                     </button>
                     <button class="btn btn-outline" data-dir-exp="${provName}" title="Ver Documentos">📁 Expediente</button>
                     <button class="btn btn-outline" data-dir-tariffs="${provName}" title="Ver Tarifas">💲 Tarifas</button>
+                    <button class="btn btn-outline" data-dir-edit-wizard="${provName}" title="Reabrir en asistente para actualizar expediente, tarifas o adendas" style="color: #2563EB; border-color: rgba(37, 99, 235, 0.45); font-weight: 600;">✏️ Reabrir en Pasos</button>
                     ${isDraft ? `<button class="btn btn-outline" data-dir-del="${provName}" title="Eliminar Borrador" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4); flex: 0.5;">🗑️</button>` : ''}
                 </div>
                 ${isDraft ? `
@@ -7589,6 +7590,10 @@ function renderDirectory() {
 
         card.querySelector(`[data-dir-tariffs="${provName}"]`)?.addEventListener('click', () => {
             openTarifasModal(prov);
+        });
+
+        card.querySelector(`[data-dir-edit-wizard="${provName}"]`)?.addEventListener('click', () => {
+            resumeProviderOnboarding(prov);
         });
 
         card.querySelector(`[data-dir-resume="${provName}"]`)?.addEventListener('click', () => {
