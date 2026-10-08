@@ -2162,24 +2162,86 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
+// Sanitizar un registro eliminando cadenas base64 pesadas para no reventar la cuota de localStorage (5MB)
+function sanitizeRecordForLocalStorage(record) {
+    if (!record || typeof record !== 'object') return record;
+    try {
+        const clone = JSON.parse(JSON.stringify(record));
+        
+        // 1. Contrato rubricado
+        if (clone.contrato_rubricado && clone.contrato_rubricado.dataUrl && clone.contrato_rubricado.dataUrl.length > 15000) {
+            delete clone.contrato_rubricado.dataUrl;
+            clone.contrato_rubricado.hasStoredData = true;
+        }
+
+        // 2. Documentos adjuntos del expediente
+        if (clone.documentos && typeof clone.documentos === 'object') {
+            Object.keys(clone.documentos).forEach(k => {
+                const doc = clone.documentos[k];
+                if (doc && doc.dataUrl && doc.dataUrl.length > 15000) {
+                    delete doc.dataUrl;
+                    doc.hasStoredData = true;
+                }
+            });
+        }
+        return clone;
+    } catch (e) {
+        return record;
+    }
+}
+
 function safeSaveProvidersLocally(providers) {
     try {
-        localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(providers));
+        const sanitizedList = (providers || []).map(p => sanitizeRecordForLocalStorage(p));
+        localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(sanitizedList));
     } catch (e) {
-        console.warn("Límite de cuota de localStorage alcanzado. Almacenando versión sin binarios pesados en local:", e);
+        console.warn("Límite de cuota de localStorage alcanzado al guardar proveedores. Reintentando versión ultra-ligera:", e);
         try {
-            const lightList = providers.map(p => {
-                if (p.contrato_rubricado && p.contrato_rubricado.dataUrl && p.contrato_rubricado.dataUrl.length > 50000) {
-                    const clone = { ...p, contrato_rubricado: { ...p.contrato_rubricado } };
+            const ultraLightList = (providers || []).map(p => {
+                const clone = JSON.parse(JSON.stringify(p));
+                if (clone.contrato_rubricado) {
                     delete clone.contrato_rubricado.dataUrl;
                     clone.contrato_rubricado.hasStoredData = true;
-                    return clone;
                 }
-                return p;
+                if (clone.documentos && typeof clone.documentos === 'object') {
+                    Object.keys(clone.documentos).forEach(k => {
+                        delete clone.documentos[k].dataUrl;
+                        clone.documentos[k].hasStoredData = true;
+                    });
+                }
+                return clone;
             });
-            localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(lightList));
+            localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(ultraLightList));
         } catch (err2) {
             console.error("Error al guardar respaldo ligero en localStorage:", err2);
+        }
+    }
+}
+
+function safeSaveWizardDraftLocally(draftRecord) {
+    try {
+        const safeDraft = sanitizeRecordForLocalStorage(draftRecord);
+        localStorage.setItem(STORAGE_KEY_WIZARD_DRAFT, JSON.stringify(safeDraft));
+        return true;
+    } catch (e) {
+        console.warn("Límite de cuota alcanzado al guardar borrador activo. Reintentando versión ultra-ligera:", e);
+        try {
+            const ultraDraft = JSON.parse(JSON.stringify(draftRecord));
+            if (ultraDraft.contrato_rubricado) {
+                delete ultraDraft.contrato_rubricado.dataUrl;
+                ultraDraft.contrato_rubricado.hasStoredData = true;
+            }
+            if (ultraDraft.documentos && typeof ultraDraft.documentos === 'object') {
+                Object.keys(ultraDraft.documentos).forEach(k => {
+                    delete ultraDraft.documentos[k].dataUrl;
+                    ultraDraft.documentos[k].hasStoredData = true;
+                });
+            }
+            localStorage.setItem(STORAGE_KEY_WIZARD_DRAFT, JSON.stringify(ultraDraft));
+            return true;
+        } catch (err2) {
+            console.error("No se pudo guardar borrador en localStorage:", err2);
+            return false;
         }
     }
 }
@@ -2544,55 +2606,59 @@ function triggerWizardAutosave() {
 
 // Guardar borrador activo en localStorage
 function saveActiveDraftToStorage() {
-    const data = getWizardData();
-    const hasAnyData = (data.nombre_comercial && data.nombre_comercial.trim()) ||
-                       (data.nombre_representante && data.nombre_representante.trim()) ||
-                       (data.cedula && data.cedula.trim()) ||
-                       (data.telefono && data.telefono.trim()) ||
-                       (data.cuenta_bancaria && data.cuenta_bancaria.trim()) ||
-                       (data.tarifas && data.tarifas.length > 0) ||
-                       (data.documentos && Object.keys(data.documentos).length > 0);
+    try {
+        const data = getWizardData();
+        const hasAnyData = (data.nombre_comercial && data.nombre_comercial.trim()) ||
+                           (data.nombre_representante && data.nombre_representante.trim()) ||
+                           (data.cedula && data.cedula.trim()) ||
+                           (data.telefono && data.telefono.trim()) ||
+                           (data.cuenta_bancaria && data.cuenta_bancaria.trim()) ||
+                           (data.tarifas && data.tarifas.length > 0) ||
+                           (data.documentos && Object.keys(data.documentos).length > 0);
 
-    const ind = document.getElementById('wizard-autosave-indicator');
-    const txt = document.getElementById('wizard-autosave-text');
+        const ind = document.getElementById('wizard-autosave-indicator');
+        const txt = document.getElementById('wizard-autosave-text');
 
-    if (!hasAnyData) {
-        if (ind && txt) {
-            ind.classList.remove('saved');
-            txt.textContent = 'Formulario limpio';
+        if (!hasAnyData) {
+            if (ind && txt) {
+                ind.classList.remove('saved');
+                txt.textContent = 'Formulario limpio';
+            }
+            return;
         }
-        return;
-    }
 
-    const prog = calculateOnboardingProgress(data);
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const prog = calculateOnboardingProgress(data);
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    const draft = {
-        ...data,
-        estado: 'BORRADOR',
-        paso_actual: currentWizardStep,
-        progreso: prog,
-        updatedAt: now.toISOString(),
-        updatedTimeStr: timeStr
-    };
+        const draft = {
+            ...data,
+            estado: 'BORRADOR',
+            paso_actual: currentWizardStep,
+            progreso: prog,
+            updatedAt: now.toISOString(),
+            updatedTimeStr: timeStr
+        };
 
-    localStorage.setItem(STORAGE_KEY_WIZARD_DRAFT, JSON.stringify(draft));
+        safeSaveWizardDraftLocally(draft);
 
-    if (ind && txt) {
-        ind.classList.add('saved');
-        txt.textContent = `Borrador autoguardado (${timeStr})`;
-    }
+        if (ind && txt) {
+            ind.classList.add('saved');
+            txt.textContent = `Borrador autoguardado (${timeStr})`;
+        }
 
-    // Actualizar banner si existe
-    const banner = document.getElementById('wizard-draft-banner');
-    const title = document.getElementById('draft-banner-title');
-    const desc = document.getElementById('draft-banner-desc');
-    if (banner && title && desc) {
-        const provName = draft.nombre_comercial || draft.nombre_representante || 'Contratista en proceso';
-        title.textContent = `📝 Registro en curso: "${provName}" (${prog}% completado)`;
-        desc.textContent = `Última edición: Hoy a las ${timeStr}. Los campos llenados se conservan automáticamente.`;
-        banner.classList.remove('hidden');
+        // Actualizar banner si existe
+        const banner = document.getElementById('wizard-draft-banner');
+        const title = document.getElementById('draft-banner-title');
+        const desc = document.getElementById('draft-banner-desc');
+        if (banner && title && desc) {
+            const provName = draft.nombre_comercial || draft.nombre_representante || 'Contratista en proceso';
+            title.textContent = `📝 Registro en curso: "${provName}" (${prog}% completado)`;
+            desc.textContent = `Última edición: Hoy a las ${timeStr}. Los campos llenados se conservan automáticamente.`;
+            banner.classList.remove('hidden');
+        }
+    } catch (err) {
+        console.warn("Aviso en autoguardado de borrador:", err);
     }
 }
 
@@ -2767,90 +2833,111 @@ function loadDraftIntoForm(draft, targetStep = null) {
 }
 
 // Guardar explícitamente el asistente como borrador en el directorio
-async function saveCurrentWizardAsDraft(goToDirectory = true) {
-    const data = getWizardData();
-    let name = data.nombre_comercial.trim();
-
-    if (!name) {
-        name = prompt("Para guardar este borrador, por favor ingresa un Nombre Comercial o Alias para identificar al contratista:", data.nombre_representante || "Contratista Pendiente");
-        if (!name || !name.trim()) {
-            alert("⚠️ No se puede guardar el borrador sin un nombre o alias identificador.");
-            return;
-        }
-        document.getElementById('wiz-nombre-comercial').value = name.trim();
-        data.nombre_comercial = name.trim();
-    }
-
-    const prog = calculateOnboardingProgress(data);
-    const origName = window.currentEditingProviderOriginalName;
-    let idx = -1;
-    if (origName) {
-        idx = proveedoresRegistrados.findIndex(p => 
-            (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === origName.trim().toUpperCase()
-        );
-    }
-    if (idx < 0) {
-        idx = proveedoresRegistrados.findIndex(p => 
-            (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === name.toUpperCase()
-        );
-    }
-
-    const existingProv = idx >= 0 ? proveedoresRegistrados[idx] : null;
-    const isAlreadyActive = existingProv && existingProv.estado === 'ACTIVO';
-
-    const draftRecord = {
-        ...data,
-        estado: (isAlreadyActive && prog >= 90) ? 'ACTIVO' : 'BORRADOR',
-        progreso: prog,
-        paso_actual: currentWizardStep,
-        fecha_modificacion: new Date().toLocaleString()
-    };
-
-    // Guardar o actualizar en proveedoresRegistrados
-    if (idx >= 0) {
-        proveedoresRegistrados[idx] = draftRecord;
-    } else {
-        proveedoresRegistrados.push(draftRecord);
-    }
-
-    safeSaveProvidersLocally(proveedoresRegistrados);
-
-    // Sincronizar tarifas en tablaOferta para el motor de cálculos
-    if (data.tarifas && data.tarifas.length > 0) {
-        if (!tablaOferta[name]) tablaOferta[name] = {};
-        data.tarifas.forEach(t => {
-            if (t.descripcion) tablaOferta[name][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
-        });
-        localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
-    }
-
-    // Intentar sincronizar con backend
+async function saveCurrentWizardAsDraft(goToDirectory = false) {
     try {
-        await fetch('/api/save-provider', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(draftRecord)
+        const data = getWizardData();
+        let name = (data.nombre_comercial || '').trim();
+
+        if (!name) {
+            name = prompt("Para guardar este borrador, por favor ingresa un Nombre Comercial o Alias para identificar al contratista:", (data.nombre_representante || '').trim() || "Contratista Pendiente");
+            if (!name || !name.trim()) {
+                alert("⚠️ No se puede guardar el borrador sin un nombre o alias identificador.");
+                return;
+            }
+            const nomEl = document.getElementById('wiz-nombre-comercial');
+            if (nomEl) nomEl.value = name.trim();
+            data.nombre_comercial = name.trim();
+        }
+
+        const prog = calculateOnboardingProgress(data);
+        const origName = window.currentEditingProviderOriginalName;
+        let idx = -1;
+        if (origName) {
+            idx = proveedoresRegistrados.findIndex(p => 
+                (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === origName.trim().toUpperCase()
+            );
+        }
+        if (idx < 0) {
+            idx = proveedoresRegistrados.findIndex(p => 
+                (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === name.toUpperCase()
+            );
+        }
+
+        const existingProv = idx >= 0 ? proveedoresRegistrados[idx] : null;
+        const isAlreadyActive = existingProv && existingProv.estado === 'ACTIVO';
+
+        const draftRecord = {
+            ...data,
+            estado: (isAlreadyActive && prog >= 90) ? 'ACTIVO' : 'BORRADOR',
+            progreso: prog,
+            paso_actual: currentWizardStep,
+            fecha_modificacion: new Date().toLocaleString()
+        };
+
+        // Guardar o actualizar en proveedoresRegistrados (en memoria)
+        if (idx >= 0) {
+            proveedoresRegistrados[idx] = draftRecord;
+        } else {
+            proveedoresRegistrados.push(draftRecord);
+        }
+
+        // Persistir lista de proveedores de forma segura (sin que reviente la cuota)
+        safeSaveProvidersLocally(proveedoresRegistrados);
+
+        // Sincronizar tarifas en tablaOferta para el motor de cálculos
+        if (data.tarifas && data.tarifas.length > 0) {
+            try {
+                if (!tablaOferta[name]) tablaOferta[name] = {};
+                data.tarifas.forEach(t => {
+                    if (t.descripcion) tablaOferta[name][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
+                });
+                localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
+            } catch (errT) {
+                console.warn("Aviso al guardar tablaOferta:", errT);
+            }
+        }
+
+        // Intentar sincronizar con backend si está disponible
+        try {
+            await fetch('/api/save-provider', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(draftRecord)
+            });
+        } catch (e) {
+            console.log("Guardado local completado.");
+        }
+
+        // Actualizar también el borrador activo en curso de forma protegida
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        safeSaveWizardDraftLocally({
+            ...draftRecord,
+            updatedAt: now.toISOString(),
+            updatedTimeStr: timeStr
         });
-    } catch (e) {
-        console.log("Guardado local completado.");
-    }
 
-    // Actualizar también el borrador activo en curso
-    localStorage.setItem(STORAGE_KEY_WIZARD_DRAFT, JSON.stringify({
-        ...draftRecord,
-        updatedAt: new Date().toISOString(),
-        updatedTimeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }));
+        window.currentEditingProviderOriginalName = name;
 
-    window.currentEditingProviderOriginalName = name;
+        // Feedback visual en el indicador superior
+        const ind = document.getElementById('wizard-autosave-indicator');
+        const txt = document.getElementById('wizard-autosave-text');
+        if (ind && txt) {
+            ind.classList.add('saved');
+            txt.textContent = `Borrador guardado (${timeStr})`;
+        }
 
-    alert(`💾 ¡Borrador de "${name}" guardado exitosamente!\n\nAvance: ${prog}% completado.\nTodos los campos editados, tarifas y documentos se encuentran resguardados. Podrás continuar el registro en cualquier momento desde el "Directorio de Proveedores" pulsando el botón ✏️.`);
-
-    if (goToDirectory) {
-        switchModuleView('view-directory');
-        renderDirectory();
-    } else {
-        checkActiveWizardDraft();
+        if (goToDirectory) {
+            alert(`💾 ¡Borrador de "${name}" guardado exitosamente!\n\nAvance: ${prog}% completado.\nTodos los campos editados, tarifas y documentos se encuentran resguardados en el Directorio.`);
+            switchModuleView('view-directory');
+            renderDirectory();
+        } else {
+            alert(`💾 ¡Borrador de "${name}" guardado exitosamente!\n\nAvance: ${prog}% completado.\nTodos tus datos, tarifas y documentos han quedado resguardados en este paso. Puedes continuar completando los pasos con total tranquilidad.`);
+            checkActiveWizardDraft();
+        }
+    } catch (err) {
+        console.error("Error crítico al guardar borrador:", err);
+        alert("⚠️ Ocurrió un error al procesar el guardado: " + (err.message || err));
     }
 }
 
@@ -2861,12 +2948,12 @@ function resumeProviderOnboarding(prov) {
     switchModuleView('view-onboarding');
     loadDraftIntoForm(prov, prov.paso_actual || 1);
 
-    // Actualizar active draft
-    localStorage.setItem(STORAGE_KEY_WIZARD_DRAFT, JSON.stringify({
+    // Actualizar active draft de forma segura
+    safeSaveWizardDraftLocally({
         ...prov,
         updatedAt: new Date().toISOString(),
         updatedTimeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }));
+    });
 
     checkActiveWizardDraft();
     window.scrollTo({ top: 120, behavior: 'smooth' });
@@ -3685,12 +3772,12 @@ function setupWizardAutosaveListeners() {
         el.addEventListener('change', triggerWizardAutosave);
     });
 
-    // Botones explícitos de "Guardar Borrador"
-    document.getElementById('btn-save-wizard-draft-top')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
-    document.getElementById('btn-wiz-draft-1')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
-    document.getElementById('btn-wiz-draft-2')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
-    document.getElementById('btn-wiz-draft-3')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
-    document.getElementById('btn-wiz-draft-4')?.addEventListener('click', () => saveCurrentWizardAsDraft(true));
+    // Botones explícitos de "Guardar Borrador" (guardan el avance en el mismo paso sin forzar salida)
+    document.getElementById('btn-save-wizard-draft-top')?.addEventListener('click', () => saveCurrentWizardAsDraft(false));
+    document.getElementById('btn-wiz-draft-1')?.addEventListener('click', () => saveCurrentWizardAsDraft(false));
+    document.getElementById('btn-wiz-draft-2')?.addEventListener('click', () => saveCurrentWizardAsDraft(false));
+    document.getElementById('btn-wiz-draft-3')?.addEventListener('click', () => saveCurrentWizardAsDraft(false));
+    document.getElementById('btn-wiz-draft-4')?.addEventListener('click', () => saveCurrentWizardAsDraft(false));
 
     // Botones del Banner de Borrador Activo
     document.getElementById('btn-draft-resume')?.addEventListener('click', () => {
@@ -4338,31 +4425,31 @@ function downloadContractorExcelTemplate() {
 // Obtener los datos actuales del formulario sin inventar valores por defecto si están vacíos
 function getWizardData() {
     return {
-        nombre_comercial: document.getElementById('wiz-nombre-comercial')?.value.trim() || '',
-        nombre_representante: document.getElementById('wiz-nombre-rep')?.value.trim() || '',
-        cedula: document.getElementById('wiz-cedula')?.value.trim() || '',
-        ruc: document.getElementById('wiz-ruc')?.value.trim() || '',
-        matricula: document.getElementById('wiz-matricula')?.value.trim() || '',
+        nombre_comercial: (document.getElementById('wiz-nombre-comercial')?.value || '').trim(),
+        nombre_representante: (document.getElementById('wiz-nombre-rep')?.value || '').trim(),
+        cedula: (document.getElementById('wiz-cedula')?.value || '').trim(),
+        ruc: (document.getElementById('wiz-ruc')?.value || '').trim(),
+        matricula: (document.getElementById('wiz-matricula')?.value || '').trim(),
         regimen: document.getElementById('wiz-regimen')?.value || 'Régimen de Cuota Fija',
         estado_civil: document.getElementById('wiz-estado-civil')?.value || 'casado',
-        profesion: document.getElementById('wiz-profesion')?.value.trim() || 'técnico',
-        domicilio: document.getElementById('wiz-domicilio')?.value.trim() || 'Managua',
-        telefono: document.getElementById('wiz-telefono')?.value.trim() || '',
-        correo: document.getElementById('wiz-correo')?.value.trim() || '',
-        contacto_operativo: document.getElementById('wiz-contacto-op')?.value.trim() || '',
-        direccion: document.getElementById('wiz-direccion')?.value.trim() || '',
+        profesion: (document.getElementById('wiz-profesion')?.value || '').trim() || 'técnico',
+        domicilio: (document.getElementById('wiz-domicilio')?.value || '').trim() || 'Managua',
+        telefono: (document.getElementById('wiz-telefono')?.value || '').trim(),
+        correo: (document.getElementById('wiz-correo')?.value || '').trim(),
+        contacto_operativo: (document.getElementById('wiz-contacto-op')?.value || '').trim(),
+        direccion: (document.getElementById('wiz-direccion')?.value || '').trim(),
         banco: document.getElementById('wiz-banco')?.value || 'BAC Credomatic',
-        cuenta_bancaria: document.getElementById('wiz-cuenta')?.value.trim() || '',
-        titular_cuenta: document.getElementById('wiz-titular')?.value.trim() || document.getElementById('wiz-nombre-rep')?.value.trim() || '',
-        inss: document.getElementById('wiz-inss')?.value.trim() || '',
+        cuenta_bancaria: (document.getElementById('wiz-cuenta')?.value || '').trim(),
+        titular_cuenta: (document.getElementById('wiz-titular')?.value || '').trim() || (document.getElementById('wiz-nombre-rep')?.value || '').trim(),
+        inss: (document.getElementById('wiz-inss')?.value || '').trim(),
         dia: parseInt(document.getElementById('contract-day')?.value, 10) || 23,
         mes: document.getElementById('contract-month')?.value || 'octubre',
         anio: 2026,
         tipo_cobertura: document.getElementById('wiz-tipo-cobertura')?.value || 'MANAGUA',
-        base_operativa: document.getElementById('wiz-base-operativa')?.value.trim() || 'Managua',
-        departamentos: document.getElementById('wiz-departamentos')?.value.trim() || 'Managua',
+        base_operativa: (document.getElementById('wiz-base-operativa')?.value || '').trim() || 'Managua',
+        departamentos: (document.getElementById('wiz-departamentos')?.value || '').trim() || 'Managua',
         geocerca_modalidad: document.getElementById('wiz-geocerca-modalidad')?.value || 'RADIO_KM',
-        geocerca_url: document.getElementById('wiz-geocerca-url')?.value.trim() || '',
+        geocerca_url: (document.getElementById('wiz-geocerca-url')?.value || '').trim(),
         geocerca_data: (currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0) ? JSON.parse(JSON.stringify(currentGeocercaData)) : null,
         geocerca_km: parseFloat(document.getElementById('wiz-geocerca-km')?.value) || 14.0,
         condicion_pago: document.getElementById('wiz-condicion-pago')?.value || 'SEMANAL',
