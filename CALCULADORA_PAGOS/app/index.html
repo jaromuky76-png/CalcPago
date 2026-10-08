@@ -228,8 +228,17 @@
                         </div>
 
                         <!-- Provider Prices Table -->
-                        <div class="table-container">
-                            <h3>Precios del Proveedor</h3>
+                        <div class="table-container" id="provider-prices-container">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
+                                <h3 style="margin: 0;">Precios del Proveedor</h3>
+                                <span id="provider-badge-status" class="badge-tag" style="display: none; font-size: 0.72rem; margin: 0;"></span>
+                            </div>
+
+                            <!-- Ficha de Datos del Proveedor Seleccionado -->
+                            <div id="provider-details-card" style="display: none; background: var(--bg-panel-hover); border: 1px solid var(--glass-border); border-radius: 10px; padding: 0.85rem; margin-bottom: 0.9rem;">
+                                <!-- Rellenado dinámicamente -->
+                            </div>
+
                             <div class="table-scroll">
                                 <table class="data-table" id="provider-prices-table">
                                     <thead>

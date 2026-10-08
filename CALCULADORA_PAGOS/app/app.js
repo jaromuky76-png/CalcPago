@@ -123,6 +123,38 @@ function consolidateEnergyProvider() {
     } catch (e) {}
 }
 
+// Sincronizar todos los contratistas del directorio que tengan tarifas pactadas con el motor de liquidación de pagos
+function syncAllProvidersToTablaOferta() {
+    if (!tablaOferta || typeof tablaOferta !== 'object') {
+        tablaOferta = {};
+    }
+
+    if (Array.isArray(proveedoresRegistrados)) {
+        proveedoresRegistrados.forEach(prov => {
+            const pName = (prov.nombre_comercial || prov.nombre || '').trim();
+            if (!pName) return;
+
+            if (prov.tarifas && Array.isArray(prov.tarifas) && prov.tarifas.length > 0) {
+                if (!tablaOferta[pName]) tablaOferta[pName] = {};
+                prov.tarifas.forEach(t => {
+                    if (t && t.descripcion) {
+                        tablaOferta[pName][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
+                    }
+                });
+            }
+        });
+    }
+
+    consolidateEnergyProvider();
+
+    try {
+        localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
+    } catch (e) {}
+
+    updateInitialProviderSelect();
+    updateManageProviderSelect();
+}
+
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
     const savedOferta = localStorage.getItem('calcPago_tablaOferta');
@@ -405,13 +437,23 @@ function updateManageProviderSelect() {
     if (!select) return;
     const currentVal = select.value;
     select.innerHTML = '<option value="">-- Seleccionar Proveedor --</option>';
+    
+    const names = new Set();
     Object.keys(tablaOferta).forEach(p => {
+        if (p && p !== 'ENERGY' && p !== 'ENERGY SYSTEMS') names.add(p);
+    });
+    (proveedoresRegistrados || []).forEach(p => {
+        const nom = (p.nombre_comercial || p.nombre || '').trim();
+        if (nom) names.add(nom);
+    });
+
+    Array.from(names).sort((a, b) => a.localeCompare(b)).forEach(p => {
         const opt = document.createElement('option');
         opt.value = p;
         opt.textContent = p;
         select.appendChild(opt);
     });
-    if(tablaOferta[currentVal]) select.value = currentVal;
+    if (currentVal && names.has(currentVal)) select.value = currentVal;
 }
 
 // Functions
@@ -710,20 +752,49 @@ function updateInitialProviderSelect() {
     const select = document.getElementById('initial-provider-select');
     if (!select) return;
     const currentVal = select.value;
-    select.innerHTML = '<option value="">-- Seleccionar --</option>';
+    select.innerHTML = '<option value="">-- Seleccionar Proveedor --</option>';
+
+    // Unir nombres de tablaOferta y proveedoresRegistrados
+    const providerMap = new Map();
+    
+    // 1. Agregar desde proveedoresRegistrados
+    (proveedoresRegistrados || []).forEach(p => {
+        const nom = (p.nombre_comercial || p.nombre || '').trim();
+        if (nom) {
+            const acts = (p.tarifas && p.tarifas.length) || (tablaOferta[nom] ? Object.keys(tablaOferta[nom]).length : 0);
+            providerMap.set(nom.toUpperCase(), { name: nom, actCount: acts });
+        }
+    });
+
+    // 2. Agregar desde tablaOferta
     Object.keys(tablaOferta).forEach(p => {
+        if (!p || p === 'ENERGY' || p === 'ENERGY SYSTEMS') return;
+        const key = p.trim().toUpperCase();
+        const acts = Object.keys(tablaOferta[p]).length;
+        if (!providerMap.has(key)) {
+            providerMap.set(key, { name: p, actCount: acts });
+        } else {
+            const entry = providerMap.get(key);
+            entry.actCount = Math.max(entry.actCount, acts);
+        }
+    });
+
+    const sorted = Array.from(providerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+    sorted.forEach(item => {
         const opt = document.createElement('option');
-        opt.value = p;
-        opt.textContent = p;
+        opt.value = item.name;
+        opt.textContent = item.actCount > 0 ? `${item.name} (${item.actCount} actividades pactadas)` : item.name;
         select.appendChild(opt);
     });
-    if(tablaOferta[currentVal]) select.value = currentVal;
+
+    if (currentVal && (tablaOferta[currentVal] || providerMap.has(currentVal.toUpperCase()))) {
+        select.value = currentVal;
+    }
 }
 
-
-
 // Update initial provider select change listener to update table
-document.getElementById('initial-provider-select').addEventListener('change', (e) => {
+document.getElementById('initial-provider-select')?.addEventListener('change', (e) => {
     selectedProvider = e.target.value;
     renderTable();
     calculateAndRenderSummary();
@@ -751,20 +822,91 @@ btnTableSearch?.addEventListener('click', () => {
 
 function updateProviderPricesTable() {
     const tableBody = document.getElementById('provider-prices-body');
+    const detailsCard = document.getElementById('provider-details-card');
+    const badgeStatus = document.getElementById('provider-badge-status');
     if (!tableBody) return;
     
     tableBody.innerHTML = '';
     
-    if (!selectedProvider || selectedProvider === 'ALL' || !tablaOferta[selectedProvider]) {
-        tableBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-muted);">Seleccione un proveedor para ver sus precios.</td></tr>';
+    if (!selectedProvider || selectedProvider === 'ALL') {
+        tableBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-muted); padding: 1.2rem;">Seleccione un proveedor arriba para ver sus precios e información pactada.</td></tr>';
+        if (detailsCard) detailsCard.style.display = 'none';
+        if (badgeStatus) badgeStatus.style.display = 'none';
         return;
     }
     
-    const activities = tablaOferta[selectedProvider];
+    // Buscar datos completos del proveedor en el directorio
+    const provRecord = (proveedoresRegistrados || []).find(p => 
+        normalizeProviderName(p.nombre_comercial || p.nombre || '').trim().toUpperCase() === normalizeProviderName(selectedProvider).trim().toUpperCase()
+    );
+
+    // Si está en proveedoresRegistrados y tiene tarifas pero aún no en tablaOferta, sincronizarlo inmediatamente
+    if (provRecord && provRecord.tarifas && provRecord.tarifas.length > 0) {
+        if (!tablaOferta[selectedProvider]) tablaOferta[selectedProvider] = {};
+        provRecord.tarifas.forEach(t => {
+            if (t && t.descripcion) {
+                tablaOferta[selectedProvider][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
+            }
+        });
+    }
+
+    // Renderizar Ficha Informativa del Proveedor
+    if (detailsCard) {
+        if (provRecord) {
+            const rep = provRecord.nombre_representante || '<em style="color:#9CA3AF;">Pendiente</em>';
+            const rucCed = provRecord.ruc || provRecord.cedula || '<em style="color:#DC2626;">Pendiente</em>';
+            const bank = provRecord.cuenta_bancaria ? `${provRecord.banco || 'BAC'} - ${provRecord.cuenta_bancaria}` : '<em style="color:#DC2626;">Pendiente</em>';
+            const fuel = (provRecord.tarifa_combustible !== undefined && provRecord.tarifa_combustible > 0) ? `C$ ${Number(provRecord.tarifa_combustible).toFixed(2)}/km` : 'C$ 12.00/km (Estándar)';
+            const cob = provRecord.tipo_cobertura || 'MANAGUA';
+            const reg = provRecord.regimen || 'Cuota Fija';
+            const tel = provRecord.telefono || '<em style="color:#9CA3AF;">No registrado</em>';
+            const isActivo = provRecord.estado === 'ACTIVO';
+
+            detailsCard.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.6rem;">
+                    <div>
+                        <strong style="color: var(--primary); font-size: 0.98rem; display: block;">${provRecord.nombre_comercial || selectedProvider}</strong>
+                        <span style="font-size: 0.78rem; color: var(--text-muted);">👤 Representante: <strong>${rep}</strong></span>
+                    </div>
+                    <span class="badge-tag ${isActivo ? 'badge-active' : 'badge-draft'}" style="font-size: 0.72rem; margin: 0;">
+                        ${isActivo ? '🟢 Activo' : '🟡 En Vinculación'}
+                    </span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; font-size: 0.78rem; color: var(--text-main); border-top: 1px dashed var(--glass-border); padding-top: 0.5rem;">
+                    <div><strong>RUC/Cédula:</strong> ${rucCed}</div>
+                    <div><strong>Teléfono:</strong> ${tel}</div>
+                    <div><strong>Cuenta Bancaria:</strong> ${bank}</div>
+                    <div><strong>Combustible:</strong> ${fuel}</div>
+                    <div><strong>Régimen Fiscal:</strong> ${reg}</div>
+                    <div><strong>Cobertura:</strong> ${cob}</div>
+                </div>
+            `;
+            detailsCard.style.display = 'block';
+
+            if (badgeStatus) {
+                badgeStatus.textContent = isActivo ? '✓ Proveedor Vinculado' : '⏳ Expediente en Proceso';
+                badgeStatus.className = `badge-tag ${isActivo ? 'badge-active' : 'badge-draft'}`;
+                badgeStatus.style.display = 'inline-block';
+            }
+        } else {
+            // Proveedor tradicional de tabla de oferta
+            const actCount = tablaOferta[selectedProvider] ? Object.keys(tablaOferta[selectedProvider]).length : 0;
+            detailsCard.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: var(--primary); font-size: 0.95rem;">${selectedProvider}</strong>
+                    <span class="badge-tag badge-active" style="font-size: 0.72rem; margin: 0;">${actCount} Actividades Oficiales</span>
+                </div>
+            `;
+            detailsCard.style.display = 'block';
+            if (badgeStatus) badgeStatus.style.display = 'none';
+        }
+    }
+
+    const activities = tablaOferta[selectedProvider] || {};
     const keys = Object.keys(activities);
     
     if (keys.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-muted);">El proveedor no tiene actividades.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-muted); padding: 1.2rem;">El proveedor no tiene actividades ni tarifas pactadas.</td></tr>';
         return;
     }
     
@@ -2891,7 +3033,7 @@ async function saveCurrentWizardAsDraft(goToDirectory = false) {
                 data.tarifas.forEach(t => {
                     if (t.descripcion) tablaOferta[name][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
                 });
-                localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
+                syncAllProvidersToTablaOferta();
             } catch (errT) {
                 console.warn("Aviso al guardar tablaOferta:", errT);
             }
@@ -2969,6 +3111,11 @@ async function deleteProviderDraft(provName) {
         (p.nombre_comercial || p.nombre || '').trim().toUpperCase() !== provName.trim().toUpperCase()
     );
     safeSaveProvidersLocally(proveedoresRegistrados);
+
+    if (tablaOferta && tablaOferta[provName]) {
+        delete tablaOferta[provName];
+    }
+    syncAllProvidersToTablaOferta();
 
     // Si coincide con el borrador activo, limpiarlo
     const activeDraftJson = localStorage.getItem(STORAGE_KEY_WIZARD_DRAFT);
@@ -3303,6 +3450,7 @@ async function loadProveedoresRegistrados() {
     });
 
     localStorage.setItem('calcPago_proveedoresRegistrados', JSON.stringify(proveedoresRegistrados));
+    syncAllProvidersToTablaOferta();
     renderDirectory();
 }
 
@@ -3353,6 +3501,9 @@ function switchModuleView(targetViewId) {
     // Mostrar vista destino
     if (targetViewId === 'dashboard' && dashboardView) {
         dashboardView.classList.remove('hidden');
+        syncAllProvidersToTablaOferta();
+        updateInitialProviderSelect();
+        updateProviderPricesTable();
         calculateAndRenderSummary();
     } else if (targetViewId === 'view-onboarding' && onboardingView) {
         onboardingView.classList.remove('hidden');
@@ -7594,18 +7745,7 @@ async function finishProviderOnboarding() {
     }
 
     // 4. SINCRONIZACIÓN INMEDIATA CON EL MOTOR DE PAGOS (tablaOferta)
-    if (!tablaOferta[provName]) {
-        tablaOferta[provName] = {};
-    }
-
-    data.tarifas.forEach(t => {
-        if (t.descripcion) {
-            tablaOferta[provName][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
-        }
-    });
-
-    // Guardar tablaOferta actualizada
-    saveAndRefresh();
+    syncAllProvidersToTablaOferta();
 
     // 5. Seleccionar este proveedor en el Resumen de Pagos
     selectedProvider = provName;
@@ -7801,9 +7941,16 @@ function renderDirectory() {
                     ${isDraft ? `<button class="btn btn-outline btn-del-draft" data-dir-del="${provName}" title="Eliminar Borrador">🗑️</button>` : ''}
                 </div>
                 ${isDraft ? `
-                    <button class="btn directory-btn-resume" data-dir-resume="${provName}" title="Continuar llenando campos y recaudos pendientes">
-                        <span>✏️</span> Continuar Registro (${prog}%)
-                    </button>
+                    <div style="display: flex; gap: 8px; width: 100%;">
+                        <button class="btn directory-btn-resume" data-dir-resume="${provName}" style="flex: 1;" title="Continuar llenando campos y recaudos pendientes">
+                            <span>✏️</span> Continuar (${prog}%)
+                        </button>
+                        ${totalActs > 0 ? `
+                        <button class="btn directory-btn-pay" data-dir-pay="${provName}" style="flex: 1;" title="Liquidar Pagos de Facturas">
+                            <span>🧮</span> Liquidar Pagos
+                        </button>
+                        ` : ''}
+                    </div>
                 ` : `
                     <button class="btn directory-btn-pay" data-dir-pay="${provName}" title="Liquidar Pagos de Facturas">
                         <span>🧮</span> Liquidar Pagos
@@ -7853,6 +8000,8 @@ function renderDirectory() {
             const selectEl = document.getElementById('initial-provider-select');
             if (selectEl) selectEl.value = provName;
             updateProviderPricesTable();
+            renderTable();
+            calculateAndRenderSummary();
             switchModuleView('dashboard');
         });
 
