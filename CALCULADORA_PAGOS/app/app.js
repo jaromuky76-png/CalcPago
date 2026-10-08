@@ -2691,11 +2691,30 @@ function loadDraftIntoForm(draft, targetStep = null) {
     setVal('wiz-base-operativa', draft.base_operativa || 'Managua');
     setVal('wiz-departamentos', draft.departamentos || 'Managua');
     setVal('wiz-geocerca-km', draft.geocerca_km !== undefined ? draft.geocerca_km : 14);
+
+    const isCoverageForanea = (draft.tipo_cobertura === 'FORANEA' || draft.tipo_cobertura === 'MIXTA');
+    const defaultModalidad = isCoverageForanea ? 'MAPA_POLIGONO' : 'RADIO_KM';
+    const effectiveModalidad = draft.geocerca_modalidad || defaultModalidad;
+    setVal('wiz-geocerca-modalidad', effectiveModalidad);
+    setVal('wiz-geocerca-url', draft.geocerca_url !== undefined ? draft.geocerca_url : 'https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13');
+
+    const satBox = document.getElementById('wiz-geocerca-satelital-box');
+    const radBox = document.getElementById('wiz-geocerca-radio-box');
+    if (satBox && radBox) {
+        if (effectiveModalidad === 'MAPA_POLIGONO') {
+            satBox.classList.remove('hidden');
+            radBox.classList.add('hidden');
+        } else {
+            satBox.classList.add('hidden');
+            radBox.classList.remove('hidden');
+        }
+    }
+
     setVal('wiz-condicion-pago', draft.condicion_pago || 'SEMANAL');
     setVal('wiz-garantia-instalacion', draft.garantia_instalacion !== undefined ? draft.garantia_instalacion : 12);
     setVal('wiz-garantia-mantenimiento', draft.garantia_mantenimiento !== undefined ? draft.garantia_mantenimiento : '1');
     setVal('wiz-politica-uniformes', draft.politica_uniformes || 'SINSA_OBLIGATORIO');
-    setVal('wiz-contract-variant', draft.contract_variant || 'MANAGUA');
+    setVal('wiz-contract-variant', draft.contract_variant || (isCoverageForanea ? 'FORANEO' : 'MANAGUA'));
 
     const enableConsignacionEl = document.getElementById('wiz-enable-consignacion');
     if (enableConsignacionEl) {
@@ -3019,6 +3038,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initDirectoryModule();
     loadProveedoresRegistrados();
     checkActiveWizardDraft();
+    if (typeof initGeocercasModule === 'function') {
+        initGeocercasModule();
+    }
 });
 
 // Navegación entre Módulos
@@ -3046,10 +3068,12 @@ function switchModuleView(targetViewId) {
     const dashboardView = document.getElementById('dashboard');
     const onboardingView = document.getElementById('view-onboarding');
     const directoryView = document.getElementById('view-directory');
+    const geocercasView = document.getElementById('view-geocercas');
 
     if (dashboardView) dashboardView.classList.add('hidden');
     if (onboardingView) onboardingView.classList.add('hidden');
     if (directoryView) directoryView.classList.add('hidden');
+    if (geocercasView) geocercasView.classList.add('hidden');
 
     // Mostrar vista destino
     if (targetViewId === 'dashboard' && dashboardView) {
@@ -3061,6 +3085,21 @@ function switchModuleView(targetViewId) {
     } else if (targetViewId === 'view-directory' && directoryView) {
         directoryView.classList.remove('hidden');
         renderDirectory();
+    } else if (targetViewId === 'view-geocercas' && geocercasView) {
+        geocercasView.classList.remove('hidden');
+        if (!currentGeocercaData || !currentGeocercaData.zones || currentGeocercaData.zones.length === 0) {
+            if (typeof processKMLContent === 'function') {
+                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas CLIMA Occidente');
+            }
+        }
+        if (window.geocercaLeafletMap) {
+            setTimeout(() => {
+                window.geocercaLeafletMap.invalidateSize();
+                if (window.currentGeocercaBounds) {
+                    window.geocercaLeafletMap.fitBounds(window.currentGeocercaBounds, { padding: [35, 35] });
+                }
+            }, 200);
+        }
     }
 }
 
@@ -3240,8 +3279,21 @@ function initOnboardingWizard() {
         const val = e.target.value;
         const varSelect = document.getElementById('wiz-contract-variant');
         const consigCheck = document.getElementById('wiz-enable-consignacion');
+        const modSelect = document.getElementById('wiz-geocerca-modalidad');
+        const satBox = document.getElementById('wiz-geocerca-satelital-box');
+        const radBox = document.getElementById('wiz-geocerca-radio-box');
+
         if (val === 'FORANEA' || val === 'MIXTA') {
             if (varSelect) varSelect.value = 'FORANEO';
+            if (modSelect) modSelect.value = 'MAPA_POLIGONO';
+            if (satBox) satBox.classList.remove('hidden');
+            if (radBox) radBox.classList.add('hidden');
+
+            const urlInput = document.getElementById('wiz-geocerca-url');
+            if (urlInput && !urlInput.value.trim()) {
+                urlInput.value = 'https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13';
+            }
+
             if (consigCheck && !consigCheck.checked) {
                 consigCheck.checked = true;
                 if (wizardMateriales.length === 0) {
@@ -3253,7 +3305,85 @@ function initOnboardingWizard() {
             updateVariantBadgeAndWarning('FORANEO');
         } else {
             if (varSelect) varSelect.value = 'MANAGUA';
+            if (modSelect) modSelect.value = 'RADIO_KM';
+            if (satBox) satBox.classList.add('hidden');
+            if (radBox) radBox.classList.remove('hidden');
             updateVariantBadgeAndWarning('MANAGUA');
+        }
+        triggerWizardAutosave();
+    });
+
+    // Cambio de Modalidad de Delimitación Territorial (Polígono GPS vs Radio Km)
+    document.getElementById('wiz-geocerca-modalidad')?.addEventListener('change', (e) => {
+        const val = e.target.value;
+        const satBox = document.getElementById('wiz-geocerca-satelital-box');
+        const radBox = document.getElementById('wiz-geocerca-radio-box');
+        if (val === 'MAPA_POLIGONO') {
+            if (satBox) satBox.classList.remove('hidden');
+            if (radBox) radBox.classList.add('hidden');
+        } else {
+            if (satBox) satBox.classList.add('hidden');
+            if (radBox) radBox.classList.remove('hidden');
+        }
+        triggerWizardAutosave();
+    });
+
+    // Botón Vincular Geocercas Occidente (CLIMA) en el Asistente
+    document.getElementById('btn-wiz-load-occidente')?.addEventListener('click', () => {
+        const urlInput = document.getElementById('wiz-geocerca-url');
+        const modSelect = document.getElementById('wiz-geocerca-modalidad');
+        const satBox = document.getElementById('wiz-geocerca-satelital-box');
+        const radBox = document.getElementById('wiz-geocerca-radio-box');
+        const statusText = document.getElementById('wiz-geocerca-status-text');
+
+        if (urlInput) {
+            urlInput.value = 'https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13';
+        }
+        if (modSelect) modSelect.value = 'MAPA_POLIGONO';
+        if (satBox) satBox.classList.remove('hidden');
+        if (radBox) radBox.classList.add('hidden');
+
+        if (typeof processKMLContent === 'function') {
+            processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas CLIMA Occidente');
+        }
+
+        if (statusText) {
+            statusText.textContent = 'Geocerca Vinculada: 2 Zonas (Chinandega y León) | 28 Vértices GPS Inmutables';
+        }
+
+        triggerWizardAutosave();
+        alert('⭐ Mapa oficial de Occidente vinculado con éxito (28 vértices GPS periciales inmutables).');
+    });
+
+    // Botón Abrir en Visor de Geocercas desde el Asistente
+    document.getElementById('btn-wiz-open-geocercas-view')?.addEventListener('click', () => {
+        const provInput = document.getElementById('geocerca-provider-input');
+        const urlInputWiz = document.getElementById('wiz-geocerca-url');
+        const urlInputGeo = document.getElementById('geocerca-url-input');
+
+        const nom = document.getElementById('wiz-nombre-comercial')?.value || document.getElementById('wiz-nombre-rep')?.value || 'CLIMA OCCIDENTE';
+        if (provInput) provInput.value = nom.toUpperCase();
+        if (urlInputWiz && urlInputGeo) urlInputGeo.value = urlInputWiz.value;
+
+        if (typeof processKMLContent === 'function' && (!currentGeocercaData || !currentGeocercaData.zones || currentGeocercaData.zones.length === 0)) {
+            processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas CLIMA Occidente');
+        }
+
+        switchModuleView('view-geocercas');
+    });
+
+    // Listener para actualizar estado cuando el usuario escribe una URL en el wizard
+    document.getElementById('wiz-geocerca-url')?.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        const statusText = document.getElementById('wiz-geocerca-status-text');
+        if (statusText) {
+            if (val.includes('1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc')) {
+                statusText.textContent = 'Geocerca Vinculada: 2 Zonas (Chinandega y León) | 28 Vértices GPS Inmutables';
+            } else if (val) {
+                statusText.textContent = 'Enlace Google My Maps asignado. Verificable en Visor de Geocercas.';
+            } else {
+                statusText.textContent = 'Pendiente: Ingrese URL de Google My Maps';
+            }
         }
         triggerWizardAutosave();
     });
@@ -3845,6 +3975,8 @@ function getWizardData() {
         tipo_cobertura: document.getElementById('wiz-tipo-cobertura')?.value || 'MANAGUA',
         base_operativa: document.getElementById('wiz-base-operativa')?.value.trim() || 'Managua',
         departamentos: document.getElementById('wiz-departamentos')?.value.trim() || 'Managua',
+        geocerca_modalidad: document.getElementById('wiz-geocerca-modalidad')?.value || 'MAPA_POLIGONO',
+        geocerca_url: document.getElementById('wiz-geocerca-url')?.value.trim() || '',
         geocerca_km: parseFloat(document.getElementById('wiz-geocerca-km')?.value) || 14.0,
         condicion_pago: document.getElementById('wiz-condicion-pago')?.value || 'SEMANAL',
         garantia_instalacion: parseInt(document.getElementById('wiz-garantia-instalacion')?.value, 10) || 12,
@@ -4555,9 +4687,16 @@ function renderContractPreview() {
         `;
     });
 
-    const fuelLabel = isForaneo 
-        ? `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE ${(data.base_operativa || 'LA CIUDAD').toUpperCase()} (${data.geocerca_km || 14} KM)`
-        : `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)`;
+    const isPoligono = (data.geocerca_modalidad === 'MAPA_POLIGONO' || (isForaneo && (!data.geocerca_modalidad || data.geocerca_modalidad === 'MAPA_POLIGONO')));
+
+    let fuelLabel = '';
+    if (isPoligono) {
+        fuelLabel = `TARIFA DE COMBUSTIBLE POR KM FUERA DE LA GEOCERCA CONTRACTUAL (${(data.base_operativa || 'OCCIDENTE').toUpperCase()} - ANEXO III DE GEOCERCAS)`;
+    } else if (isForaneo) {
+        fuelLabel = `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE ${(data.base_operativa || 'LA CIUDAD').toUpperCase()} (${data.geocerca_km || 14} KM)`;
+    } else {
+        fuelLabel = `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)`;
+    }
 
     tableRowsHtml += `
         <tr style="background: #F1F5F9; font-weight: bold;">
@@ -4683,6 +4822,109 @@ function renderContractPreview() {
         `;
     }
 
+    // Construcción del Anexo III de Geocercas Periciales si aplica delimitación por polígonos
+    let anexoIIIHtml = '';
+    if (isPoligono) {
+        let geoData = (typeof currentGeocercaData !== 'undefined' && currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0)
+            ? currentGeocercaData
+            : null;
+
+        if (!geoData && typeof parseKMLZones === 'function' && typeof DEMO_OCCIDENTE_KML !== 'undefined') {
+            geoData = {
+                providerName: provNameDisplay,
+                contractNum: 'CONT-2026-OCC-01',
+                zones: parseKMLZones(DEMO_OCCIDENTE_KML)
+            };
+        }
+
+        if (geoData && geoData.zones && geoData.zones.length > 0) {
+            let zonesHtml = '';
+            geoData.zones.forEach((z, zIdx) => {
+                let coordRows = '';
+                const half = Math.ceil(z.coordinates.length / 2);
+                for (let i = 0; i < half; i++) {
+                    const pt1 = z.coordinates[i];
+                    const v1 = `V-${String(i + 1).padStart(2, '0')}`;
+                    const lat1 = `${pt1.lat.toFixed(6)}° N`;
+                    const lng1 = `${Math.abs(pt1.lng).toFixed(6)}° W`;
+
+                    let v2 = '', lat2 = '', lng2 = '';
+                    if (i + half < z.coordinates.length) {
+                        const pt2 = z.coordinates[i + half];
+                        v2 = `V-${String(i + half + 1).padStart(2, '0')}`;
+                        lat2 = `${pt2.lat.toFixed(6)}° N`;
+                        lng2 = `${Math.abs(pt2.lng).toFixed(6)}° W`;
+                    }
+
+                    coordRows += `
+                        <tr>
+                            <td style="text-align: center; font-weight: 700; color: #1E3A8A; width: 65px;">${v1}</td>
+                            <td style="text-align: center; font-family: monospace;">${lat1}</td>
+                            <td style="text-align: center; font-family: monospace;">${lng1}</td>
+                            <td style="text-align: center; font-weight: 700; color: #1E3A8A; width: 65px;">${v2}</td>
+                            <td style="text-align: center; font-family: monospace;">${lat2}</td>
+                            <td style="text-align: center; font-family: monospace;">${lng2}</td>
+                        </tr>
+                    `;
+                }
+
+                zonesHtml += `
+                    <div style="margin-top: 1.5rem;">
+                        <div style="font-weight: 700; font-size: 0.95rem; color: #059669; margin-bottom: 0.3rem;">
+                            📍 POLÍGONO ${zIdx + 1}: ${z.name.toUpperCase()} (${z.coordinates.length} VÉRTICES GPS CERTIFICADOS)
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748B; margin-bottom: 0.6rem;"><em>${escapeHtml(z.description)}</em></div>
+                        <table class="contract-annex-table" style="font-size: 0.8rem;">
+                            <thead>
+                                <tr style="background: #059669; color: white;">
+                                    <th style="text-align: center;">Vértice</th>
+                                    <th style="text-align: center;">Latitud (N)</th>
+                                    <th style="text-align: center;">Longitud (W)</th>
+                                    <th style="text-align: center;">Vértice</th>
+                                    <th style="text-align: center;">Latitud (N)</th>
+                                    <th style="text-align: center;">Longitud (W)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${coordRows}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+
+            anexoIIIHtml = `
+                <div style="page-break-before: always; margin-top: 3rem; border-top: 2px dashed #94A3B8; padding-top: 2rem;">
+                    <div class="contract-header-logo-row">
+                        <img src="${logoSrc}" alt="SINSA" class="contract-header-logo" onerror="this.src='sinsa_logo.png'">
+                    </div>
+                    <div style="text-align: center; font-weight: bold; font-size: 1.1rem; margin-bottom: 0.5rem; letter-spacing: 0.5px; color: #047857;">
+                        ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES
+                    </div>
+                    <div style="text-align: center; font-size: 0.88rem; color: #475569; margin-bottom: 1rem;">
+                        CONTRATISTA: <strong>${provNameDisplay.toUpperCase()}</strong> &bull; BASE OPERATIVA: <strong>${(data.base_operativa || 'OCCIDENTE').toUpperCase()}</strong>
+                    </div>
+                    <div style="background: #F8FAFC; border: 1px solid #CBD5E1; border-left: 4px solid #059669; padding: 0.85rem; border-radius: 6px; font-size: 0.83rem; line-height: 1.5; color: #1E293B; text-align: justify; margin-bottom: 1.2rem;">
+                        <strong>DECLARACIÓN CONTRACTUAL DE INMUTABILIDAD CARTOGRÁFICA:</strong> El presente anexo fija de manera pericial e inalterable la delimitación territorial aplicable al contrato suscrito con <strong>${provNameDisplay.toUpperCase()}</strong>. Toda orden de trabajo cuya ubicación física comprobada mediante GPS se ubique dentro de los polígonos certificados a continuación se liquidará exclusivamente bajo las tarifas unitarias ordinarias del Anexo I sin cobro adicional de transporte. Cualquier servicio fuera de estos vértices se liquidará aplicando la tarifa de combustible por kilómetro pactada.
+                    </div>
+                    ${zonesHtml}
+                    <div style="margin-top: 2rem; display: flex; justify-content: space-around; padding-top: 2rem;">
+                        <div style="text-align: center; width: 40%;">
+                            <div style="border-top: 1px solid #475569; margin-bottom: 0.3rem;"></div>
+                            <div style="font-weight: 700; font-size: 0.85rem;">POR SINSA</div>
+                            <div style="font-size: 0.78rem; color: #64748B;">Rúbrica & Sello</div>
+                        </div>
+                        <div style="text-align: center; width: 40%;">
+                            <div style="border-top: 1px solid #475569; margin-bottom: 0.3rem;"></div>
+                            <div style="font-weight: 700; font-size: 0.85rem;">POR EL CONTRATISTA</div>
+                            <div style="font-size: 0.78rem; color: #64748B;">Firma & Rúbrica</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
     const acceptanceClauseNum = hasConsignacion ? 'VIGÉSIMA' : 'DÉCIMA NOVENA';
 
     viewer.innerHTML = `
@@ -4700,7 +4942,7 @@ function renderContractPreview() {
         </p>
 
         <div class="contract-clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
-        <p style="text-align: justify;">Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>${isForaneo ? ` en las zonas y municipios autorizados del departamento de <strong>${data.base_operativa || 'la circunscripción foránea'}</strong>` : ''}.</p>
+        <p style="text-align: justify;">Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>${isForaneo ? (isPoligono ? ` en las zonas y polígonos delimitados en el Anexo III de Delimitación Territorial (${(data.base_operativa || 'Occidente').toUpperCase()})` : ` en las zonas y municipios autorizados del departamento de <strong>${data.base_operativa || 'la circunscripción foránea'}</strong>`) : ''}.</p>
 
         <div class="contract-clause-title">SEGUNDA [ALCANCES DEL CONTRATO]:</div>
         <p>Los alcances de los servicios a brindar por parte de <strong>EL CONTRATISTA</strong> comprenden:</p>
@@ -4713,12 +4955,13 @@ function renderContractPreview() {
         <div class="contract-clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
         <p>Forman parte integrante del presente contrato los siguientes documentos:</p>
         <ol class="contract-clause-numbered">
-            <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de ${isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua'}.</li>
+            <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional ${isPoligono ? 'fuera de la geocerca contractual pactada en el Anexo III' : `fuera del radio de ${isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua'}`}.</li>
             <li>Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por <strong>EL CONTRATANTE</strong> para cada labor asignada.</li>
             <li>El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de <strong>EL CONTRATANTE</strong>.</li>
             <li>Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.</li>
             <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
             ${hasConsignacion ? '<li>El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.</li>' : ''}
+            ${isPoligono ? '<li>El Anexo III de Delimitación Territorial y Geocercas Periciales Satelitales (Google My Maps) que fija de manera inmutable los polígonos y vértices GPS certificados dentro de los cuales aplica la tarifa ordinaria pactada sin cobro de kilometraje.</li>' : ''}
         </ol>
 
         <div class="contract-clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
@@ -4824,6 +5067,7 @@ function renderContractPreview() {
         </div>
 
         ${anexoIIHtml}
+        ${anexoIIIHtml}
 
         <div class="contract-footer-page-row">
             Página Oficial de Contrato &bull; SILVA INTERNACIONAL S.A. (SINSA) &bull; Centro de Servicios
@@ -5006,8 +5250,10 @@ async function buildDocxFromContractData(data) {
         }));
     }
 
+    const isPoligono = (data.geocerca_modalidad === 'MAPA_POLIGONO' || (isForaneo && (!data.geocerca_modalidad || data.geocerca_modalidad === 'MAPA_POLIGONO')));
+
     // CLÁUSULAS DEL CONTRATO
-    const primeraText = 'Por medio del presente documento, EL CONTRATANTE contrata los servicios profesionales independientes de EL CONTRATISTA para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de EL CONTRATANTE' + (isForaneo ? ' en las circunscripciones y municipios autorizados del departamento de ' + (data.base_operativa || 'la base operativa asignada') + '.' : '.');
+    const primeraText = 'Por medio del presente documento, EL CONTRATANTE contrata los servicios profesionales independientes de EL CONTRATISTA para que ejecute labores de instalación, desinstalación y mantenimiento preventivo de equipos de aires acondicionados, así como obras accesorias inherentes tales como pintura, metalurgia, plomería, instalación de rejas metálicas y canaletas que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de EL CONTRATANTE' + (isForaneo ? (isPoligono ? ' en las zonas y polígonos delimitados en el Anexo III de Delimitación Territorial (' + (data.base_operativa || 'Occidente').toUpperCase() + ').' : ' en las circunscripciones y municipios autorizados del departamento de ' + (data.base_operativa || 'la base operativa asignada') + '.') : '.');
 
     addClause('PRIMERA [OBJETO DEL CONTRATO]:', primeraText);
 
@@ -5020,7 +5266,7 @@ async function buildDocxFromContractData(data) {
 
     const docsIntegrales = [
         'Forman parte integrante del presente contrato los siguientes documentos:',
-        '1. El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de ' + (isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua') + '.',
+        '1. El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional ' + (isPoligono ? 'fuera de la geocerca contractual pactada en el Anexo III.' : ('fuera del radio de ' + (isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua') + '.')),
         '2. Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por EL CONTRATANTE para cada labor asignada.',
         '3. El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de EL CONTRATANTE.',
         '4. Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.',
@@ -5028,6 +5274,9 @@ async function buildDocxFromContractData(data) {
     ];
     if (hasConsignacion) {
         docsIntegrales.push('6. El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.');
+    }
+    if (isPoligono) {
+        docsIntegrales.push((hasConsignacion ? '7.' : '6.') + ' El Anexo III de Delimitación Territorial y Geocercas Periciales Satelitales (Google My Maps) que fija de manera inmutable los polígonos y vértices GPS certificados dentro de los cuales aplica la tarifa ordinaria pactada sin cobro de kilometraje.');
     }
     addClause('TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:', docsIntegrales);
 
@@ -5297,9 +5546,11 @@ async function buildDocxFromContractData(data) {
 
     // Fila de Combustible
     const fuelPriceStr = 'C$ ' + combustible.toLocaleString('es-NI', { minimumFractionDigits: 2 });
-    const fuelLabelDocx = isForaneo 
-        ? 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE ' + (data.base_operativa || 'LA CIUDAD').toUpperCase() + ' (' + (data.geocerca_km || 14) + ' KM)'
-        : 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)';
+    const fuelLabelDocx = isPoligono
+        ? 'TARIFA DE COMBUSTIBLE POR KM FUERA DE LA GEOCERCA CONTRACTUAL (' + (data.base_operativa || 'OCCIDENTE').toUpperCase() + ' - ANEXO III DE GEOCERCAS)'
+        : (isForaneo 
+            ? 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE ' + (data.base_operativa || 'LA CIUDAD').toUpperCase() + ' (' + (data.geocerca_km || 14) + ' KM)'
+            : 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)');
 
     tableRows.push(new TableRow({
         children: [
@@ -5491,6 +5742,183 @@ async function buildDocxFromContractData(data) {
                 new TextRun({ text: matTotals.totalLetras, italics: true, font, size: 17 })
             ]
         }));
+    }
+
+    // ======================================================================
+    // ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES
+    // ======================================================================
+    if (isPoligono) {
+        let geoData = (typeof currentGeocercaData !== 'undefined' && currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0)
+            ? currentGeocercaData
+            : null;
+
+        if (!geoData && typeof parseKMLZones === 'function' && typeof DEMO_OCCIDENTE_KML !== 'undefined') {
+            geoData = {
+                providerName: nomCom,
+                contractNum: 'CONT-2026-OCC-01',
+                zones: parseKMLZones(DEMO_OCCIDENTE_KML)
+            };
+        }
+
+        if (geoData && geoData.zones && geoData.zones.length > 0) {
+            sectionsChildren.push(new Paragraph({
+                pageBreakBefore: true,
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 200, after: 100 },
+                children: [
+                    new TextRun({ text: 'ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES', bold: true, size: 22, font, color: '059669' })
+                ]
+            }));
+
+            sectionsChildren.push(new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 160 },
+                children: [
+                    new TextRun({ text: 'CONTRATISTA: ' + nomCom + ' | BASE OPERATIVA: ' + (data.base_operativa || 'OCCIDENTE').toUpperCase(), font, size: 18, color: '555555' })
+                ]
+            }));
+
+            sectionsChildren.push(new Paragraph({
+                alignment: AlignmentType.JUSTIFIED,
+                spacing: { after: 200, line: 276 },
+                border: { left: { style: BorderStyle.SINGLE, size: 16, color: '059669' } },
+                indent: { left: 160 },
+                children: [
+                    new TextRun({ text: 'DECLARACIÓN CONTRACTUAL DE INMUTABILIDAD CARTOGRÁFICA: ', bold: true, font, size: 18 }),
+                    new TextRun({ text: 'El presente anexo fija de manera pericial e inalterable la delimitación territorial aplicable al contrato suscrito con ' + nomCom + '. Toda orden de trabajo cuya ubicación física comprobada mediante coordenadas GPS se ubique dentro de los polígonos certificados a continuación se liquidará exclusivamente bajo las tarifas unitarias ordinarias del Anexo I sin cobro adicional de transporte. Cualquier servicio fuera de estos vértices se liquidará aplicando la tarifa de combustible por kilómetro pactada.', font, size: 18 })
+                ]
+            }));
+
+            geoData.zones.forEach((z, zIdx) => {
+                sectionsChildren.push(new Paragraph({
+                    spacing: { before: 180, after: 80 },
+                    children: [
+                        new TextRun({ text: 'POLÍGONO ' + (zIdx + 1) + ': ' + z.name.toUpperCase() + ' (' + z.coordinates.length + ' VÉRTICES GPS CERTIFICADOS)', bold: true, font, size: 19, color: '059669' })
+                    ]
+                }));
+
+                const geoTableHeaders = new TableRow({
+                    tableHeader: true,
+                    children: [
+                        new TableCell({
+                            width: { size: 14, type: WidthType.PERCENTAGE },
+                            borders: cellBorderSolid,
+                            shading: { fill: '059669' },
+                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Vértice', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                        }),
+                        new TableCell({
+                            width: { size: 18, type: WidthType.PERCENTAGE },
+                            borders: cellBorderSolid,
+                            shading: { fill: '059669' },
+                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Latitud (N)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                        }),
+                        new TableCell({
+                            width: { size: 18, type: WidthType.PERCENTAGE },
+                            borders: cellBorderSolid,
+                            shading: { fill: '059669' },
+                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Longitud (W)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                        }),
+                        new TableCell({
+                            width: { size: 14, type: WidthType.PERCENTAGE },
+                            borders: cellBorderSolid,
+                            shading: { fill: '059669' },
+                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Vértice', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                        }),
+                        new TableCell({
+                            width: { size: 18, type: WidthType.PERCENTAGE },
+                            borders: cellBorderSolid,
+                            shading: { fill: '059669' },
+                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Latitud (N)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                        }),
+                        new TableCell({
+                            width: { size: 18, type: WidthType.PERCENTAGE },
+                            borders: cellBorderSolid,
+                            shading: { fill: '059669' },
+                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Longitud (W)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                        })
+                    ]
+                });
+
+                const geoRows = [geoTableHeaders];
+                const half = Math.ceil(z.coordinates.length / 2);
+                for (let i = 0; i < half; i++) {
+                    const pt1 = z.coordinates[i];
+                    const v1 = 'V-' + String(i + 1).padStart(2, '0');
+                    const lat1 = pt1.lat.toFixed(6) + '° N';
+                    const lng1 = Math.abs(pt1.lng).toFixed(6) + '° W';
+
+                    let v2 = '', lat2 = '', lng2 = '';
+                    if (i + half < z.coordinates.length) {
+                        const pt2 = z.coordinates[i + half];
+                        v2 = 'V-' + String(i + half + 1).padStart(2, '0');
+                        lat2 = pt2.lat.toFixed(6) + '° N';
+                        lng2 = Math.abs(pt2.lng).toFixed(6) + '° W';
+                    }
+
+                    const bg = i % 2 === 0 ? 'F8FAFC' : 'FFFFFF';
+                    geoRows.push(new TableRow({
+                        children: [
+                            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: v1, bold: true, font, size: 16, color: '1E3A8A' })] })] }),
+                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lat1, font, size: 16 })] })] }),
+                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lng1, font, size: 16 })] })] }),
+                            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: v2, bold: true, font, size: 16, color: '1E3A8A' })] })] }),
+                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lat2, font, size: 16 })] })] }),
+                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lng2, font, size: 16 })] })] })
+                        ]
+                    }));
+                }
+
+                const geoTable = new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    rows: geoRows
+                });
+                sectionsChildren.push(geoTable);
+            });
+
+            // Bloque de Firmas para Anexo III
+            sectionsChildren.push(new Paragraph({
+                spacing: { before: 240, after: 120 },
+                children: [
+                    new TextRun({ text: 'Suscrito de conformidad por ambas partes en prueba de aceptación pericial inmutable:', italics: true, font, size: 16, color: '64748B' })
+                ]
+            }));
+
+            sectionsChildren.push(new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: sigBorderNone,
+                rows: [
+                    new TableRow({
+                        children: [
+                            new TableCell({
+                                width: { size: 45, type: WidthType.PERCENTAGE },
+                                borders: sigBorderNone,
+                                children: [
+                                    new Paragraph({ spacing: { before: 600, after: 60 }, children: [] }),
+                                    new Paragraph({ alignment: AlignmentType.CENTER, border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } }, spacing: { before: 60, after: 30 }, children: [new TextRun({ text: 'POR SINSA', bold: true, font, size: 17 })] }),
+                                    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Rúbrica & Sello', font, size: 15, color: '64748B' })] })
+                                ]
+                            }),
+                            new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, borders: sigBorderNone, children: [new Paragraph({})] }),
+                            new TableCell({
+                                width: { size: 45, type: WidthType.PERCENTAGE },
+                                borders: sigBorderNone,
+                                children: [
+                                    new Paragraph({ spacing: { before: 600, after: 60 }, children: [] }),
+                                    new Paragraph({ alignment: AlignmentType.CENTER, border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } }, spacing: { before: 60, after: 30 }, children: [new TextRun({ text: 'POR EL CONTRATISTA', bold: true, font, size: 17 })] }),
+                                    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: nomRep, font, size: 15, color: '64748B' })] })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }));
+        }
     }
 
     const doc = new Document({
@@ -7205,5 +7633,651 @@ function openTarifasModal(prov) {
     }
 
     modal.classList.remove('hidden');
+}
+
+/* ==========================================================================
+   MÓDULO: GENERADOR DE ANEXO DE GEOCERCAS CONTRACTUALES
+   ========================================================================== */
+
+// Datos de respaldo y demo del KML oficial del usuario (Occidente: Chinandega y León)
+const DEMO_OCCIDENTE_KML = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Geocercas CLIMA Occidente</name>
+    <Folder>
+      <name>Geocercas Reducidas CLIMA Occidente</name>
+      <Placemark>
+        <name>Geocerca Reducida Chinandega</name>
+        <description>Cobertura urbana propuesta reducida. Fuera de esta geocerca aplica kilometraje segun anexo contractual.</description>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>
+                -87.1478391,12.645884,0
+                -87.1492939,12.6350677,0
+                -87.1485171,12.6270151,0
+                -87.148663,12.6165034,0
+                -87.1213992,12.6020825,0
+                -87.1174662,12.6092368,0
+                -87.1113015,12.6113655,0
+                -87.0954186,12.6108125,0
+                -87.0949853,12.6172115,0
+                -87.0945948,12.6213907,0
+                -87.110278,12.6200045,0
+                -87.1067354,12.6300089,0
+                -87.1095161,12.6352825,0
+                -87.1248285,12.6399695,0
+                -87.1211817,12.6445195,0
+                -87.1207964,12.6500744,0
+                -87.1175568,12.6533334,0
+                -87.1215269,12.6557548,0
+                -87.130154,12.6574153,0
+                -87.1478391,12.645884,0
+              </coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+      <Placemark>
+        <name>Geocerca Reducida Leon</name>
+        <description>Cobertura urbana propuesta reducida. Fuera de esta geocerca aplica kilometraje segun anexo contractual.</description>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>
+                -86.900046,12.448009,0
+                -86.901483,12.433158,0
+                -86.891902,12.421661,0
+                -86.868907,12.420463,0
+                -86.858368,12.430284,0
+                -86.860764,12.444176,0
+                -86.87753,12.448248,0
+                -86.900046,12.448009,0
+              </coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>`;
+
+let currentGeocercaData = {
+    providerName: 'CLIMA OCCIDENTE',
+    contractNum: 'CONT-2026-OCC-01',
+    sourceLabel: '',
+    zones: []
+};
+
+window.geocercaLeafletMap = null;
+window.currentGeocercaBounds = null;
+let geocercaPolygonLayers = [];
+
+function initGeocercasModule() {
+    const btnProcessUrl = document.getElementById('btn-process-geocerca-url');
+    const btnLoadDemo = document.getElementById('btn-load-demo-occidente');
+    const fileInputKml = document.getElementById('geocerca-kml-file-input');
+    const btnRecenter = document.getElementById('btn-recenter-map');
+    const btnCopyClause = document.getElementById('btn-copy-geocerca-clause');
+    const btnDownloadPdf = document.getElementById('btn-download-geocerca-pdf');
+    const btnCopySummary = document.getElementById('btn-copy-geocerca-summary-text');
+
+    if (btnProcessUrl) {
+        btnProcessUrl.addEventListener('click', handleProcessGeocercaUrl);
+    }
+
+    if (btnLoadDemo) {
+        btnLoadDemo.addEventListener('click', () => {
+            const urlIn = document.getElementById('geocerca-url-input');
+            const provIn = document.getElementById('geocerca-provider-input');
+            const contIn = document.getElementById('geocerca-contract-input');
+            if (urlIn) urlIn.value = 'https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13';
+            if (provIn) provIn.value = 'CLIMA OCCIDENTE';
+            if (contIn) contIn.value = 'CONT-2026-OCC-01';
+            processKMLContent(DEMO_OCCIDENTE_KML, 'Demo Oficial Occidente (Chinandega y León)');
+        });
+    }
+
+    if (fileInputKml) {
+        fileInputKml.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                processKMLContent(evt.target.result, file.name);
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+        });
+    }
+
+    if (btnRecenter) {
+        btnRecenter.addEventListener('click', () => {
+            if (window.geocercaLeafletMap && window.currentGeocercaBounds) {
+                window.geocercaLeafletMap.fitBounds(window.currentGeocercaBounds, { padding: [35, 35] });
+            }
+        });
+    }
+
+    if (btnCopyClause) {
+        btnCopyClause.addEventListener('click', () => {
+            const text = document.getElementById('geocerca-clause-preview-box')?.innerText || '';
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('¡Cláusula contractual copiada al portapapeles con éxito!');
+            }).catch(() => {
+                alert('No se pudo copiar automáticamente. Por favor selecciónala y presiona Ctrl+C.');
+            });
+        });
+    }
+
+    if (btnCopySummary) {
+        btnCopySummary.addEventListener('click', handleCopyGeocercaSummary);
+    }
+
+    if (btnDownloadPdf) {
+        btnDownloadPdf.addEventListener('click', generateGeocercaAnnexPDF);
+    }
+}
+
+async function handleProcessGeocercaUrl() {
+    const urlInput = document.getElementById('geocerca-url-input');
+    const spinner = document.getElementById('geocerca-loading-spinner');
+    const url = (urlInput?.value || '').trim();
+
+    if (!url) {
+        alert('Por favor introduce un enlace de Google My Maps.');
+        return;
+    }
+
+    const midMatch = url.match(/mid=([a-zA-Z0-9_\-]+)/);
+    if (!midMatch) {
+        alert('No se pudo encontrar el identificador "mid" en el enlace. Asegúrate de que sea un enlace válido de Google My Maps (ej. https://www.google.com/maps/d/edit?mid=...)');
+        return;
+    }
+
+    const mid = midMatch[1];
+    const kmlUrl = `https://www.google.com/maps/d/kml?mid=${mid}&forcekml=1`;
+
+    if (spinner) spinner.classList.remove('hidden');
+
+    try {
+        let kmlText = null;
+
+        // Intento 1: Proxy AllOrigins
+        try {
+            const resp = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(kmlUrl)}`);
+            if (resp.ok) {
+                kmlText = await resp.text();
+            }
+        } catch (e1) {
+            console.warn('Proxy 1 falló, intentando Proxy 2...', e1);
+        }
+
+        // Intento 2: Proxy CorsProxy.io
+        if (!kmlText || !kmlText.includes('<kml')) {
+            try {
+                const resp2 = await fetch(`https://corsproxy.io/?${encodeURIComponent(kmlUrl)}`);
+                if (resp2.ok) {
+                    kmlText = await resp2.text();
+                }
+            } catch (e2) {
+                console.warn('Proxy 2 falló...', e2);
+            }
+        }
+
+        if (spinner) spinner.classList.add('hidden');
+
+        if (kmlText && kmlText.includes('<kml')) {
+            processKMLContent(kmlText, 'Google My Maps (' + mid + ')');
+        } else {
+            // Si coincide con el mapa del usuario de Occidente, cargar el KML directo
+            if (mid === '1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc') {
+                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas CLIMA Occidente');
+            } else {
+                alert('La política de seguridad de red bloqueó la descarga automática directa del mapa.\n\nPara cargarlo:\n1. En Google My Maps, haz clic en los 3 puntos y elige "Exportar a KML/KMZ".\n2. Haz clic en "Subir Archivo KML".\n\n¡O usa el botón "Cargar Demo Occidente" para probar la geocerca de Chinandega y León!');
+            }
+        }
+    } catch (err) {
+        if (spinner) spinner.classList.add('hidden');
+        alert('Error al procesar el enlace: ' + err.message);
+    }
+}
+
+function processKMLContent(kmlText, sourceLabel) {
+    const providerInput = document.getElementById('geocerca-provider-input');
+    const contractInput = document.getElementById('geocerca-contract-input');
+
+    const providerName = (providerInput?.value || 'CLIMA OCCIDENTE').trim().toUpperCase();
+    const contractNum = (contractInput?.value || 'CONT-2026-OCC-01').trim();
+
+    const zones = parseKMLZones(kmlText);
+    if (!zones || zones.length === 0) {
+        alert('No se encontraron polígonos o geocercas dentro del archivo KML.');
+        return;
+    }
+
+    currentGeocercaData = {
+        providerName,
+        contractNum,
+        sourceLabel,
+        zones
+    };
+
+    renderGeocercasResults(currentGeocercaData);
+}
+
+function parseKMLZones(kmlText) {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(kmlText, 'text/xml');
+    const placemarks = xmlDoc.getElementsByTagName('Placemark');
+    const zones = [];
+
+    const zoneColors = [
+        { stroke: '#059669', fill: '#10B981' }, // Verde Sinsa / Esmeralda
+        { stroke: '#2563EB', fill: '#3B82F6' }, // Azul
+        { stroke: '#7C3AED', fill: '#8B5CF6' }, // Púrpura
+        { stroke: '#D97706', fill: '#F59E0B' }, // Ámbar
+        { stroke: '#DC2626', fill: '#EF4444' }  // Rojo
+    ];
+
+    for (let i = 0; i < placemarks.length; i++) {
+        const pm = placemarks[i];
+        const nameEl = pm.getElementsByTagName('name')[0];
+        const descEl = pm.getElementsByTagName('description')[0];
+        const coordsEl = pm.getElementsByTagName('coordinates')[0];
+
+        if (!coordsEl) continue;
+
+        const name = nameEl ? nameEl.textContent.trim() : `Zona Geográfica ${i + 1}`;
+        const description = descEl ? descEl.textContent.trim() : 'Delimitación perimetral pactada en contrato.';
+        const rawCoords = coordsEl.textContent.trim().split(/\s+/);
+
+        const coordinates = [];
+        rawCoords.forEach(str => {
+            const parts = str.split(',');
+            if (parts.length >= 2) {
+                const lng = parseFloat(parts[0]);
+                const lat = parseFloat(parts[1]);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    coordinates.push({ lat, lng });
+                }
+            }
+        });
+
+        if (coordinates.length >= 3) {
+            const color = zoneColors[zones.length % zoneColors.length];
+            zones.push({
+                index: zones.length + 1,
+                name,
+                description,
+                coordinates,
+                color
+            });
+        }
+    }
+
+    return zones;
+}
+
+function renderGeocercasResults(data) {
+    const container = document.getElementById('geocerca-results-container');
+    if (!container) return;
+    container.classList.remove('hidden');
+
+    const totalVertices = data.zones.reduce((sum, z) => sum + z.coordinates.length, 0);
+    const kpiZones = document.getElementById('kpi-geocerca-zones');
+    const kpiVertices = document.getElementById('kpi-geocerca-vertices');
+
+    if (kpiZones) kpiZones.textContent = data.zones.length;
+    if (kpiVertices) kpiVertices.textContent = totalVertices;
+
+    renderLeafletMap(data.zones);
+    renderCoordinateTables(data.zones);
+    renderLegalClause(data);
+
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderLeafletMap(zones) {
+    const mapContainer = document.getElementById('geocerca-leaflet-map');
+    if (!mapContainer || !window.L) return;
+
+    if (!window.geocercaLeafletMap) {
+        window.geocercaLeafletMap = L.map('geocerca-leaflet-map', {
+            zoomControl: true,
+            scrollWheelZoom: true
+        });
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(window.geocercaLeafletMap);
+    }
+
+    geocercaPolygonLayers.forEach(layer => window.geocercaLeafletMap.removeLayer(layer));
+    geocercaPolygonLayers = [];
+
+    const allLatLngs = [];
+
+    zones.forEach(zone => {
+        const latLngs = zone.coordinates.map(c => [c.lat, c.lng]);
+        allLatLngs.push(...latLngs);
+
+        const polygon = L.polygon(latLngs, {
+            color: zone.color.stroke,
+            weight: 3,
+            fillColor: zone.color.fill,
+            fillOpacity: 0.25
+        }).addTo(window.geocercaLeafletMap);
+
+        polygon.bindPopup(`
+            <div style="font-family: sans-serif; font-size: 0.88rem; line-height: 1.4;">
+                <strong style="color: ${zone.color.stroke}; font-size: 0.95rem;">📍 ${zone.name}</strong>
+                <p style="margin: 0.4rem 0; color: #475569;">${zone.description}</p>
+                <div style="font-size: 0.8rem; background: #F1F5F9; padding: 4px 8px; border-radius: 4px; font-weight: 600;">
+                    Vértices fijados: ${zone.coordinates.length} puntos GPS
+                </div>
+            </div>
+        `);
+
+        polygon.bindTooltip(zone.name, {
+            permanent: false,
+            direction: 'center'
+        });
+
+        geocercaPolygonLayers.push(polygon);
+    });
+
+    if (allLatLngs.length > 0) {
+        window.currentGeocercaBounds = L.latLngBounds(allLatLngs);
+        setTimeout(() => {
+            window.geocercaLeafletMap.invalidateSize();
+            window.geocercaLeafletMap.fitBounds(window.currentGeocercaBounds, { padding: [40, 40] });
+        }, 150);
+    }
+}
+
+function renderCoordinateTables(zones) {
+    const listContainer = document.getElementById('geocerca-zones-tables-list');
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+
+    zones.forEach((zone, zIdx) => {
+        const card = document.createElement('div');
+        card.className = 'geocerca-zone-card';
+
+        let rowsHtml = '';
+        zone.coordinates.forEach((pt, pIdx) => {
+            const vNum = `V-${String(pIdx + 1).padStart(2, '0')}`;
+            const latStr = `${pt.lat.toFixed(6)}° N`;
+            const lngStr = `${Math.abs(pt.lng).toFixed(6)}° W`;
+
+            rowsHtml += `
+                <tr>
+                    <td style="width: 80px;"><span class="coord-vertex-badge">${vNum}</span></td>
+                    <td class="coord-cell">${latStr}</td>
+                    <td class="coord-cell">${lngStr}</td>
+                </tr>
+            `;
+        });
+
+        card.innerHTML = `
+            <div class="geocerca-zone-header">
+                <div class="geocerca-zone-title">
+                    <span style="color: ${zone.color.stroke};">📍</span>
+                    <span>${zone.name}</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <span class="geocerca-zone-badge" style="background: rgba(16, 185, 129, 0.1); color: ${zone.color.stroke};">
+                        ${zone.coordinates.length} Vértices GPS
+                    </span>
+                    <button class="btn btn-outline btn-copy-zone-table" data-zone-idx="${zIdx}" style="font-size: 0.78rem; padding: 0.25rem 0.6rem;">
+                        📋 Copiar Tabla
+                    </button>
+                </div>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem; line-height: 1.4;">
+                <em>${zone.description}</em>
+            </p>
+            <div style="max-height: 280px; overflow-y: auto; border: 1px solid var(--glass-border); border-radius: 8px;">
+                <table class="geocerca-coord-table">
+                    <thead>
+                        <tr>
+                            <th>Vértice</th>
+                            <th>Latitud (GPS)</th>
+                            <th>Longitud (GPS)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        listContainer.appendChild(card);
+    });
+
+    listContainer.querySelectorAll('.btn-copy-zone-table').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.getAttribute('data-zone-idx'));
+            const z = zones[idx];
+            if (!z) return;
+
+            let text = `TABLA DE VÉRTICES GPS - ${z.name.toUpperCase()}\n`;
+            text += `Descripción: ${z.description}\n`;
+            text += `Vértice\tLatitud\tLongitud\n`;
+            z.coordinates.forEach((pt, pIdx) => {
+                text += `V-${String(pIdx + 1).padStart(2, '0')}\t${pt.lat.toFixed(6)}° N\t${Math.abs(pt.lng).toFixed(6)}° W\n`;
+            });
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert(`¡Coordenadas de "${z.name}" copiadas al portapapeles!`);
+            });
+        });
+    });
+}
+
+function renderLegalClause(data) {
+    const box = document.getElementById('geocerca-clause-preview-box');
+    if (!box) return;
+
+    const zoneNames = data.zones.map(z => `«${z.name}»`).join(' y ');
+
+    box.innerHTML = `
+        <p style="margin: 0 0 0.8rem 0; font-weight: 700; color: var(--primary);">
+            CLÁUSULA ESPECIAL - DELIMITACIÓN TERRITORIAL Y GEOCERCA DE COBERTURA:
+        </p>
+        <p style="margin: 0 0 0.8rem 0;">
+            <strong>PRIMERA (ÁREA OPERATIVA PACTADA):</strong> Las tarifas de mano de obra y servicios pactadas con el <strong>PROVEEDOR (${data.providerName})</strong> en el marco del contrato <strong>${data.contractNum}</strong> se circunscriben de forma taxativa y obligatoria al perímetro geográfico conformado por las zonas de cobertura denominadas ${zoneNames}.
+        </p>
+        <p style="margin: 0 0 0.8rem 0;">
+            <strong>SEGUNDA (INMUTABILIDAD CARTOGRÁFICA Y PERICIAL):</strong> Para la determinación exacta de los límites operativos, las partes convienen de común acuerdo incorporar como parte integrante e indivisible del presente contrato el <strong>ANEXO DE DELIMITACIÓN GEOGRÁFICA</strong>, compuesto por la cartografía pericial y la relación inalterable de coordenadas satelitales (Latitud y Longitud) de cada uno de los vértices que componen los polígonos.
+        </p>
+        <p style="margin: 0;">
+            <strong>TERCERA (SERVICIOS EXTRAORDINARIOS Y EXCLUSIONES):</strong> Toda orden de trabajo cuya ubicación física comprobable mediante coordenadas GPS se sitúe fuera de los vértices geográficos del Anexo, se considerará servicio foráneo y estará sujeta a la liquidación de kilometraje adicional según tabla tarifaria vigente. Ninguna de las partes podrá invocar modificaciones a la geocerca salvo adenda escrita y rubricada en debida forma.
+        </p>
+    `;
+}
+
+function handleCopyGeocercaSummary() {
+    const data = currentGeocercaData;
+    if (!data || !data.zones || data.zones.length === 0) return;
+
+    let text = `=======================================================\n`;
+    text += `ANEXO TÉCNICO: DELIMITACIÓN TERRITORIAL Y GEOCERCAS\n`;
+    text += `Contrato: ${data.contractNum} | Proveedor: ${data.providerName}\n`;
+    text += `=======================================================\n\n`;
+
+    data.zones.forEach(z => {
+        text += `[ZONA: ${z.name.toUpperCase()}]\n`;
+        text += `Descripción: ${z.description}\n`;
+        text += `Vértice\tLatitud\tLongitud\n`;
+        z.coordinates.forEach((pt, pIdx) => {
+            text += `V-${String(pIdx + 1).padStart(2, '0')}\t${pt.lat.toFixed(6)}° N\t${Math.abs(pt.lng).toFixed(6)}° W\n`;
+        });
+        text += `\n`;
+    });
+
+    navigator.clipboard.writeText(text).then(() => {
+        alert('¡Resumen completo de tablas copiado al portapapeles! Listo para pegar en Microsoft Word.');
+    });
+}
+
+function generateGeocercaAnnexPDF() {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+        alert('Librería PDF cargando. Por favor espera 2 segundos y reintenta.');
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'pt', 'letter');
+
+    const data = currentGeocercaData;
+    if (!data || !data.zones || data.zones.length === 0) {
+        alert('No hay geocercas procesadas para exportar.');
+        return;
+    }
+
+    const verdeSinsa = [42, 143, 58];
+    const naranjaSinsa = [245, 130, 32];
+    const grisOscuro = [51, 65, 85];
+
+    const todayStr = new Date().toLocaleDateString('es-NI', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Barra decorativa superior
+    doc.setFillColor(verdeSinsa[0], verdeSinsa[1], verdeSinsa[2]);
+    doc.rect(40, 35, 532, 6, 'F');
+
+    // Título Principal
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(verdeSinsa[0], verdeSinsa[1], verdeSinsa[2]);
+    doc.text('ANEXO TÉCNICO: DELIMITACIÓN TERRITORIAL Y GEOCERCA', 40, 65);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(grisOscuro[0], grisOscuro[1], grisOscuro[2]);
+    doc.text(`CONTRATO Nº: ${data.contractNum}`, 40, 85);
+    doc.text(`PROVEEDOR / CONTRATISTA: ${data.providerName}`, 40, 100);
+    doc.text(`FECHA DE EMISIÓN Y CONGELAMIENTO: ${todayStr}`, 40, 115);
+    doc.text(`VALIDEZ JURÍDICA: INMUTABLE (VÉRTICES GPS CERTIFICADOS)`, 40, 130);
+
+    doc.setDrawColor(203, 213, 225);
+    doc.line(40, 140, 572, 140);
+
+    // Cláusula de Respaldo
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(naranjaSinsa[0], naranjaSinsa[1], naranjaSinsa[2]);
+    doc.text('DECLARACIÓN CONTRACTUAL DE INMUTABILIDAD DE COBERTURA:', 40, 158);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(grisOscuro[0], grisOscuro[1], grisOscuro[2]);
+
+    const zoneNames = data.zones.map(z => `"${z.name}"`).join(' y ');
+    const clauseText = `El presente anexo fija de manera definitiva y vinculante la delimitación territorial aplicable al contrato ${data.contractNum} celebrado con ${data.providerName}. Toda actividad ejecutada dentro de los polígonos periciales ${zoneNames} se liquidará bajo la tarifa ordinaria pactada. Las coordenadas satelitales (Latitud y Longitud) listadas a continuación son inalterables y constituyen la referencia pericial matemática ante cualquier controversia de liquidación o kilometraje.`;
+
+    const splitClause = doc.splitTextToSize(clauseText, 532);
+    doc.text(splitClause, 40, 172);
+
+    let startY = 172 + (splitClause.length * 11) + 15;
+
+    // Tablas de Coordenadas por Zona
+    data.zones.forEach((zone, zIdx) => {
+        if (startY > 620) {
+            doc.addPage();
+            startY = 50;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(verdeSinsa[0], verdeSinsa[1], verdeSinsa[2]);
+        doc.text(`ZONA ${zIdx + 1}: ${zone.name.toUpperCase()}`, 40, startY);
+
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Descripción: ${zone.description} (${zone.coordinates.length} vértices GPS fijados)`, 40, startY + 12);
+
+        // Disponer en 2 pares de columnas por fila para formato compacto y profesional
+        const tableBody = [];
+        const half = Math.ceil(zone.coordinates.length / 2);
+        for (let i = 0; i < half; i++) {
+            const pt1 = zone.coordinates[i];
+            const v1 = `V-${String(i + 1).padStart(2, '0')}`;
+            const lat1 = `${pt1.lat.toFixed(6)}° N`;
+            const lng1 = `${Math.abs(pt1.lng).toFixed(6)}° W`;
+
+            let v2 = '', lat2 = '', lng2 = '';
+            if (i + half < zone.coordinates.length) {
+                const pt2 = zone.coordinates[i + half];
+                v2 = `V-${String(i + half + 1).padStart(2, '0')}`;
+                lat2 = `${pt2.lat.toFixed(6)}° N`;
+                lng2 = `${Math.abs(pt2.lng).toFixed(6)}° W`;
+            }
+
+            tableBody.push([v1, lat1, lng1, v2, lat2, lng2]);
+        }
+
+        doc.autoTable({
+            startY: startY + 20,
+            head: [['Vértice', 'Latitud (N)', 'Longitud (W)', 'Vértice', 'Latitud (N)', 'Longitud (W)']],
+            body: tableBody,
+            headStyles: { fillColor: verdeSinsa, fontSize: 8, fontStyle: 'bold' },
+            bodyStyles: { fontSize: 7.5, textColor: grisOscuro },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            columnStyles: {
+                0: { fontStyle: 'bold', halign: 'center', cellWidth: 45 },
+                1: { halign: 'center' },
+                2: { halign: 'center' },
+                3: { fontStyle: 'bold', halign: 'center', cellWidth: 45 },
+                4: { halign: 'center' },
+                5: { halign: 'center' }
+            },
+            margin: { left: 40, right: 40 }
+        });
+
+        startY = doc.lastAutoTable.finalY + 25;
+    });
+
+    // SECCIÓN DE FIRMAS Y RÚBRICAS LEGALES
+    if (startY > 620) {
+        doc.addPage();
+        startY = 60;
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Nota: Ambas partes suscriben de conformidad el presente anexo en prueba de aceptación y conocimiento pericial.', 40, startY);
+
+    const sigY = startY + 50;
+
+    // Firma Sinsa
+    doc.setDrawColor(71, 85, 105);
+    doc.line(70, sigY, 240, sigY);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(grisOscuro[0], grisOscuro[1], grisOscuro[2]);
+    doc.text('POR SINSA', 125, sigY + 14);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text('Administración y Contratos', 110, sigY + 26);
+    doc.text('Rúbrica & Sello', 130, sigY + 38);
+
+    // Firma Proveedor
+    doc.line(360, sigY, 530, sigY);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('POR EL PROVEEDOR', 410, sigY + 14);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(data.providerName, 400, sigY + 26);
+    doc.text('Representante Legal (Firma & Rúbrica)', 365, sigY + 38);
+
+    doc.save(`Anexo_Geocercas_${data.providerName.replace(/[^a-zA-Z0-9]/g, '_')}_${data.contractNum.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
 }
 
