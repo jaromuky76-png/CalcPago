@@ -11,13 +11,26 @@
     <!-- jsPDF and AutoTable for PDF Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- Leaflet.js for interactive mapping -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar / Header -->
         <header class="header">
-            <div class="logo">
-                <h1>Calc<span>Pago</span></h1>
+            <div class="logo-nav-group" style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+                <div class="logo">
+                    <h1>Calc<span>Pago</span></h1>
+                </div>
+                <nav class="main-nav" id="main-nav" style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="nav-tab active" data-view="dashboard">
+                        <span>📊</span> Liquidación de Pagos
+                    </button>
+                    <button class="nav-tab" data-view="view-geocercas">
+                        <span>📍</span> Geocercas Contractuales
+                    </button>
+                </nav>
             </div>
             <div class="actions" style="display: flex; gap: 0.5rem; align-items: center;">
                 <button id="btn-theme-toggle" class="btn btn-outline btn-icon-only" title="Cambiar Tema" style="font-size: 1.2rem;">🌓</button>
@@ -202,6 +215,179 @@
                             </div>
                         </div>
                     </aside>
+                </div>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- VISTA 2: GENERADOR DE ANEXO DE GEOCERCAS CONTRACTUALES                    -->
+            <!-- ========================================================================= -->
+            <section class="module-view hidden" id="view-geocercas" style="padding: 1rem 0;">
+                <div class="geocercas-container" style="max-width: 1400px; margin: 0 auto;">
+                    <div class="module-header-box" style="margin-bottom: 1.5rem;">
+                        <div class="module-header-info">
+                            <span class="badge-tag" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700; font-size: 0.78rem; padding: 0.3rem 0.8rem; border-radius: 20px; display: inline-block; margin-bottom: 0.5rem;">
+                                📍 Delimitación Territorial & Peritaje GPS
+                            </span>
+                            <h2 style="font-size: 1.6rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">Generador de Anexo de Geocercas Contractuales</h2>
+                            <p style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.5;">
+                                Convierte cualquier enlace de Google My Maps o archivo KML en un anexo técnico <strong>inmutable, formal y con validez jurídica</strong> para contratos con proveedores foráneos. Extrae las coordenadas exactas de cada vértice, dibuja el mapa pericial y redacta la cláusula legal de blindaje territorial.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Card de Configuración y Enlace -->
+                    <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
+                        <div style="margin-bottom: 1rem;">
+                            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.3rem;">🔗 1. Enlace o Archivo de la Geocerca Negociada</h3>
+                            <p style="color: var(--text-muted); font-size: 0.85rem;">
+                                Pega el enlace de Google My Maps compartido por el área de operaciones o sube directamente el archivo KML.
+                            </p>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; align-items: end;">
+                            <div class="form-group">
+                                <label for="geocerca-url-input" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                                    Enlace de Google My Maps:
+                                </label>
+                                <input type="text" id="geocerca-url-input" class="custom-input" style="width: 100%;" placeholder="https://www.google.com/maps/d/edit?mid=... o https://www.google.com/maps/d/viewer?mid=..." value="https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="geocerca-provider-input" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                                    Proveedor Contratado:
+                                </label>
+                                <input type="text" id="geocerca-provider-input" class="custom-input" style="width: 100%;" placeholder="Ej. GLOBAL AIR / CLIMA OCCIDENTE" value="CLIMA OCCIDENTE">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="geocerca-contract-input" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                                    Nº Contrato / Referencia:
+                                </label>
+                                <input type="text" id="geocerca-contract-input" class="custom-input" style="width: 100%;" placeholder="Ej. CONT-2026-OCC-01" value="CONT-2026-OCC-01">
+                            </div>
+                        </div>
+
+                        <!-- Barra de Acciones de Carga -->
+                        <div style="display: flex; gap: 0.8rem; margin-top: 1.2rem; flex-wrap: wrap; align-items: center;">
+                            <button id="btn-process-geocerca-url" class="btn btn-primary" style="font-weight: 700; padding: 0.65rem 1.4rem; display: flex; align-items: center; gap: 0.5rem; background: var(--primary); color: white; border: none; border-radius: 8px;">
+                                <span>🌐</span> Procesar Enlace de Google Maps
+                            </button>
+
+                            <button id="btn-load-demo-occidente" class="btn btn-outline" style="color: #2563EB; border-color: #2563EB; font-weight: 600; padding: 0.65rem 1.2rem; display: flex; align-items: center; gap: 0.4rem;" title="Carga inmediata de las Geocercas Reducidas de Chinandega y León">
+                                <span>⭐</span> Cargar Demo Occidente (Chinandega y León)
+                            </button>
+
+                            <label for="geocerca-kml-file-input" class="btn btn-outline" style="cursor: pointer; margin: 0; padding: 0.65rem 1.2rem; display: flex; align-items: center; gap: 0.4rem;" title="Sube un archivo .kml o .kmz exportado de Google Maps">
+                                <span>📂</span> Subir Archivo KML
+                            </label>
+                            <input type="file" id="geocerca-kml-file-input" accept=".kml,.xml" hidden>
+
+                            <span id="geocerca-loading-spinner" class="hidden" style="color: var(--primary); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                ⏳ <em>Descargando y extrayendo vértices periciales...</em>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor de Resultados (Oculto hasta procesar) -->
+                    <div id="geocerca-results-container" class="hidden">
+                        <!-- KPI Badges -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                            <div class="card" style="padding: 1rem 1.2rem;">
+                                <div class="card-title">Zonas / Polígonos</div>
+                                <div class="card-value" id="kpi-geocerca-zones" style="color: var(--primary);">0</div>
+                                <div class="card-subtitle">Áreas operativas delimitadas</div>
+                            </div>
+                            <div class="card" style="padding: 1rem 1.2rem;">
+                                <div class="card-title">Total Vértices GPS</div>
+                                <div class="card-value" id="kpi-geocerca-vertices" style="color: #059669;">0</div>
+                                <div class="card-subtitle">Coordenadas fijadas matemáticamente</div>
+                            </div>
+                            <div class="card" style="padding: 1rem 1.2rem;">
+                                <div class="card-title">Estatus Legal</div>
+                                <div class="card-value" style="color: #2563EB; font-size: 1.4rem; padding-top: 0.4rem;">✓ Inmutable</div>
+                                <div class="card-subtitle">Protegido contra ediciones web</div>
+                            </div>
+                            <div class="card" style="padding: 1rem 1.2rem;">
+                                <div class="card-title">Documento de Cierre</div>
+                                <div class="card-value" style="color: #F59E0B; font-size: 1.4rem; padding-top: 0.4rem;">Anexo Legal</div>
+                                <div class="card-subtitle">Con firmas y sellos periciales</div>
+                            </div>
+                        </div>
+
+                        <!-- Layout Principal: 2 Columnas -->
+                        <div style="display: grid; grid-template-columns: 1.35fr 1fr; gap: 1.5rem; align-items: start;">
+                            <!-- Columna Izquierda: Mapa Cartográfico y Tablas de Coordenadas -->
+                            <div>
+                                <!-- Tarjeta de Mapa -->
+                                <div class="card" style="margin-bottom: 1.5rem; padding: 1.3rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 0.8rem;">
+                                        <div>
+                                            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.2rem;">🗺️ Vista Cartográfica de Polígonos</h3>
+                                            <p style="color: var(--text-muted); font-size: 0.82rem;">Mapa satelital/topográfico generado con OpenStreetMap. Los límites coloreados representan el perímetro pactado.</p>
+                                        </div>
+                                        <button id="btn-recenter-map" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.7rem;">🎯 Encuadrar Polígonos</button>
+                                    </div>
+                                    <div id="geocerca-leaflet-map" style="height: 440px; width: 100%; border-radius: 10px; border: 1px solid var(--glass-border); z-index: 1;"></div>
+                                </div>
+
+                                <!-- Tarjeta de Tablas de Vértices -->
+                                <div class="card" style="padding: 1.3rem;">
+                                    <div style="margin-bottom: 1rem;">
+                                        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.2rem;">📐 Tablas Periciales de Coordenadas GPS</h3>
+                                        <p style="color: var(--text-muted); font-size: 0.82rem;">Listado matemático inmutable de vértices de cada zona para incorporación formal al contrato.</p>
+                                    </div>
+                                    <div id="geocerca-zones-tables-list" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                                        <!-- Inyectado dinámicamente -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Columna Derecha: Cláusula Contractual y Exportador a PDF -->
+                            <div>
+                                <!-- Tarjeta de Cláusula Legal -->
+                                <div class="card" style="margin-bottom: 1.5rem; border-left: 5px solid var(--primary); padding: 1.3rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 0.8rem;">
+                                        <div>
+                                            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.2rem;">⚖️ Cláusula Legal de Blindaje</h3>
+                                            <p style="color: var(--text-muted); font-size: 0.82rem;">Redacción formal lista para insertar en el cuerpo principal del contrato.</p>
+                                        </div>
+                                        <button id="btn-copy-geocerca-clause" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; color: var(--primary); border-color: var(--primary); font-weight: 600;">
+                                            📋 Copiar Cláusula
+                                        </button>
+                                    </div>
+                                    <div style="background: var(--bg-panel-hover); padding: 1.1rem; border-radius: 8px; border: 1px solid var(--glass-border); font-size: 0.86rem; line-height: 1.6; color: var(--text-main);" id="geocerca-clause-preview-box">
+                                        <!-- Inyectado dinámicamente -->
+                                    </div>
+                                </div>
+
+                                <!-- Tarjeta de Exportación a PDF -->
+                                <div class="card" style="border-left: 5px solid #059669; padding: 1.3rem;">
+                                    <div style="margin-bottom: 1rem;">
+                                        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.2rem;">📄 Exportación de Anexo Contractual</h3>
+                                        <p style="color: var(--text-muted); font-size: 0.82rem;">
+                                            Genera un documento PDF listo para imprimir en papel legal, con membrete SINSA, glosario de términos, tablas de coordenadas numeradas y áreas formales de firma y rúbrica para ambas partes.
+                                        </p>
+                                    </div>
+
+                                    <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 1rem; margin-bottom: 1.2rem; font-size: 0.83rem; color: #047857; line-height: 1.5;">
+                                        <strong>✓ Validez Jurídica Asegurada:</strong>
+                                        <p style="margin: 0.3rem 0 0 0;">
+                                            Al adjuntar este documento firmado, el proveedor no podrá alegar cobros extraordinarios dentro de las zonas marcadas, ni tampoco podrá modificarse el perímetro a espaldas de la empresa.
+                                        </p>
+                                    </div>
+
+                                    <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                                        <button id="btn-download-geocerca-pdf" class="btn btn-primary" style="background: #059669; color: white; border: none; font-size: 0.95rem; padding: 0.85rem 1.5rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 0.6rem; border-radius: 8px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);">
+                                            <span>📥</span> Descargar Anexo Formal en PDF
+                                        </button>
+                                        <button id="btn-copy-geocerca-summary-text" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1rem;">
+                                            📋 Copiar Tablas en Texto para Pegar en Word
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>
