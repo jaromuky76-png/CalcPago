@@ -1523,6 +1523,38 @@ body {
     border-color: rgba(0, 168, 89, 0.25);
 }
 
+.contract-paper-viewer.is-editing {
+    border: 2px dashed #2563EB !important;
+    background: #FFFFFF !important;
+    color: #111827 !important;
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.22) !important;
+    cursor: text !important;
+    position: relative;
+}
+
+[data-theme="dark"] .contract-paper-viewer.is-editing {
+    background: #0F172A !important;
+    color: #F8FAFC !important;
+    border-color: #38BDF8 !important;
+    box-shadow: 0 0 25px rgba(56, 189, 248, 0.25) !important;
+}
+
+.contract-paper-viewer.is-editing [contenteditable="true"] {
+    outline: none;
+    transition: background 0.15s ease;
+}
+
+.contract-paper-viewer.is-editing [contenteditable="true"]:hover {
+    background: rgba(37, 99, 235, 0.05);
+    border-radius: 4px;
+}
+
+.contract-paper-viewer.is-editing [contenteditable="true"]:focus {
+    background: rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
+    border-radius: 4px;
+}
+
 .contract-header-logo-row {
     display: flex;
     justify-content: flex-end;

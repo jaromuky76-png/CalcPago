@@ -716,6 +716,67 @@
                                     </div>
                                 </div>
 
+                                <!-- SECCIÓN ESPECIALIDADES Y OBJETO DEL SERVICIO -->
+                                <div class="step-card-header" style="margin-top: 1.6rem; border-top: 1px solid var(--glass-border); padding-top: 1.2rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
+                                        <div>
+                                            <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                                                <span>🎯</span>
+                                                <span>Especialidades y Objeto Contractual del Servicio</span>
+                                            </h3>
+                                            <p class="step-card-desc">Define con precisión las labores que este contratista prestará a SINSA. Esta redacción se integrará directamente en la Cláusula Primera [OBJETO DEL CONTRATO] del borrador legal y en el documento Word (.docx).</p>
+                                        </div>
+                                        <button type="button" id="btn-auto-generate-scope" class="btn btn-outline" style="font-size: 0.82rem; color: var(--primary); border-color: var(--primary); display: flex; align-items: center; gap: 0.4rem;" title="Generar redacción automática basada en la tabla de actividades cargada">
+                                            <span>🪄</span> <span>Auto-redactar según Actividades</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style="background: var(--bg-panel-hover); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.1rem 1.3rem; margin-top: 0.6rem;">
+                                    <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.6rem; display: block;">
+                                        Tipos de Servicio / Especialidades Habilitadas:
+                                    </label>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.6rem; margin-bottom: 1rem;">
+                                        <label class="custom-checkbox-label" style="font-size: 0.84rem; color: var(--text-main);">
+                                            <input type="checkbox" id="wiz-esp-instalacion" checked>
+                                            <span>Instalación de Aires Acondicionados</span>
+                                        </label>
+                                        <label class="custom-checkbox-label" style="font-size: 0.84rem; color: var(--text-main);">
+                                            <input type="checkbox" id="wiz-esp-mant-prev" checked>
+                                            <span>Mantenimiento Preventivo</span>
+                                        </label>
+                                        <label class="custom-checkbox-label" style="font-size: 0.84rem; color: var(--text-main);">
+                                            <input type="checkbox" id="wiz-esp-mant-gen" checked>
+                                            <span>Mantenimiento General / Correctivo</span>
+                                        </label>
+                                        <label class="custom-checkbox-label" style="font-size: 0.84rem; color: var(--text-main);">
+                                            <input type="checkbox" id="wiz-esp-desinstalacion" checked>
+                                            <span>Desinstalación / Reubicación de Equipos</span>
+                                        </label>
+                                        <label class="custom-checkbox-label" style="font-size: 0.84rem; color: var(--text-main);">
+                                            <input type="checkbox" id="wiz-esp-visitas">
+                                            <span>Diagnóstico y Visitas Técnicas Previas</span>
+                                        </label>
+                                        <label class="custom-checkbox-label" style="font-size: 0.84rem; color: var(--text-main);">
+                                            <input type="checkbox" id="wiz-esp-obras-acc">
+                                            <span>Obras Accesorias (Pintura, Metalurgia, Plomería, Rejas)</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                            <label for="wiz-objeto-servicio-descripcion" style="font-size: 0.85rem; font-weight: 700; color: var(--text-main);">
+                                                Descripción Específica de las Labores a Contratar:
+                                            </label>
+                                            <span style="font-size: 0.75rem; color: var(--text-muted);">Editable libremente por el usuario</span>
+                                        </div>
+                                        <textarea id="wiz-objeto-servicio-descripcion" class="custom-input" rows="3" style="width: 100%; resize: vertical; font-family: inherit; font-size: 0.88rem; line-height: 1.45;" placeholder="Ej. labores de instalación, desinstalación, mantenimiento preventivo y mantenimiento general de equipos de aires acondicionados"></textarea>
+                                        <small class="form-hint" style="margin-top: 0.35rem; display: block;">
+                                            💡 Este texto se ensambla dentro de la Cláusula Primera: <em>"Por medio del presente documento, EL CONTRATANTE contrata los servicios profesionales independientes de EL CONTRATISTA para que ejecute [TU TEXTO AQUÍ]..."</em>
+                                        </small>
+                                    </div>
+                                </div>
+
                                 <!-- SECCIÓN CONSIGNACIÓN DE MATERIALES (ANEXO II) -->
                                 <div class="consignacion-section-card" id="wiz-consignacion-wrapper" style="margin-top: 1.8rem; background: var(--bg-panel); border: 1px solid var(--glass-border); border-left: 4px solid #3B82F6; border-radius: 14px; padding: 1.2rem 1.4rem;">
                                     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
@@ -923,6 +984,37 @@
 
                             <!-- Flujo de Aprobación Legal y Carga de Contrato Rubricado -->
                             <div id="wizard-rubrication-box"></div>
+
+                            <!-- Barra de Herramientas de Edición Interactiva del Contrato -->
+                            <div class="contract-editor-toolbar" style="margin-top: 1.5rem; margin-bottom: 0.8rem; background: var(--bg-panel); border: 1px solid var(--glass-border); border-radius: 12px; padding: 0.85rem 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
+                                <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                                    <span style="font-weight: 700; font-size: 0.92rem; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+                                        <span>📝</span> <span>Redacción del Documento:</span>
+                                    </span>
+                                    <span id="contract-edit-mode-badge" class="badge-tag" style="background: rgba(100, 116, 139, 0.12); color: var(--text-muted); border-color: rgba(100, 116, 139, 0.3); font-size: 0.78rem;">
+                                        👁️ Modo Lectura
+                                    </span>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" id="btn-toggle-contract-edit" class="btn btn-outline" style="font-size: 0.82rem; padding: 0.4rem 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                        <span>✏️</span> <span>Habilitar Edición en Pantalla</span>
+                                    </button>
+                                    <button type="button" id="btn-save-custom-contract" class="btn btn-primary hidden" style="font-size: 0.82rem; padding: 0.4rem 0.85rem; font-weight: 600; background: #059669; border-color: #059669; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                        <span>💾</span> <span>Guardar Cambios</span>
+                                    </button>
+                                    <button type="button" id="btn-reset-contract-text" class="btn btn-outline" style="font-size: 0.82rem; padding: 0.4rem 0.7rem; color: #DC2626; border-color: rgba(220, 38, 38, 0.3);" title="Revertir cualquier cambio manual y restaurar la plantilla oficial predeterminada">
+                                        <span>🔄</span> <span>Restaurar Plantilla</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Banner Informativo del Modo Edición (oculto por defecto) -->
+                            <div id="contract-edit-banner" class="hidden" style="margin-bottom: 0.8rem; background: rgba(59, 130, 246, 0.08); border: 1px dashed #3B82F6; border-radius: 10px; padding: 0.75rem 1rem; font-size: 0.82rem; color: #1D4ED8; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;">
+                                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                    <span style="font-size: 1.2rem;">✍️</span>
+                                    <span><strong>Modo Edición Activo:</strong> Puedes hacer clic sobre cualquier cláusula, párrafo o título del contrato para modificar, agregar o suprimir texto directamente en pantalla. Al terminar, presiona <strong>"💾 Guardar Cambios"</strong>. La exportación en Word (.docx) descargará exactamente lo que edites aquí.</span>
+                                </div>
+                            </div>
 
                             <!-- Live Contract Document Viewer -->
                             <div class="contract-paper-viewer" id="contract-paper-viewer">
