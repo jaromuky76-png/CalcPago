@@ -2691,7 +2691,7 @@ function loadDraftIntoForm(draft, targetStep = null) {
     setVal('wiz-cuenta', draft.cuenta_bancaria || '');
     setVal('wiz-titular', draft.titular_cuenta || '');
     setVal('wiz-inss', draft.inss || '');
-    setVal('wiz-fuel-rate', draft.tarifa_combustible !== undefined ? draft.tarifa_combustible : 12.0);
+    setVal('wiz-fuel-rate', (draft.tarifa_combustible !== undefined && draft.tarifa_combustible > 0) ? draft.tarifa_combustible : '');
     setVal('contract-day', draft.dia !== undefined ? draft.dia : 23);
     setVal('contract-month', draft.mes || 'octubre');
 
@@ -3053,22 +3053,22 @@ async function loadProveedoresRegistrados() {
 
     const bajoCeroProv = {
         nombre_comercial: "BAJO CERO",
-        nombre_representante: "Roberto José Somarriba López",
-        cedula: "081-140582-0002A",
-        ruc: "J0810000001234",
-        matricula: "MAT-CH-2023-889",
+        nombre_representante: "",
+        cedula: "",
+        ruc: "",
+        matricula: "",
         regimen: "Régimen General",
         estado_civil: "casado",
-        profesion: "Ingeniero Mecánico",
+        profesion: "",
         domicilio: "Chinandega",
-        telefono: "8899-7766",
-        correo: "bajocero.servicios@gmail.com",
-        contacto_operativo: "ventas.bajocero@empresa.com (Ing. Somarriba)",
-        direccion: "Costado Norte Parque Central 2c al Oeste, Chinandega",
+        telefono: "",
+        correo: "",
+        contacto_operativo: "",
+        direccion: "",
         banco: "BAC Credomatic",
-        cuenta_bancaria: "365890123",
-        titular_cuenta: "Roberto José Somarriba López",
-        inss: "445890-1",
+        cuenta_bancaria: "",
+        titular_cuenta: "",
+        inss: "",
         dia: 28,
         mes: "septiembre",
         anio: 2026,
@@ -3113,7 +3113,7 @@ async function loadProveedoresRegistrados() {
             ]
         },
         contract_variant: "FORANEO",
-        tarifa_combustible: 12.0,
+        tarifa_combustible: 0,
         condicion_pago: "SEMANAL",
         garantia_instalacion: 12,
         garantia_mantenimiento: "30",
@@ -3121,22 +3121,9 @@ async function loadProveedoresRegistrados() {
         consignacion_activa: false,
         materiales: [],
         tarifas: bajoCeroTarifas,
-        documentos: {
-            formato_alta: { fileName: "Formato_Alta_BajoCero.pdf", fileSize: "1.2 MB", validated: true, notRequired: false },
-            cedula: { fileName: "Cedula_Roberto_Somarriba.pdf", fileSize: "840 KB", validated: true, notRequired: false },
-            ruc: { fileName: "RUC_BajoCero_Chinandega.pdf", fileSize: "420 KB", validated: true, notRequired: false },
-            matricula: { fileName: "Matricula_Alcaldia_Chinandega_2026.pdf", fileSize: "680 KB", validated: true, notRequired: false },
-            factura: { fileName: "Factura_Membretada_BajoCero.pdf", fileSize: "510 KB", validated: true, notRequired: false },
-            constitucion: { notRequired: true, justification: "Persona Natural con Matrícula y Negocio Directo" },
-            poder: { notRequired: true, justification: "Titular directo / Sin apoderado intermedio" },
-            constancia_dgi: { fileName: "Constancia_Inscripcion_DGI_BajoCero.pdf", fileSize: "720 KB", validated: true, notRequired: false },
-            iva: { fileName: "Constancia_Responsable_IVA_BajoCero.pdf", fileSize: "490 KB", validated: true, notRequired: false },
-            solvencia: { fileName: "Solvencia_Fiscal_Chinandega_Vigente.pdf", fileSize: "550 KB", validated: true, notRequired: false },
-            beneficiario: { notRequired: true, justification: "Persona Natural directa" },
-            etica: { fileName: "Declaracion_Etica_Firmada_Somarriba.pdf", fileSize: "920 KB", validated: true, notRequired: false },
-            inss: { fileName: "Constancia_Afiliacion_INSS_BajoCero.pdf", fileSize: "630 KB", validated: true, notRequired: false }
-        },
-        estado: 'ACTIVO'
+        documentos: {},
+        estado: 'BORRADOR',
+        progreso: 45
     };
 
     const bajoCeroExistingIdx = proveedoresRegistrados.findIndex(p => {
@@ -3144,11 +3131,42 @@ async function loadProveedoresRegistrados() {
         return k === 'BAJO CERO' || k === 'BAJOCERO' || k === 'BAJO CERO CHINANDEGA';
     });
     if (bajoCeroExistingIdx >= 0) {
-        proveedoresRegistrados[bajoCeroExistingIdx].materiales = [];
-        proveedoresRegistrados[bajoCeroExistingIdx].consignacion_activa = false;
+        const curProv = proveedoresRegistrados[bajoCeroExistingIdx];
+        // Limpiar cualquier residuo de datos ficticios previos de Somarriba o documentos simulados
+        if (curProv.nombre_representante && curProv.nombre_representante.includes('Somarriba')) {
+            curProv.nombre_representante = '';
+            curProv.cedula = '';
+            curProv.ruc = '';
+            curProv.matricula = '';
+            curProv.profesion = '';
+            curProv.telefono = '';
+            curProv.correo = '';
+            curProv.contacto_operativo = '';
+            curProv.direccion = '';
+            curProv.cuenta_bancaria = '';
+            curProv.titular_cuenta = '';
+            curProv.inss = '';
+            curProv.tarifa_combustible = 0;
+            curProv.documentos = {};
+            curProv.estado = 'BORRADOR';
+            curProv.progreso = 45;
+        }
+        curProv.materiales = [];
+        curProv.consignacion_activa = false;
     } else {
         proveedoresRegistrados.splice(1, 0, bajoCeroProv);
     }
+
+    // Purgar borrador residual en localStorage si tiene los datos ficticios
+    try {
+        const activeDraftJson = localStorage.getItem(STORAGE_KEY_WIZARD_DRAFT);
+        if (activeDraftJson) {
+            const d = JSON.parse(activeDraftJson);
+            if (d.nombre_representante && d.nombre_representante.includes('Somarriba')) {
+                localStorage.removeItem(STORAGE_KEY_WIZARD_DRAFT);
+            }
+        }
+    } catch(e) {}
 
     if (!tablaOferta['BAJO CERO']) {
         tablaOferta['BAJO CERO'] = {};
@@ -3179,19 +3197,20 @@ async function loadProveedoresRegistrados() {
             }));
             proveedoresRegistrados.push({
                 nombre_comercial: pName,
-                nombre_representante: pName,
-                cedula: 'En trámite',
+                nombre_representante: '',
+                cedula: '',
                 ruc: '',
                 regimen: 'Régimen de Cuota Fija',
                 banco: 'BAC Credomatic',
                 cuenta_bancaria: '',
-                titular_cuenta: pName,
-                telefono: '8888-0000',
-                correo: 'contacto@proveedor.com',
-                direccion: 'Managua, Nicaragua',
-                tarifa_combustible: 12.0,
+                titular_cuenta: '',
+                telefono: '',
+                correo: '',
+                direccion: '',
+                tarifa_combustible: 0,
                 tarifas: actList,
-                documentos: {}
+                documentos: {},
+                estado: 'BORRADOR'
             });
         }
     });
@@ -7526,9 +7545,9 @@ function renderDirectory() {
 
     filtered.forEach(prov => {
         const provName = prov.nombre_comercial || prov.nombre || 'Contratista';
-        const repName = prov.nombre_representante || provName;
+        const repName = (prov.nombre_representante && prov.nombre_representante.trim()) ? prov.nombre_representante.trim() : '<em style="color: #9CA3AF; font-weight: normal;">Pendiente de asignar</em>';
         const totalActs = (prov.tarifas && prov.tarifas.length) || (tablaOferta[provName] ? Object.keys(tablaOferta[provName]).length : 0);
-        const fuelRate = prov.tarifa_combustible !== undefined ? prov.tarifa_combustible : 12.0;
+        const fuelRate = (prov.tarifa_combustible !== undefined && prov.tarifa_combustible > 0) ? prov.tarifa_combustible : 0;
         const isDraft = prov.estado === 'BORRADOR';
         const prog = prov.progreso !== undefined ? prov.progreso : (isDraft ? calculateOnboardingProgress(prov) : 100);
         const hasRubricado = !!(prov.contrato_rubricado && prov.contrato_rubricado.fileName);
@@ -7588,7 +7607,7 @@ function renderDirectory() {
                     </div>
                     <div class="directory-data-row">
                         <span class="directory-data-label">Tarifa Combustible:</span>
-                        <span class="directory-data-value">C$ ${Number(fuelRate).toFixed(2)}/km</span>
+                        <span class="directory-data-value">${fuelRate > 0 ? `C$ ${Number(fuelRate).toFixed(2)}/km` : '<em style="color:#DC2626;">Por acordar</em>'}</span>
                     </div>
                 </div>
             </div>
