@@ -7407,11 +7407,21 @@ function initDirectoryModule() {
     document.getElementById('btn-close-expediente-bottom')?.addEventListener('click', () => {
         document.getElementById('expediente-modal-overlay')?.classList.add('hidden');
     });
+    document.getElementById('expediente-modal-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'expediente-modal-overlay') {
+            document.getElementById('expediente-modal-overlay')?.classList.add('hidden');
+        }
+    });
     document.getElementById('close-edit-tarifas')?.addEventListener('click', () => {
         document.getElementById('edit-tarifas-modal-overlay')?.classList.add('hidden');
     });
     document.getElementById('btn-cancel-tarifas')?.addEventListener('click', () => {
         document.getElementById('edit-tarifas-modal-overlay')?.classList.add('hidden');
+    });
+    document.getElementById('edit-tarifas-modal-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'edit-tarifas-modal-overlay') {
+            document.getElementById('edit-tarifas-modal-overlay')?.classList.add('hidden');
+        }
     });
 
     // Modal de Contrato Rubricado
@@ -7639,55 +7649,72 @@ function openExpedienteModal(prov) {
     if (title) title.textContent = `📁 Expediente Digital: ${provName}`;
 
     if (infoBar) {
+        infoBar.className = 'expediente-info-bar-grid';
+        infoBar.removeAttribute('style');
         infoBar.innerHTML = `
-            <div><strong>Representante:</strong> ${prov.nombre_representante || provName}</div>
-            <div><strong>RUC/Cédula:</strong> ${prov.ruc || prov.cedula || 'N/D'}</div>
-            <div><strong>Régimen:</strong> ${prov.regimen || 'Cuota Fija'}</div>
-            <div><strong>Cuenta:</strong> ${prov.banco || 'BAC'} ${prov.cuenta_bancaria || ''}</div>
+            <div class="expediente-info-item">
+                <span class="label">Representante</span>
+                <span class="val" title="${escapeHtml(prov.nombre_representante || provName)}">${escapeHtml(prov.nombre_representante || provName)}</span>
+            </div>
+            <div class="expediente-info-item">
+                <span class="label">RUC / Cédula</span>
+                <span class="val">${escapeHtml(prov.ruc || prov.cedula || 'N/D')}</span>
+            </div>
+            <div class="expediente-info-item">
+                <span class="label">Régimen</span>
+                <span class="val">${escapeHtml(prov.regimen || 'Cuota Fija')}</span>
+            </div>
+            <div class="expediente-info-item">
+                <span class="label">Cuenta Bancaria</span>
+                <span class="val">${escapeHtml(prov.banco || 'BAC')} ${escapeHtml(prov.cuenta_bancaria || '')}</span>
+            </div>
         `;
     }
 
     const reqDocs = DOCS_BY_REGIMEN[prov.regimen] || DOCS_BY_REGIMEN["Régimen de Cuota Fija"];
     if (docsList) {
+        docsList.className = 'expediente-docs-grid';
+        docsList.removeAttribute('style');
         docsList.innerHTML = '';
         const provDocs = prov.documentos || {};
 
-        // 1. Tarjeta Especial: Contrato Formal Rubricado
+        // 1. Tarjeta Especial: Contrato Marco Rubricado
         const rubricado = prov.contrato_rubricado;
         const hasRubricado = !!(rubricado && rubricado.fileName);
 
         const contractCard = document.createElement('div');
-        contractCard.className = `doc-checklist-card ${hasRubricado ? 'card-rubricado completed' : ''}`;
-        contractCard.style.marginBottom = '1rem';
+        contractCard.className = `expediente-card-compact ${hasRubricado ? 'completed' : 'pending'}`;
+        contractCard.style.gridColumn = '1 / -1';
+        contractCard.style.padding = '0.85rem 1rem';
         contractCard.innerHTML = `
-            <div class="doc-card-top">
-                <div style="flex: 1;">
-                    <div class="doc-info-title" style="display: flex; align-items: center; gap: 0.4rem;">
+            <div class="expediente-card-top">
+                <div style="flex: 1; min-width: 0;">
+                    <div class="expediente-card-title" style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.92rem;">
                         <span>📜</span>
                         <strong>Contrato Marco de Servicios (Legal & Rúbricas)</strong>
                     </div>
-                    <div class="doc-info-sub" style="margin-top: 3px;">
+                    <div class="expediente-card-desc" style="-webkit-line-clamp: 2;">
                         ${hasRubricado ? 
                             `<strong>${escapeHtml(rubricado.fileName)}</strong> (${rubricado.fileSize || 'N/D'}) • Registrado: ${rubricado.uploadDate || 'Previamente'}` : 
                             'Borrador generado por CalcPago. Pendiente de visto bueno legal y firma rubricada en cada hoja.'}
                     </div>
                     ${(hasRubricado && rubricado.observaciones) ? `
-                        <div style="font-size: 0.78rem; color: #059669; margin-top: 4px;">
+                        <div style="font-size: 0.74rem; color: #059669; margin-top: 3px;">
                             Dictamen Legal: <em>"${escapeHtml(rubricado.observaciones)}"</em>
                         </div>
                     ` : ''}
                 </div>
-                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; margin-left: 0.75rem;">
                     <span class="status-badge ${hasRubricado ? 'uploaded' : 'pending'}">
                         ${hasRubricado ? '✓ Rubricado' : '⏳ Pendiente Rúbrica'}
                     </span>
-                    <div style="display: flex; gap: 0.4rem; margin-top: 4px;">
+                    <div style="display: flex; gap: 0.4rem; margin-top: 2px;">
                         ${hasRubricado ? `
-                            <button type="button" class="btn btn-outline" id="btn-exp-view-rubricado" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; color: #059669; border-color: rgba(16,185,129,0.5);">
-                                📥 Ver Rubricado
+                            <button type="button" class="btn btn-outline" id="btn-exp-view-rubricado" style="font-size: 0.75rem; padding: 0.2rem 0.55rem; color: #059669; border-color: rgba(16,185,129,0.5);">
+                                📥 Ver
                             </button>
                         ` : ''}
-                        <button type="button" class="btn btn-outline" id="btn-exp-manage-rubricado" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; color: var(--primary); border-color: var(--primary);">
+                        <button type="button" class="btn btn-outline" id="btn-exp-manage-rubricado" style="font-size: 0.75rem; padding: 0.2rem 0.55rem; color: var(--primary); border-color: var(--primary);">
                             ${hasRubricado ? '🔄 Reemplazar' : '📤 Subir Rubricado'}
                         </button>
                     </div>
@@ -7706,48 +7733,72 @@ function openExpedienteModal(prov) {
             });
         }, 50);
 
-        // Subtítulo divisor
+        // Subtítulo divisor con indicador de progreso
+        const totalDocs = reqDocs.length;
+        let completedCount = 0;
+        reqDocs.forEach(doc => {
+            const d = provDocs[doc.id] || {};
+            if (d.notRequired || d.validated) completedCount++;
+        });
+        const pct = totalDocs > 0 ? Math.round((completedCount / totalDocs) * 100) : 100;
+
         const divider = document.createElement('div');
-        divider.style.cssText = 'font-weight: 700; font-size: 0.85rem; color: var(--text-muted); margin: 0.8rem 0 0.4rem 0; border-top: 1px solid var(--glass-border); padding-top: 0.8rem;';
-        divider.textContent = '📋 Requisitos Documentales del Expediente:';
+        divider.style.gridColumn = '1 / -1';
+        divider.style.display = 'flex';
+        divider.style.justifyContent = 'space-between';
+        divider.style.alignItems = 'center';
+        divider.style.margin = '0.5rem 0 0.2rem 0';
+        divider.style.borderTop = '1px solid var(--glass-border)';
+        divider.style.paddingTop = '0.6rem';
+        divider.innerHTML = `
+            <span style="font-weight: 700; font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+                📋 Requisitos del Expediente (${totalDocs} documentos)
+            </span>
+            <span class="status-badge ${pct === 100 ? 'uploaded' : 'pending'}" style="font-size: 0.74rem;">
+                ${completedCount} de ${totalDocs} Cumplidos (${pct}%)
+            </span>
+        `;
         docsList.appendChild(divider);
 
         reqDocs.forEach(doc => {
             const docData = provDocs[doc.id] || {};
             const isNotReq = !!docData.notRequired;
             const hasDoc = !isNotReq && docData.validated;
-            const isResolved = isNotReq || hasDoc;
 
-            let badgeHtml = '';
-            if (isNotReq) {
-                badgeHtml = `<span class="status-badge not-required-badge">⚪ No Requerido</span>`;
-            } else if (hasDoc) {
-                badgeHtml = `<span class="status-badge uploaded">✓ En Expediente</span>`;
-            } else {
-                badgeHtml = `<span class="status-badge pending">Pendiente</span>`;
-            }
+            let cardClass = 'pending';
+            let badgeClass = 'missing';
+            let badgeText = 'Pendiente';
+            let fileText = 'Sin archivo adjunto';
 
-            let detailHtml = '';
             if (isNotReq) {
-                detailHtml = `⚪ Exonerado / No necesario${docData.justification ? ` — <em>${docData.justification}</em>` : ''}`;
+                cardClass = 'not-required';
+                badgeClass = 'exempt';
+                badgeText = '⚪ Exonerado';
+                fileText = docData.justification ? `Exento: ${docData.justification}` : 'No aplica a su modalidad';
             } else if (hasDoc) {
-                detailHtml = `Archivo: ${docData.fileName || 'Digitalizado'}`;
-            } else {
-                detailHtml = 'Sin archivo adjunto';
+                cardClass = 'completed';
+                badgeClass = 'verified';
+                badgeText = '✓ Verificado';
+                fileText = docData.fileName || 'Digitalizado en expediente';
             }
 
             const docItem = document.createElement('div');
-            docItem.className = `doc-checklist-card ${hasDoc ? 'completed' : ''} ${isNotReq ? 'not-required' : ''}`;
+            docItem.className = `expediente-card-compact ${cardClass}`;
             docItem.innerHTML = `
-                <div class="doc-card-top">
-                    <div>
-                        <div class="doc-info-title">${doc.name}</div>
-                        <div class="doc-info-sub">${doc.desc}</div>
+                <div class="expediente-card-top">
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="expediente-card-title" title="${escapeHtml(doc.name)}">${escapeHtml(doc.name)}</div>
+                        <div class="expediente-card-desc" title="${escapeHtml(doc.desc)}">${escapeHtml(doc.desc)}</div>
                     </div>
-                    ${badgeHtml}
+                    <span class="status-badge ${isNotReq ? 'not-required-badge' : (hasDoc ? 'uploaded' : 'pending')}" style="flex-shrink: 0; font-size: 0.72rem; padding: 0.15rem 0.45rem;">
+                        ${badgeText}
+                    </span>
                 </div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem;">
-                    ${detailHtml}
+                <div class="expediente-card-bottom">
+                    <span class="expediente-file-tag ${badgeClass}" title="${escapeHtml(fileText)}">
+                        📄 ${escapeHtml(fileText)}
+                    </span>
+                    ${hasDoc && docData.fileSize ? `<span style="color: #64748B; font-size: 0.7rem; flex-shrink: 0;">${escapeHtml(docData.fileSize)}</span>` : ''}
                 </div>
             `;
             docsList.appendChild(docItem);
