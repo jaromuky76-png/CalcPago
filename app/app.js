@@ -2610,6 +2610,15 @@ function checkActiveWizardDraft() {
 
     try {
         const draft = JSON.parse(draftJson);
+
+        // Si el borrador corresponde a la muestra artificial inyectada previamente, purgarlo de inmediato
+        if (draft.nombre_representante === "Roberto José Somarriba López" && draft.ruc === "J0810000001234") {
+            localStorage.removeItem(STORAGE_KEY_WIZARD_DRAFT);
+            if (banner) banner.classList.add('hidden');
+            resetWizardForm();
+            return;
+        }
+
         const name = draft.nombre_comercial || draft.nombre_representante || 'Contratista en proceso';
         const prog = draft.progreso !== undefined ? draft.progreso : calculateOnboardingProgress(draft);
 
@@ -2902,109 +2911,6 @@ const DOCS_BY_REGIMEN = {
     ]
 };
 
-// Perfil modelo oficial de contratista foráneo (BAJO CERO - Chinandega)
-function getBajoCeroSampleData() {
-    return {
-        nombre_comercial: "BAJO CERO",
-        nombre_representante: "Roberto José Somarriba López",
-        cedula: "081-140582-0002A",
-        ruc: "J0810000001234",
-        matricula: "MAT-CH-2023-889",
-        regimen: "Régimen General",
-        estado_civil: "casado",
-        profesion: "Ingeniero Mecánico",
-        domicilio: "Chinandega",
-        telefono: "8899-7766",
-        correo: "bajocero.servicios@gmail.com",
-        contacto_operativo: "ventas.bajocero@empresa.com (Ing. Somarriba)",
-        direccion: "Costado Norte Parque Central 2c al Oeste, Chinandega",
-        banco: "BAC Credomatic",
-        cuenta_bancaria: "365890123",
-        titular_cuenta: "Roberto José Somarriba López",
-        inss: "445890-1",
-        dia: 28,
-        mes: "septiembre",
-        anio: 2026,
-        tipo_cobertura: "FORANEA",
-        base_operativa: "Chinandega",
-        departamentos: "Chinandega, León",
-        geocerca_km: 14.0,
-        geocerca_modalidad: "MAPA_POLIGONO",
-        geocerca_url: "https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13",
-        geocerca_data: {
-            providerName: "BAJO CERO",
-            contractNum: "CONT-2026-OCC-01",
-            mapTitle: "Geocercas BAJO CERO Chinandega",
-            zones: [
-                {
-                    name: "Geocerca Reducida Chinandega",
-                    desc: "Cobertura urbana propuesta reducida. Fuera de esta geocerca aplica kilometraje segun anexo contractual.",
-                    coordsCount: 20,
-                    coords: [
-                        { lat: 12.645884, lng: -87.1478391 },
-                        { lat: 12.6350677, lng: -87.1492939 },
-                        { lat: 12.6270151, lng: -87.1485171 },
-                        { lat: 12.6165034, lng: -87.148663 },
-                        { lat: 12.6079093, lng: -87.1476044 },
-                        { lat: 12.6074906, lng: -87.1415962 },
-                        { lat: 12.6080349, lng: -87.1353735 },
-                        { lat: 12.6080349, lng: -87.1265759 },
-                        { lat: 12.6088724, lng: -87.1207394 },
-                        { lat: 12.6148286, lng: -87.1147742 },
-                        { lat: 12.6180524, lng: -87.1158471 },
-                        { lat: 12.6270988, lng: -87.1219839 },
-                        { lat: 12.6322904, lng: -87.1234431 },
-                        { lat: 12.6366861, lng: -87.1278633 },
-                        { lat: 12.6417937, lng: -87.1312966 },
-                        { lat: 12.6441381, lng: -87.1345582 },
-                        { lat: 12.645394, lng: -87.1390213 },
-                        { lat: 12.6454778, lng: -87.1430983 },
-                        { lat: 12.645884, lng: -87.1478391 },
-                        { lat: 12.645884, lng: -87.1478391 }
-                    ]
-                }
-            ]
-        },
-        contract_variant: "FORANEO",
-        tarifa_combustible: 12.0,
-        condicion_pago: "SEMANAL",
-        garantia_instalacion: 12,
-        garantia_mantenimiento: "30",
-        politica_uniformes: "SINSA_OBLIGATORIO",
-        consignacion_activa: true,
-        tarifas: [
-            { rms: "130196450", descripcion: "INSTALACION BASICA DE AIRE ACONDICIONADO 12-18-24 MIL BTU", tarifa: 1500.00 },
-            { rms: "130196452", descripcion: "INSTALACION BASICA DE AIRE ACONDICIONADO > 24 MIL BTU", tarifa: 2200.00 },
-            { rms: "130196451", descripcion: "DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU", tarifa: 800.00 },
-            { rms: "137301040", descripcion: "DESINSTALACION DE AIRE 12-18-24 MIL BTU", tarifa: 450.00 },
-            { rms: "101026023", descripcion: "MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO", tarifa: 750.00 }
-        ],
-        documentos: {
-            formato_alta: { fileName: "Formato_Alta_BajoCero.pdf", fileSize: "1.2 MB", validated: true, notRequired: false },
-            cedula: { fileName: "Cedula_Roberto_Somarriba.pdf", fileSize: "840 KB", validated: true, notRequired: false },
-            ruc: { fileName: "RUC_BajoCero_Chinandega.pdf", fileSize: "420 KB", validated: true, notRequired: false },
-            matricula: { fileName: "Matricula_Alcaldia_Chinandega_2026.pdf", fileSize: "680 KB", validated: true, notRequired: false },
-            factura: { fileName: "Factura_Membretada_BajoCero.pdf", fileSize: "510 KB", validated: true, notRequired: false },
-            constitucion: { notRequired: true, justification: "Persona Natural con Matrícula y Negocio Directo" },
-            poder: { notRequired: true, justification: "Titular directo / Sin apoderado intermedio" },
-            constancia_dgi: { fileName: "Constancia_Inscripcion_DGI_BajoCero.pdf", fileSize: "720 KB", validated: true, notRequired: false },
-            iva: { fileName: "Constancia_Responsable_IVA_BajoCero.pdf", fileSize: "490 KB", validated: true, notRequired: false },
-            solvencia: { fileName: "Solvencia_Fiscal_Chinandega_Vigente.pdf", fileSize: "550 KB", validated: true, notRequired: false },
-            beneficiario: { notRequired: true, justification: "Persona Natural directa" },
-            etica: { fileName: "Declaracion_Etica_Firmada_Somarriba.pdf", fileSize: "920 KB", validated: true, notRequired: false },
-            inss: { fileName: "Constancia_Afiliacion_INSS_BajoCero.pdf", fileSize: "630 KB", validated: true, notRequired: false }
-        },
-        materiales: [
-            { rms: "101016766", descripcion: "KIT DE TUBERÍA DE COBRE 1/4 Y 3/8 (3 METROS)", unidad: "JGO", cantidad: 5, costo_unitario: 450.00 },
-            { rms: "101016773", descripcion: "CABLE DE USO RUDO 3X12 AWG", unidad: "MTR", cantidad: 30, costo_unitario: 65.00 },
-            { rms: "101016781", descripcion: "CINTA VINILICA AISLANTE NEGRA", unidad: "ROLLO", cantidad: 10, costo_unitario: 45.00 },
-            { rms: "101016790", descripcion: "BASE METÁLICA DE CONDENSADORA 12K-24K", unidad: "PAR", cantidad: 4, costo_unitario: 380.00 },
-            { rms: "101016802", descripcion: "BREAKER TERMOMAGNÉTICO 2 POLOS 20A", unidad: "UND", cantidad: 4, costo_unitario: 220.00 }
-        ],
-        estado: 'ACTIVO'
-    };
-}
-
 // Carga inicial de proveedores registrados
 async function loadProveedoresRegistrados() {
     // 1. Intentar cargar desde localStorage
@@ -3109,22 +3015,12 @@ async function loadProveedoresRegistrados() {
     delete tablaOferta['ENERGY SYSTEMS'];
     setupEnergyAliases();
 
-    // 2.6 Consolidar proveedor oficial foráneo BAJO CERO (Chinandega / Occidente)
+    // Limpiar cualquier residuo de la muestra artificial de BAJO CERO (Roberto José Somarriba López) si quedó en memoria local
     proveedoresRegistrados = proveedoresRegistrados.filter(p => {
-        const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
-        return k !== 'BAJO CERO' && k !== 'BAJOCERO' && k !== 'BAJO CERO CHINANDEGA';
+        const rep = (p.nombre_representante || '').trim();
+        const ruc = (p.ruc || '').trim();
+        return !(rep === "Roberto José Somarriba López" && ruc === "J0810000001234");
     });
-    const bajoCeroProv = getBajoCeroSampleData();
-    proveedoresRegistrados.push(bajoCeroProv);
-
-    if (!tablaOferta['BAJO CERO']) {
-        tablaOferta['BAJO CERO'] = {};
-    }
-    bajoCeroProv.tarifas.forEach(t => {
-        tablaOferta['BAJO CERO'][t.descripcion] = t.tarifa;
-    });
-
-    localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
 
     // 3. Si tablaOferta tiene proveedores que no están en el directorio, agregarlos como base
     Object.keys(tablaOferta).forEach(rawPName => {
@@ -3323,13 +3219,6 @@ function initOnboardingWizard() {
             renderWizardDocs();
             triggerWizardAutosave();
         }
-    });
-
-    // Cargar perfil modelo oficial de BAJO CERO (Chinandega)
-    document.getElementById('btn-load-bajocero-sample')?.addEventListener('click', () => {
-        loadDraftIntoForm(getBajoCeroSampleData(), currentWizardStep || 1);
-        saveActiveDraftToStorage();
-        alert('✓ Expediente modelo de BAJO CERO (Chinandega) cargado con éxito, incluyendo sus 13 recaudos del Paso 2, geocerca pericial de 20 vértices y tarifas acordadas.');
     });
 
     // Reset wizard
