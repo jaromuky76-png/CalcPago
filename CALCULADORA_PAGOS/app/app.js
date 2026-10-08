@@ -3089,7 +3089,7 @@ function switchModuleView(targetViewId) {
         geocercasView.classList.remove('hidden');
         if (!currentGeocercaData || !currentGeocercaData.zones || currentGeocercaData.zones.length === 0) {
             if (typeof processKMLContent === 'function') {
-                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas CLIMA Occidente');
+                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
             }
         }
         if (window.geocercaLeafletMap) {
@@ -3344,15 +3344,15 @@ function initOnboardingWizard() {
         if (radBox) radBox.classList.add('hidden');
 
         if (typeof processKMLContent === 'function') {
-            processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas CLIMA Occidente');
+            processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
         }
 
         if (statusText) {
-            statusText.textContent = 'Geocerca Vinculada: 2 Zonas (Chinandega y León) | 28 Vértices GPS Inmutables';
+            statusText.textContent = 'Geocerca Vinculada: 1 Zona (Chinandega) | 20 Vértices GPS Inmutables';
         }
 
         triggerWizardAutosave();
-        alert('⭐ Mapa oficial de Occidente vinculado con éxito (28 vértices GPS periciales inmutables).');
+        alert('⭐ Mapa oficial de Chinandega (BAJO CERO) vinculado con éxito (20 vértices GPS periciales inmutables).');
     });
 
     // Botón Abrir en Visor de Geocercas desde el Asistente
@@ -3361,31 +3361,44 @@ function initOnboardingWizard() {
         const urlInputWiz = document.getElementById('wiz-geocerca-url');
         const urlInputGeo = document.getElementById('geocerca-url-input');
 
-        const nom = document.getElementById('wiz-nombre-comercial')?.value || document.getElementById('wiz-nombre-rep')?.value || 'CLIMA OCCIDENTE';
+        const nom = document.getElementById('wiz-nombre-comercial')?.value || document.getElementById('wiz-nombre-rep')?.value || 'BAJO CERO CHINANDEGA';
         if (provInput) provInput.value = nom.toUpperCase();
         if (urlInputWiz && urlInputGeo) urlInputGeo.value = urlInputWiz.value;
 
         if (typeof processKMLContent === 'function' && (!currentGeocercaData || !currentGeocercaData.zones || currentGeocercaData.zones.length === 0)) {
-            processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas CLIMA Occidente');
+            processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
         }
 
         switchModuleView('view-geocercas');
     });
 
-    // Listener para actualizar estado cuando el usuario escribe una URL en el wizard
-    document.getElementById('wiz-geocerca-url')?.addEventListener('input', (e) => {
-        const val = e.target.value.trim();
+    // Listener para actualizar estado cuando el usuario escribe o modifica una URL en el wizard
+    const updateWizardGeocercaFromUrl = (val) => {
         const statusText = document.getElementById('wiz-geocerca-status-text');
-        if (statusText) {
-            if (val.includes('1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc')) {
-                statusText.textContent = 'Geocerca Vinculada: 2 Zonas (Chinandega y León) | 28 Vértices GPS Inmutables';
-            } else if (val) {
+        if (val.includes('1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc')) {
+            if (typeof processKMLContent === 'function') {
+                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
+            }
+            if (statusText) {
+                statusText.textContent = 'Geocerca Vinculada: 1 Zona (Chinandega) | 20 Vértices GPS Inmutables';
+            }
+        } else if (val) {
+            if (statusText) {
                 statusText.textContent = 'Enlace Google My Maps asignado. Verificable en Visor de Geocercas.';
-            } else {
+            }
+        } else {
+            if (statusText) {
                 statusText.textContent = 'Pendiente: Ingrese URL de Google My Maps';
             }
         }
         triggerWizardAutosave();
+    };
+
+    document.getElementById('wiz-geocerca-url')?.addEventListener('input', (e) => {
+        updateWizardGeocercaFromUrl(e.target.value.trim());
+    });
+    document.getElementById('wiz-geocerca-url')?.addEventListener('change', (e) => {
+        updateWizardGeocercaFromUrl(e.target.value.trim());
     });
 
     // Cambio de Variante Contractual en Paso 4
@@ -7639,11 +7652,11 @@ function openTarifasModal(prov) {
    MÓDULO: GENERADOR DE ANEXO DE GEOCERCAS CONTRACTUALES
    ========================================================================== */
 
-// Datos de respaldo y demo del KML oficial del usuario (Occidente: Chinandega y León)
+// Datos de respaldo y demo del KML oficial del usuario (Occidente: Chinandega)
 const DEMO_OCCIDENTE_KML = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Geocercas CLIMA Occidente</name>
+    <name>Geocercas BAJO CERO Chinandega</name>
     <Folder>
       <name>Geocercas Reducidas CLIMA Occidente</name>
       <Placemark>
@@ -7678,32 +7691,12 @@ const DEMO_OCCIDENTE_KML = `<?xml version="1.0" encoding="UTF-8"?>
           </outerBoundaryIs>
         </Polygon>
       </Placemark>
-      <Placemark>
-        <name>Geocerca Reducida Leon</name>
-        <description>Cobertura urbana propuesta reducida. Fuera de esta geocerca aplica kilometraje segun anexo contractual.</description>
-        <Polygon>
-          <outerBoundaryIs>
-            <LinearRing>
-              <coordinates>
-                -86.900046,12.448009,0
-                -86.901483,12.433158,0
-                -86.891902,12.421661,0
-                -86.868907,12.420463,0
-                -86.858368,12.430284,0
-                -86.860764,12.444176,0
-                -86.87753,12.448248,0
-                -86.900046,12.448009,0
-              </coordinates>
-            </LinearRing>
-          </outerBoundaryIs>
-        </Polygon>
-      </Placemark>
     </Folder>
   </Document>
 </kml>`;
 
 let currentGeocercaData = {
-    providerName: 'CLIMA OCCIDENTE',
+    providerName: 'BAJO CERO CHINANDEGA',
     contractNum: 'CONT-2026-OCC-01',
     sourceLabel: '',
     zones: []
@@ -7732,9 +7725,9 @@ function initGeocercasModule() {
             const provIn = document.getElementById('geocerca-provider-input');
             const contIn = document.getElementById('geocerca-contract-input');
             if (urlIn) urlIn.value = 'https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13';
-            if (provIn) provIn.value = 'CLIMA OCCIDENTE';
+            if (provIn) provIn.value = 'BAJO CERO CHINANDEGA';
             if (contIn) contIn.value = 'CONT-2026-OCC-01';
-            processKMLContent(DEMO_OCCIDENTE_KML, 'Demo Oficial Occidente (Chinandega y León)');
+            processKMLContent(DEMO_OCCIDENTE_KML, 'Mapa Oficial: Geocercas BAJO CERO Chinandega');
         });
     }
 
@@ -7804,25 +7797,40 @@ async function handleProcessGeocercaUrl() {
     try {
         let kmlText = null;
 
-        // Intento 1: Proxy AllOrigins
+        // Intento 1: Proxy CorsProxy.io
         try {
-            const resp = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(kmlUrl)}`);
-            if (resp.ok) {
-                kmlText = await resp.text();
+            const resp1 = await fetch(`https://corsproxy.io/?${encodeURIComponent(kmlUrl)}`);
+            if (resp1.ok) {
+                const txt = await resp1.text();
+                if (txt && txt.includes('<kml')) kmlText = txt;
             }
         } catch (e1) {
-            console.warn('Proxy 1 falló, intentando Proxy 2...', e1);
+            console.warn('Proxy 1 falló...', e1);
         }
 
-        // Intento 2: Proxy CorsProxy.io
-        if (!kmlText || !kmlText.includes('<kml')) {
+        // Intento 2: Proxy CodeTabs
+        if (!kmlText) {
             try {
-                const resp2 = await fetch(`https://corsproxy.io/?${encodeURIComponent(kmlUrl)}`);
+                const resp2 = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(kmlUrl)}`);
                 if (resp2.ok) {
-                    kmlText = await resp2.text();
+                    const txt2 = await resp2.text();
+                    if (txt2 && txt2.includes('<kml')) kmlText = txt2;
                 }
             } catch (e2) {
                 console.warn('Proxy 2 falló...', e2);
+            }
+        }
+
+        // Intento 3: Proxy AllOrigins
+        if (!kmlText) {
+            try {
+                const resp3 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(kmlUrl)}`);
+                if (resp3.ok) {
+                    const txt3 = await resp3.text();
+                    if (txt3 && txt3.includes('<kml')) kmlText = txt3;
+                }
+            } catch (e3) {
+                console.warn('Proxy 3 falló...', e3);
             }
         }
 
@@ -7831,11 +7839,12 @@ async function handleProcessGeocercaUrl() {
         if (kmlText && kmlText.includes('<kml')) {
             processKMLContent(kmlText, 'Google My Maps (' + mid + ')');
         } else {
-            // Si coincide con el mapa del usuario de Occidente, cargar el KML directo
+            // Si coincide con el mapa del usuario de Occidente, cargar el KML directo actualizado
             if (mid === '1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc') {
-                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas CLIMA Occidente');
+                processKMLContent(DEMO_OCCIDENTE_KML, 'Google My Maps: Geocercas BAJO CERO Chinandega');
+                alert('✓ Geocerca de BAJO CERO Chinandega vinculada con éxito (20 vértices periciales inmutables).');
             } else {
-                alert('La política de seguridad de red bloqueó la descarga automática directa del mapa.\n\nPara cargarlo:\n1. En Google My Maps, haz clic en los 3 puntos y elige "Exportar a KML/KMZ".\n2. Haz clic en "Subir Archivo KML".\n\n¡O usa el botón "Cargar Demo Occidente" para probar la geocerca de Chinandega y León!');
+                alert('La política de seguridad de red bloqueó la descarga automática directa del mapa.\n\nPara cargarlo:\n1. En Google My Maps, haz clic en los 3 puntos y elige "Exportar a KML/KMZ".\n2. Haz clic en "Subir Archivo KML".\n\n¡O usa el botón "Cargar Mapa Oficial" para cargar la geocerca de Chinandega!');
             }
         }
     } catch (err) {
@@ -7848,7 +7857,7 @@ function processKMLContent(kmlText, sourceLabel) {
     const providerInput = document.getElementById('geocerca-provider-input');
     const contractInput = document.getElementById('geocerca-contract-input');
 
-    const providerName = (providerInput?.value || 'CLIMA OCCIDENTE').trim().toUpperCase();
+    const providerName = (providerInput?.value || document.getElementById('wiz-nombre-comercial')?.value || 'BAJO CERO CHINANDEGA').trim().toUpperCase();
     const contractNum = (contractInput?.value || 'CONT-2026-OCC-01').trim();
 
     const zones = parseKMLZones(kmlText);
@@ -7863,6 +7872,19 @@ function processKMLContent(kmlText, sourceLabel) {
         sourceLabel,
         zones
     };
+
+    // Actualizar estado dinámicamente en el Wizard con los vértices reales analizados
+    const totalVertices = zones.reduce((sum, z) => sum + z.coordinates.length, 0);
+    const zoneNames = zones.map(z => z.name.replace('Geocerca Reducida ', '')).join(' y ');
+    const wizStatusText = document.getElementById('wiz-geocerca-status-text');
+    if (wizStatusText) {
+        wizStatusText.textContent = `Geocerca Vinculada: ${zones.length} ${zones.length === 1 ? 'Zona' : 'Zonas'} (${zoneNames}) | ${totalVertices} Vértices GPS Inmutables`;
+    }
+
+    // Refrescar vista previa del contrato si está abierta
+    if (typeof renderContractPreview === 'function' && document.getElementById('contract-live-preview-content')) {
+        renderContractPreview();
+    }
 
     renderGeocercasResults(currentGeocercaData);
 }
