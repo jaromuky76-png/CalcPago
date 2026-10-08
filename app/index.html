@@ -664,11 +664,16 @@
 
                             <!-- Editable Tariff Table -->
                             <div class="tariff-table-wrapper" style="margin-top: 1.5rem;">
-                                <div class="table-actions-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
-                                    <h4 id="tariff-count-label" style="color: var(--primary);">Actividades Pactadas (0)</h4>
-                                    <button id="btn-add-wiz-tariff-row" class="btn btn-outline" style="font-size: 0.85rem; color: var(--primary); border-color: var(--primary);">
-                                        ➕ Añadir Actividad
-                                    </button>
+                                <div class="table-actions-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.6rem;">
+                                    <h4 id="tariff-count-label" style="color: var(--primary); margin: 0;">Actividades Pactadas (0)</h4>
+                                    <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                                        <button id="btn-download-wiz-tariffs" class="btn btn-outline" style="font-size: 0.85rem; color: #059669; border-color: #059669; display: inline-flex; align-items: center; gap: 0.4rem;" title="Descargar esta tabla de actividades pactadas en formato Excel (.xlsx)">
+                                            <span>📥</span> <span>Descargar Tabla (.xlsx)</span>
+                                        </button>
+                                        <button id="btn-add-wiz-tariff-row" class="btn btn-outline" style="font-size: 0.85rem; color: var(--primary); border-color: var(--primary);">
+                                            ➕ Añadir Actividad
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div class="table-scroll" style="max-height: 45vh;">

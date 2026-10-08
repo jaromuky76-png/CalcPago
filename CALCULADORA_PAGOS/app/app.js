@@ -3510,6 +3510,9 @@ function initOnboardingWizard() {
     // Botón descargar plantilla Excel
     document.getElementById('btn-download-offer-template')?.addEventListener('click', downloadContractorExcelTemplate);
 
+    // Botón descargar tabla de actividades pactadas
+    document.getElementById('btn-download-wiz-tariffs')?.addEventListener('click', downloadAgreedTariffsExcel);
+
     // Botón añadir fila de tarifa
     document.getElementById('btn-add-wiz-tariff-row')?.addEventListener('click', () => {
         wizardTarifas.push({
@@ -4420,6 +4423,92 @@ function downloadContractorExcelTemplate() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Oferta");
     XLSX.writeFile(wb, "PLANTILLA_OFERTA_MAESTROS_SINSA.xlsx");
+}
+
+// Descargar la tabla de actividades pactadas actualmente configurada en el Paso 3
+function downloadAgreedTariffsExcel() {
+    // Sincronizar por si hay algún input en edición activa en el DOM
+    const tbody = document.getElementById('wiz-tariff-body');
+    if (tbody) {
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((tr, idx) => {
+            if (wizardTarifas[idx]) {
+                const rmsInput = tr.querySelector(`[data-t-rms="${idx}"]`);
+                const descInput = tr.querySelector(`[data-t-desc="${idx}"]`);
+                const priceInput = tr.querySelector(`[data-t-price="${idx}"]`);
+                if (rmsInput) wizardTarifas[idx].rms = rmsInput.value.trim();
+                if (descInput) wizardTarifas[idx].descripcion = descInput.value.trim();
+                if (priceInput) wizardTarifas[idx].tarifa = parseFloat(priceInput.value) || 0;
+            }
+        });
+    }
+
+    if (!wizardTarifas || wizardTarifas.length === 0) {
+        alert("⚠️ No hay actividades pactadas registradas para descargar. Por favor añade o carga al menos una actividad primero.");
+        return;
+    }
+
+    const provName = (document.getElementById('wiz-nombre-comercial')?.value || '').trim() || 
+                     (document.getElementById('wiz-nombre-rep')?.value || '').trim() || 
+                     'CONTRATISTA';
+    const repName = (document.getElementById('wiz-nombre-rep')?.value || '').trim();
+    const ruc = (document.getElementById('wiz-ruc')?.value || '').trim();
+    const fuelRateVal = parseFloat(document.getElementById('wiz-fuel-rate')?.value) || 12.00;
+    const tipoCobertura = document.getElementById('wiz-tipo-cobertura')?.value || 'MANAGUA';
+    const condicionPago = document.getElementById('wiz-condicion-pago')?.value || 'SEMANAL';
+    const garantiaInst = document.getElementById('wiz-garantia-instalacion')?.value || '12';
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString();
+
+    const safeProv = provName.toUpperCase().replace(/[^A-Z0-9_-]/g, '_');
+
+    // Estructura de filas para la hoja de cálculo
+    const wsData = [
+        ["TABLA DE ACTIVIDADES Y TARIFAS PACTADAS - MAESTROS SINSA"],
+        ["CONTRATISTA / PROVEEDOR:", provName.toUpperCase()],
+        ["REPRESENTANTE LEGAL:", repName ? repName.toUpperCase() : "PENDIENTE"],
+        ["RUC / CÉDULA:", ruc || "PENDIENTE"],
+        ["COBERTURA OPERATIVA:", tipoCobertura, "CONDICIÓN DE PAGO:", condicionPago],
+        ["GARANTÍA INSTALACIÓN:", `${garantiaInst} MESES`, "FECHA DE REGISTRO:", dateStr],
+        [],
+        ["ITEM", "CODIGO RMS", "DESCRIPCIÓN DE LA ACTIVIDAD", "TARIFA PACTADA (C$)"]
+    ];
+
+    wizardTarifas.forEach((item, i) => {
+        wsData.push([
+            i + 1,
+            item.rms || "",
+            item.descripcion || "",
+            parseFloat(item.tarifa) || 0
+        ]);
+    });
+
+    if (fuelRateVal > 0) {
+        wsData.push([]);
+        wsData.push([
+            "-",
+            "COMBUSTIBLE",
+            "TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD",
+            fuelRateVal
+        ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Ajustar anchos de columnas
+    ws['!cols'] = [
+        { wch: 8 },  // ITEM
+        { wch: 18 }, // CODIGO RMS
+        { wch: 65 }, // DESCRIPCION
+        { wch: 22 }  // TARIFA
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Actividades Pactadas");
+
+    const fileName = `ACTIVIDADES_PACTADAS_${safeProv}.xlsx`;
+    XLSX.writeFile(wb, fileName);
 }
 
 // Obtener los datos actuales del formulario sin inventar valores por defecto si están vacíos
