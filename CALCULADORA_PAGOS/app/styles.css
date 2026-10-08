@@ -1413,6 +1413,21 @@ body {
     background: var(--primary-pastel);
 }
 
+.doc-upload-zone.dragover,
+.doc-checklist-card.dragover {
+    border-color: var(--primary) !important;
+    background: rgba(0, 168, 89, 0.12) !important;
+    box-shadow: 0 0 0 2px var(--primary), 0 4px 15px rgba(0, 168, 89, 0.2);
+    transform: scale(1.008);
+}
+
+.master-docs-dropzone:hover,
+.master-docs-dropzone.dragover {
+    border-color: var(--primary) !important;
+    background: rgba(0, 168, 89, 0.08) !important;
+    box-shadow: 0 0 15px rgba(0, 168, 89, 0.18);
+}
+
 .doc-file-preview {
     display: flex;
     justify-content: space-between;

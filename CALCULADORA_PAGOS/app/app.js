@@ -2902,6 +2902,109 @@ const DOCS_BY_REGIMEN = {
     ]
 };
 
+// Perfil modelo oficial de contratista foráneo (BAJO CERO - Chinandega)
+function getBajoCeroSampleData() {
+    return {
+        nombre_comercial: "BAJO CERO",
+        nombre_representante: "Roberto José Somarriba López",
+        cedula: "081-140582-0002A",
+        ruc: "J0810000001234",
+        matricula: "MAT-CH-2023-889",
+        regimen: "Régimen General",
+        estado_civil: "casado",
+        profesion: "Ingeniero Mecánico",
+        domicilio: "Chinandega",
+        telefono: "8899-7766",
+        correo: "bajocero.servicios@gmail.com",
+        contacto_operativo: "ventas.bajocero@empresa.com (Ing. Somarriba)",
+        direccion: "Costado Norte Parque Central 2c al Oeste, Chinandega",
+        banco: "BAC Credomatic",
+        cuenta_bancaria: "365890123",
+        titular_cuenta: "Roberto José Somarriba López",
+        inss: "445890-1",
+        dia: 28,
+        mes: "septiembre",
+        anio: 2026,
+        tipo_cobertura: "FORANEA",
+        base_operativa: "Chinandega",
+        departamentos: "Chinandega, León",
+        geocerca_km: 14.0,
+        geocerca_modalidad: "MAPA_POLIGONO",
+        geocerca_url: "https://www.google.com/maps/d/u/0/edit?mid=1ufao3CIxZmYPdAY3yRrIrSiPgVpzCRc&ll=12.613934358800453%2C-87.1152155465854&z=13",
+        geocerca_data: {
+            providerName: "BAJO CERO",
+            contractNum: "CONT-2026-OCC-01",
+            mapTitle: "Geocercas BAJO CERO Chinandega",
+            zones: [
+                {
+                    name: "Geocerca Reducida Chinandega",
+                    desc: "Cobertura urbana propuesta reducida. Fuera de esta geocerca aplica kilometraje segun anexo contractual.",
+                    coordsCount: 20,
+                    coords: [
+                        { lat: 12.645884, lng: -87.1478391 },
+                        { lat: 12.6350677, lng: -87.1492939 },
+                        { lat: 12.6270151, lng: -87.1485171 },
+                        { lat: 12.6165034, lng: -87.148663 },
+                        { lat: 12.6079093, lng: -87.1476044 },
+                        { lat: 12.6074906, lng: -87.1415962 },
+                        { lat: 12.6080349, lng: -87.1353735 },
+                        { lat: 12.6080349, lng: -87.1265759 },
+                        { lat: 12.6088724, lng: -87.1207394 },
+                        { lat: 12.6148286, lng: -87.1147742 },
+                        { lat: 12.6180524, lng: -87.1158471 },
+                        { lat: 12.6270988, lng: -87.1219839 },
+                        { lat: 12.6322904, lng: -87.1234431 },
+                        { lat: 12.6366861, lng: -87.1278633 },
+                        { lat: 12.6417937, lng: -87.1312966 },
+                        { lat: 12.6441381, lng: -87.1345582 },
+                        { lat: 12.645394, lng: -87.1390213 },
+                        { lat: 12.6454778, lng: -87.1430983 },
+                        { lat: 12.645884, lng: -87.1478391 },
+                        { lat: 12.645884, lng: -87.1478391 }
+                    ]
+                }
+            ]
+        },
+        contract_variant: "FORANEO",
+        tarifa_combustible: 12.0,
+        condicion_pago: "SEMANAL",
+        garantia_instalacion: 12,
+        garantia_mantenimiento: "30",
+        politica_uniformes: "SINSA_OBLIGATORIO",
+        consignacion_activa: true,
+        tarifas: [
+            { rms: "130196450", descripcion: "INSTALACION BASICA DE AIRE ACONDICIONADO 12-18-24 MIL BTU", tarifa: 1500.00 },
+            { rms: "130196452", descripcion: "INSTALACION BASICA DE AIRE ACONDICIONADO > 24 MIL BTU", tarifa: 2200.00 },
+            { rms: "130196451", descripcion: "DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU", tarifa: 800.00 },
+            { rms: "137301040", descripcion: "DESINSTALACION DE AIRE 12-18-24 MIL BTU", tarifa: 450.00 },
+            { rms: "101026023", descripcion: "MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO", tarifa: 750.00 }
+        ],
+        documentos: {
+            formato_alta: { fileName: "Formato_Alta_BajoCero.pdf", fileSize: "1.2 MB", validated: true, notRequired: false },
+            cedula: { fileName: "Cedula_Roberto_Somarriba.pdf", fileSize: "840 KB", validated: true, notRequired: false },
+            ruc: { fileName: "RUC_BajoCero_Chinandega.pdf", fileSize: "420 KB", validated: true, notRequired: false },
+            matricula: { fileName: "Matricula_Alcaldia_Chinandega_2026.pdf", fileSize: "680 KB", validated: true, notRequired: false },
+            factura: { fileName: "Factura_Membretada_BajoCero.pdf", fileSize: "510 KB", validated: true, notRequired: false },
+            constitucion: { notRequired: true, justification: "Persona Natural con Matrícula y Negocio Directo" },
+            poder: { notRequired: true, justification: "Titular directo / Sin apoderado intermedio" },
+            constancia_dgi: { fileName: "Constancia_Inscripcion_DGI_BajoCero.pdf", fileSize: "720 KB", validated: true, notRequired: false },
+            iva: { fileName: "Constancia_Responsable_IVA_BajoCero.pdf", fileSize: "490 KB", validated: true, notRequired: false },
+            solvencia: { fileName: "Solvencia_Fiscal_Chinandega_Vigente.pdf", fileSize: "550 KB", validated: true, notRequired: false },
+            beneficiario: { notRequired: true, justification: "Persona Natural directa" },
+            etica: { fileName: "Declaracion_Etica_Firmada_Somarriba.pdf", fileSize: "920 KB", validated: true, notRequired: false },
+            inss: { fileName: "Constancia_Afiliacion_INSS_BajoCero.pdf", fileSize: "630 KB", validated: true, notRequired: false }
+        },
+        materiales: [
+            { rms: "101016766", descripcion: "KIT DE TUBERÍA DE COBRE 1/4 Y 3/8 (3 METROS)", unidad: "JGO", cantidad: 5, costo_unitario: 450.00 },
+            { rms: "101016773", descripcion: "CABLE DE USO RUDO 3X12 AWG", unidad: "MTR", cantidad: 30, costo_unitario: 65.00 },
+            { rms: "101016781", descripcion: "CINTA VINILICA AISLANTE NEGRA", unidad: "ROLLO", cantidad: 10, costo_unitario: 45.00 },
+            { rms: "101016790", descripcion: "BASE METÁLICA DE CONDENSADORA 12K-24K", unidad: "PAR", cantidad: 4, costo_unitario: 380.00 },
+            { rms: "101016802", descripcion: "BREAKER TERMOMAGNÉTICO 2 POLOS 20A", unidad: "UND", cantidad: 4, costo_unitario: 220.00 }
+        ],
+        estado: 'ACTIVO'
+    };
+}
+
 // Carga inicial de proveedores registrados
 async function loadProveedoresRegistrados() {
     // 1. Intentar cargar desde localStorage
@@ -3005,6 +3108,22 @@ async function loadProveedoresRegistrados() {
     delete tablaOferta['ENERGY'];
     delete tablaOferta['ENERGY SYSTEMS'];
     setupEnergyAliases();
+
+    // 2.6 Consolidar proveedor oficial foráneo BAJO CERO (Chinandega / Occidente)
+    proveedoresRegistrados = proveedoresRegistrados.filter(p => {
+        const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
+        return k !== 'BAJO CERO' && k !== 'BAJOCERO' && k !== 'BAJO CERO CHINANDEGA';
+    });
+    const bajoCeroProv = getBajoCeroSampleData();
+    proveedoresRegistrados.push(bajoCeroProv);
+
+    if (!tablaOferta['BAJO CERO']) {
+        tablaOferta['BAJO CERO'] = {};
+    }
+    bajoCeroProv.tarifas.forEach(t => {
+        tablaOferta['BAJO CERO'][t.descripcion] = t.tarifa;
+    });
+
     localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
 
     // 3. Si tablaOferta tiene proveedores que no están en el directorio, agregarlos como base
@@ -3204,6 +3323,13 @@ function initOnboardingWizard() {
             renderWizardDocs();
             triggerWizardAutosave();
         }
+    });
+
+    // Cargar perfil modelo oficial de BAJO CERO (Chinandega)
+    document.getElementById('btn-load-bajocero-sample')?.addEventListener('click', () => {
+        loadDraftIntoForm(getBajoCeroSampleData(), currentWizardStep || 1);
+        saveActiveDraftToStorage();
+        alert('✓ Expediente modelo de BAJO CERO (Chinandega) cargado con éxito, incluyendo sus 13 recaudos del Paso 2, geocerca pericial de 20 vértices y tarifas acordadas.');
     });
 
     // Reset wizard
@@ -3486,8 +3612,13 @@ function initOnboardingWizard() {
     // Configurar listeners de autoguardado en todos los inputs y botones de borrador
     setupWizardAutosaveListeners();
 
-    // Inicializar checklist documental
+    // Inicializar checklist documental y zona de carga rápida Drag & Drop
     renderWizardDocs();
+    setupMasterDocsDropzone();
+
+    // Evitar que arrastrar archivos fuera de una zona provoque navegación por defecto en el navegador
+    window.addEventListener('dragover', (e) => e.preventDefault(), false);
+    window.addEventListener('drop', (e) => e.preventDefault(), false);
 }
 
 function setupWizardAutosaveListeners() {
@@ -3651,7 +3782,7 @@ function resetWizardForm() {
     goToWizardStep(1);
 }
 
-// Renderizar Checklist Documental del Paso 2
+// Renderizar Checklist Documental del Paso 2 con Soporte Completo Drag & Drop
 function renderWizardDocs() {
     const container = document.getElementById('docs-checklist-container');
     if (!container) return;
@@ -3682,6 +3813,7 @@ function renderWizardDocs() {
 
         const card = document.createElement('div');
         card.className = `doc-checklist-card ${isValidated ? 'completed' : ''} ${isNotRequired ? 'not-required' : ''}`;
+        card.setAttribute('data-card-doc-id', doc.id);
         card.innerHTML = `
             <div class="doc-card-top">
                 <div style="flex: 1; padding-right: 0.5rem;">
@@ -3710,14 +3842,18 @@ function renderWizardDocs() {
                     </div>
                 ` : `
                     ${docState.fileName ? `
-                        <div class="doc-file-preview">
-                            <span title="${docState.fileName}">📄 ${docState.fileName}</span>
-                            <button class="btn-icon" data-del-doc="${doc.id}" style="color: var(--danger); font-size: 0.9rem;" title="Eliminar archivo">🗑️</button>
+                        <div class="doc-file-preview" data-preview-doc="${doc.id}">
+                            <span title="${docState.fileName}">📄 ${docState.fileName} ${docState.fileSize ? `<small style="color:#64748b;">(${docState.fileSize})</small>` : ''}</span>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <button type="button" class="btn-icon" data-trigger-replace="${doc.id}" style="color: var(--primary); font-size: 0.85rem;" title="Reemplazar archivo (o arrastra un nuevo archivo encima de este cuadro)">🔄</button>
+                                <button type="button" class="btn-icon" data-del-doc="${doc.id}" style="color: var(--danger); font-size: 0.9rem;" title="Eliminar archivo">🗑️</button>
+                            </div>
+                            <input type="file" data-file-input="${doc.id}" accept=".pdf, .png, .jpg, .jpeg" hidden>
                         </div>
                     ` : `
                         <div class="doc-upload-zone" data-upload-doc="${doc.id}">
-                            <span style="font-size: 1.2rem; display: block; margin-bottom: 2px;">📎</span>
-                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">Adjuntar Archivo Digital (PDF / Imagen)</span>
+                            <span style="font-size: 1.3rem; display: block; margin-bottom: 2px;">📎</span>
+                            <span style="font-size: 0.82rem; font-weight: 600; color: var(--primary);">Arrastra tu archivo aquí o haz clic para adjuntar (PDF / Imagen)</span>
                             <input type="file" data-file-input="${doc.id}" accept=".pdf, .png, .jpg, .jpeg" hidden>
                         </div>
                     `}
@@ -3732,13 +3868,78 @@ function renderWizardDocs() {
             </div>
         `;
 
+        // Helper para procesar archivo (desde input file o desde Drag & Drop)
+        const processDocFile = (file) => {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                wizardDocuments[doc.id] = {
+                    ...(wizardDocuments[doc.id] || {}),
+                    fileName: file.name,
+                    size: file.size,
+                    fileSize: formatFileSize(file.size),
+                    dataUrl: evt.target.result,
+                    validated: true,
+                    notRequired: false
+                };
+                renderWizardDocs();
+                triggerWizardAutosave();
+            };
+            reader.readAsDataURL(file);
+        };
+
         // Event listeners
         const toggleNotReq = card.querySelector(`[data-toggle-not-req="${doc.id}"]`);
         const justInput = card.querySelector(`[data-justification-doc="${doc.id}"]`);
         const uploadZone = card.querySelector(`[data-upload-doc="${doc.id}"]`);
         const fileInput = card.querySelector(`[data-file-input="${doc.id}"]`);
+        const replaceBtn = card.querySelector(`[data-trigger-replace="${doc.id}"]`);
         const delBtn = card.querySelector(`[data-del-doc="${doc.id}"]`);
         const validateCheckbox = card.querySelector(`[data-validate-doc="${doc.id}"]`);
+
+        // Click para abrir explorador nativo
+        uploadZone?.addEventListener('click', () => fileInput?.click());
+        replaceBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput?.click();
+        });
+
+        fileInput?.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                processDocFile(e.target.files[0]);
+            }
+        });
+
+        // Soporte de DRAG & DROP individual en la tarjeta y en la zona de subida
+        ['dragenter', 'dragover'].forEach(eventType => {
+            card.addEventListener(eventType, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                card.classList.add('dragover');
+                if (uploadZone) uploadZone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'dragend'].forEach(eventType => {
+            card.addEventListener(eventType, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!card.contains(e.relatedTarget)) {
+                    card.classList.remove('dragover');
+                    if (uploadZone) uploadZone.classList.remove('dragover');
+                }
+            });
+        });
+
+        card.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            card.classList.remove('dragover');
+            if (uploadZone) uploadZone.classList.remove('dragover');
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                processDocFile(e.dataTransfer.files[0]);
+            }
+        });
 
         toggleNotReq?.addEventListener('change', (e) => {
             if (!wizardDocuments[doc.id]) {
@@ -3760,26 +3961,13 @@ function renderWizardDocs() {
             triggerWizardAutosave();
         });
 
-        uploadZone?.addEventListener('click', () => fileInput?.click());
-        fileInput?.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files[0]) {
-                const file = e.target.files[0];
-                wizardDocuments[doc.id] = {
-                    ...(wizardDocuments[doc.id] || {}),
-                    fileName: file.name,
-                    size: file.size,
-                    validated: true,
-                    notRequired: false
-                };
-                renderWizardDocs();
-                triggerWizardAutosave();
-            }
-        });
-
-        delBtn?.addEventListener('click', () => {
+        delBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (wizardDocuments[doc.id]) {
                 delete wizardDocuments[doc.id].fileName;
                 delete wizardDocuments[doc.id].size;
+                delete wizardDocuments[doc.id].fileSize;
+                delete wizardDocuments[doc.id].dataUrl;
                 wizardDocuments[doc.id].validated = false;
             }
             renderWizardDocs();
@@ -3806,6 +3994,113 @@ function renderWizardDocs() {
     const progressFill = document.getElementById('doc-progress-fill');
     if (progressText) progressText.textContent = `${completedCount} de ${total} Resueltos (${pct}%)`;
     if (progressFill) progressFill.style.width = `${pct}%`;
+}
+
+// Configuración de la Zona de Carga Rápida Masiva Drag & Drop (Paso 2)
+function setupMasterDocsDropzone() {
+    const masterDrop = document.getElementById('master-docs-dropzone');
+    const masterInput = document.getElementById('master-docs-input');
+    if (!masterDrop) return;
+
+    masterDrop.addEventListener('click', () => masterInput?.click());
+
+    masterInput?.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            handleBatchDocsFiles(Array.from(e.target.files));
+            e.target.value = '';
+        }
+    });
+
+    ['dragenter', 'dragover'].forEach(type => {
+        masterDrop.addEventListener(type, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            masterDrop.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'dragend'].forEach(type => {
+        masterDrop.addEventListener(type, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!masterDrop.contains(e.relatedTarget)) {
+                masterDrop.classList.remove('dragover');
+            }
+        });
+    });
+
+    masterDrop.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        masterDrop.classList.remove('dragover');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleBatchDocsFiles(Array.from(e.dataTransfer.files));
+        }
+    });
+}
+
+// Procesar lote de archivos arrastrados a la zona masiva con autodetección inteligente
+function handleBatchDocsFiles(files) {
+    if (!files || files.length === 0) return;
+    const regimen = document.getElementById('wiz-regimen')?.value || "Régimen de Cuota Fija";
+    const reqDocs = DOCS_BY_REGIMEN[regimen] || DOCS_BY_REGIMEN["Régimen de Cuota Fija"];
+    if (!reqDocs) return;
+
+    let assignedCount = 0;
+    const pendingSlots = reqDocs.filter(d => !wizardDocuments[d.id] || (!wizardDocuments[d.id].fileName && !wizardDocuments[d.id].notRequired));
+
+    files.forEach(file => {
+        const fn = file.name.toLowerCase();
+        let targetId = null;
+
+        // Detección por palabras clave
+        if (fn.includes('cedula') || fn.includes('identidad') || fn.includes('dni')) targetId = 'cedula';
+        else if (fn.includes('ruc') || fn.includes('tributar')) targetId = 'ruc';
+        else if (fn.includes('matricula') || fn.includes('alcald') || fn.includes('comercio')) targetId = 'matricula';
+        else if (fn.includes('solvencia') || fn.includes('fiscal')) targetId = 'solvencia';
+        else if (fn.includes('alta') || fn.includes('solicitud') || fn.includes('formato')) targetId = 'formato_alta';
+        else if (fn.includes('factura') || fn.includes('talonario') || fn.includes('recibo')) targetId = 'factura';
+        else if (fn.includes('constitucion') || fn.includes('estatuto') || fn.includes('escritura') || fn.includes('acta')) targetId = 'constitucion';
+        else if (fn.includes('poder') || fn.includes('notarial')) targetId = 'poder';
+        else if (fn.includes('inss') || fn.includes('seguro') || fn.includes('patronal')) targetId = 'inss';
+        else if (fn.includes('etica') || fn.includes('conducta')) targetId = 'etica';
+        else if (fn.includes('dgi') || fn.includes('inscripcion')) targetId = 'constancia_dgi';
+        else if (fn.includes('iva') || fn.includes('recaudador')) targetId = 'iva';
+        else if (fn.includes('beneficiario')) targetId = 'beneficiario';
+        else if (fn.includes('banco') || fn.includes('cuenta') || fn.includes('certificacion_bancaria')) targetId = 'certificacion_bancaria';
+        else if (fn.includes('tecnica') || fn.includes('refrigeracion')) targetId = 'certificacion_tecnica';
+        else if (fn.includes('antecedente') || fn.includes('policia') || fn.includes('record')) targetId = 'antecedentes';
+
+        // Validar si el targetId existe en el régimen actual
+        const docDef = targetId ? reqDocs.find(d => d.id === targetId) : null;
+        const finalId = docDef ? docDef.id : (pendingSlots.length > 0 ? pendingSlots.shift().id : null);
+
+        if (finalId) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                wizardDocuments[finalId] = {
+                    ...(wizardDocuments[finalId] || {}),
+                    fileName: file.name,
+                    size: file.size,
+                    fileSize: formatFileSize(file.size),
+                    dataUrl: evt.target.result,
+                    validated: true,
+                    notRequired: false
+                };
+                renderWizardDocs();
+                triggerWizardAutosave();
+            };
+            reader.readAsDataURL(file);
+            assignedCount++;
+        }
+    });
+
+    if (assignedCount > 0) {
+        setTimeout(() => {
+            renderWizardDocs();
+            triggerWizardAutosave();
+        }, 150);
+    }
 }
 
 // Tarifas sugeridas por defecto para Maestros SINSA

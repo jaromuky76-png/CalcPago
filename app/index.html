@@ -264,6 +264,7 @@
                                 <span class="autosave-dot"></span>
                                 <span id="wizard-autosave-text">Autoguardado activo</span>
                             </div>
+                            <button id="btn-load-bajocero-sample" class="btn btn-outline" style="font-size: 0.82rem; color: #1D4ED8; border-color: rgba(37, 99, 235, 0.45); font-weight: 600; background: rgba(37, 99, 235, 0.05);" title="Cargar expediente modelo de BAJO CERO (Chinandega) con sus recaudos de Paso 2, geocerca pericial y tarifas">❄️ Cargar BAJO CERO</button>
                             <button id="btn-save-wizard-draft-top" class="btn btn-save-draft" title="Guardar como borrador en el directorio para continuar luego">💾 Guardar Borrador</button>
                             <button id="btn-reset-wizard" class="btn btn-outline" title="Reiniciar formulario">🔄 Limpiar Datos</button>
                         </div>
@@ -603,6 +604,18 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+
+                            <!-- Zona de Carga Rápida Masiva Drag & Drop -->
+                            <div id="master-docs-dropzone" class="master-docs-dropzone" style="margin-bottom: 1.2rem; border: 2px dashed #94A3B8; border-radius: 10px; padding: 1.1rem 1.4rem; background: rgba(248, 250, 252, 0.85); text-align: center; cursor: pointer; transition: all 0.25s ease;">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; color: var(--primary);">
+                                    <span style="font-size: 1.6rem;">📂</span>
+                                    <strong style="font-size: 0.95rem;">Zona de Carga Rápida: Arrastra y suelta aquí uno o varios documentos (PDF, JPG, PNG)</strong>
+                                </div>
+                                <div style="font-size: 0.82rem; color: #64748B; margin-top: 0.35rem;">
+                                    Puedes arrastrar varios archivos a la vez; el sistema reconocerá automáticamente a qué recaudo corresponde (Cédula, RUC, Matrícula, Solvencia, Factura, INSS, etc.), o arrastrar cada archivo directamente a su recuadro individual abajo.
+                                </div>
+                                <input type="file" id="master-docs-input" multiple accept=".pdf, .png, .jpg, .jpeg" hidden>
                             </div>
 
                             <div class="docs-checklist-container" id="docs-checklist-container">
