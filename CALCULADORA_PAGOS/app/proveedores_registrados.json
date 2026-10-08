@@ -278,5 +278,112 @@
         "validated": true
       }
     }
+  },
+  {
+    "nombre_comercial": "BAJO CERO",
+    "nombre_representante": "Roberto José Somarriba López",
+    "cedula": "081-140582-0002A",
+    "ruc": "J0810000001234",
+    "matricula": "MAT-CH-2023-889",
+    "regimen": "Régimen General",
+    "estado_civil": "casado",
+    "profesion": "Ingeniero Mecánico",
+    "domicilio": "Chinandega",
+    "telefono": "8899-7766",
+    "correo": "bajocero.servicios@gmail.com",
+    "contacto_operativo": "ventas.bajocero@empresa.com (Ing. Somarriba)",
+    "direccion": "Costado Norte Parque Central 2c al Oeste, Chinandega",
+    "banco": "BAC Credomatic",
+    "cuenta_bancaria": "365890123",
+    "titular_cuenta": "Roberto José Somarriba López",
+    "inss": "445890-1",
+    "tipo_cobertura": "FORANEA",
+    "base_operativa": "Chinandega",
+    "departamentos": "Chinandega, León",
+    "geocerca_km": 14.0,
+    "tarifa_combustible": 12.0,
+    "tarifas": [
+      {
+        "rms": "130196450",
+        "descripcion": "INSTALACION BASICA DE AIRE ACONDICIONADO 12-18-24 MIL BTU",
+        "tarifa": 1500.0
+      },
+      {
+        "rms": "130196452",
+        "descripcion": "INSTALACION BASICA DE AIRE ACONDICIONADO > 24 MIL BTU",
+        "tarifa": 2200.0
+      },
+      {
+        "rms": "130196451",
+        "descripcion": "DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU",
+        "tarifa": 800.0
+      },
+      {
+        "rms": "137301040",
+        "descripcion": "DESINSTALACION DE AIRE 12-18-24 MIL BTU",
+        "tarifa": 450.0
+      },
+      {
+        "rms": "101026023",
+        "descripcion": "MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO",
+        "tarifa": 750.0
+      }
+    ],
+    "materiales": [],
+    "documentos": {
+      "formato_alta": {
+        "fileName": "Formato_Alta_BajoCero.pdf",
+        "validated": true
+      },
+      "cedula": {
+        "fileName": "Cedula_Roberto_Somarriba.pdf",
+        "validated": true
+      },
+      "ruc": {
+        "fileName": "RUC_BajoCero_Chinandega.pdf",
+        "validated": true
+      },
+      "matricula": {
+        "fileName": "Matricula_Alcaldia_Chinandega_2026.pdf",
+        "validated": true
+      },
+      "factura": {
+        "fileName": "Factura_Membretada_BajoCero.pdf",
+        "validated": true
+      },
+      "constitucion": {
+        "notRequired": true,
+        "justification": "Persona Natural con Matrícula y Negocio Directo"
+      },
+      "poder": {
+        "notRequired": true,
+        "justification": "Titular directo / Sin apoderado intermedio"
+      },
+      "constancia_dgi": {
+        "fileName": "Constancia_Inscripcion_DGI_BajoCero.pdf",
+        "validated": true
+      },
+      "iva": {
+        "fileName": "Constancia_Responsable_IVA_BajoCero.pdf",
+        "validated": true
+      },
+      "solvencia": {
+        "fileName": "Solvencia_Fiscal_Chinandega_Vigente.pdf",
+        "validated": true
+      },
+      "beneficiario": {
+        "notRequired": true,
+        "justification": "Persona Natural directa"
+      },
+      "etica": {
+        "fileName": "Declaracion_Etica_Firmada_Somarriba.pdf",
+        "validated": true
+      },
+      "inss": {
+        "fileName": "Constancia_Afiliacion_INSS_BajoCero.pdf",
+        "validated": true
+      }
+    },
+    "estado": "ACTIVO"
   }
 ]
