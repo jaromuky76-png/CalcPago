@@ -2782,18 +2782,31 @@ async function saveCurrentWizardAsDraft(goToDirectory = true) {
     }
 
     const prog = calculateOnboardingProgress(data);
+    const origName = window.currentEditingProviderOriginalName;
+    let idx = -1;
+    if (origName) {
+        idx = proveedoresRegistrados.findIndex(p => 
+            (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === origName.trim().toUpperCase()
+        );
+    }
+    if (idx < 0) {
+        idx = proveedoresRegistrados.findIndex(p => 
+            (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === name.toUpperCase()
+        );
+    }
+
+    const existingProv = idx >= 0 ? proveedoresRegistrados[idx] : null;
+    const isAlreadyActive = existingProv && existingProv.estado === 'ACTIVO';
+
     const draftRecord = {
         ...data,
-        estado: 'BORRADOR',
+        estado: (isAlreadyActive && prog >= 90) ? 'ACTIVO' : 'BORRADOR',
         progreso: prog,
         paso_actual: currentWizardStep,
         fecha_modificacion: new Date().toLocaleString()
     };
 
     // Guardar o actualizar en proveedoresRegistrados
-    const idx = proveedoresRegistrados.findIndex(p => 
-        (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === name.toUpperCase()
-    );
     if (idx >= 0) {
         proveedoresRegistrados[idx] = draftRecord;
     } else {
@@ -2801,6 +2814,15 @@ async function saveCurrentWizardAsDraft(goToDirectory = true) {
     }
 
     safeSaveProvidersLocally(proveedoresRegistrados);
+
+    // Sincronizar tarifas en tablaOferta para el motor de cálculos
+    if (data.tarifas && data.tarifas.length > 0) {
+        if (!tablaOferta[name]) tablaOferta[name] = {};
+        data.tarifas.forEach(t => {
+            if (t.descripcion) tablaOferta[name][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
+        });
+        localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
+    }
 
     // Intentar sincronizar con backend
     try {
@@ -2820,7 +2842,9 @@ async function saveCurrentWizardAsDraft(goToDirectory = true) {
         updatedTimeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }));
 
-    alert(`💾 ¡Borrador de "${name}" guardado exitosamente!\n\nAvance: ${prog}% completado.\nTodos los campos llenados, tarifas y documentos se encuentran resguardados. Podrás continuar el registro en cualquier momento desde el "Directorio de Proveedores".`);
+    window.currentEditingProviderOriginalName = name;
+
+    alert(`💾 ¡Borrador de "${name}" guardado exitosamente!\n\nAvance: ${prog}% completado.\nTodos los campos editados, tarifas y documentos se encuentran resguardados. Podrás continuar el registro en cualquier momento desde el "Directorio de Proveedores" pulsando el botón ✏️.`);
 
     if (goToDirectory) {
         switchModuleView('view-directory');
@@ -2830,8 +2854,10 @@ async function saveCurrentWizardAsDraft(goToDirectory = true) {
     }
 }
 
-// Retomar un borrador desde el directorio de proveedores
+// Retomar o editar un contratista desde el directorio de proveedores
 function resumeProviderOnboarding(prov) {
+    if (!prov) return;
+    window.currentEditingProviderOriginalName = prov.nombre_comercial || prov.nombre || '';
     switchModuleView('view-onboarding');
     loadDraftIntoForm(prov, prov.paso_actual || 1);
 
@@ -3127,9 +3153,17 @@ async function loadProveedoresRegistrados() {
     if (!tablaOferta['BAJO CERO']) {
         tablaOferta['BAJO CERO'] = {};
     }
-    bajoCeroTarifas.forEach(t => {
-        tablaOferta['BAJO CERO'][t.descripcion] = t.tarifa;
-    });
+    if (bajoCeroExistingIdx >= 0 && proveedoresRegistrados[bajoCeroExistingIdx].tarifas && proveedoresRegistrados[bajoCeroExistingIdx].tarifas.length > 0) {
+        proveedoresRegistrados[bajoCeroExistingIdx].tarifas.forEach(t => {
+            if (t.descripcion) tablaOferta['BAJO CERO'][t.descripcion] = parseFloat(t.tarifa) || 0;
+        });
+    } else {
+        bajoCeroTarifas.forEach(t => {
+            if (tablaOferta['BAJO CERO'][t.descripcion] === undefined) {
+                tablaOferta['BAJO CERO'][t.descripcion] = t.tarifa;
+            }
+        });
+    }
     localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
 
     // 3. Si tablaOferta tiene proveedores que no están en el directorio, agregarlos como base
@@ -3707,6 +3741,7 @@ function goToWizardStep(stepNum) {
 }
 
 function resetWizardForm() {
+    window.currentEditingProviderOriginalName = null;
     isRestoringDraft = true;
     const ids = [
         'wiz-nombre-comercial', 'wiz-nombre-rep', 'wiz-cedula', 'wiz-ruc',
@@ -7330,7 +7365,15 @@ async function finishProviderOnboarding() {
     data.estado_contrato = (data.contrato_rubricado && data.contrato_rubricado.fileName) ? 'RUBRICADO' : 'PENDIENTE_RUBRICA';
 
     // 1. Guardar en lista de proveedores registrados
-    const existingIdx = proveedoresRegistrados.findIndex(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === provName.toUpperCase());
+    const origName = window.currentEditingProviderOriginalName;
+    let existingIdx = -1;
+    if (origName) {
+        existingIdx = proveedoresRegistrados.findIndex(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === origName.trim().toUpperCase());
+    }
+    if (existingIdx < 0) {
+        existingIdx = proveedoresRegistrados.findIndex(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === provName.toUpperCase());
+    }
+
     if (existingIdx >= 0) {
         proveedoresRegistrados[existingIdx] = data;
     } else {
@@ -7501,7 +7544,10 @@ function renderDirectory() {
             <div>
                 <div class="directory-card-header">
                     <div>
-                        <div class="directory-prov-name">${provName}</div>
+                        <div class="directory-prov-title-wrap">
+                            <div class="directory-prov-name">${provName}</div>
+                            <button class="btn-card-edit-pencil" data-dir-edit-wizard="${provName}" title="Editar ${provName} y actualizar en asistente de 4 pasos">✏️</button>
+                        </div>
                         <div class="directory-prov-rep">👤 ${repName}</div>
                     </div>
                     <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
@@ -7549,15 +7595,15 @@ function renderDirectory() {
 
             <div class="directory-card-actions">
                 <div class="directory-actions-row">
-                    <button class="btn btn-outline" data-dir-contract="${provName}" title="Descargar Borrador Word">📄 Borrador</button>
-                    <button class="btn btn-outline" data-dir-compliance="${provName}" title="Descargar Ficha de Cumplimiento (.docx)" style="color: #059669; border-color: rgba(16, 185, 129, 0.5);">📋 Ficha</button>
-                    <button class="btn btn-outline" data-dir-rubricar="${provName}" title="${hasRubricado ? 'Ver/Descargar Contrato Rubricado' : 'Subir Contrato Rubricado por Legal'}" style="${hasRubricado ? 'color: #059669; border-color: rgba(16, 185, 129, 0.5);' : 'color: var(--primary);'}">
-                        ${hasRubricado ? '📜 Ver Rubricado' : '📤 Subir Rubricado'}
+                    <button class="btn btn-outline" data-dir-contract="${provName}" title="Descargar Borrador Word (.docx)">📄 Word</button>
+                    <button class="btn btn-outline btn-ficha" data-dir-compliance="${provName}" title="Descargar Ficha de Cumplimiento (.docx)">📋 Ficha</button>
+                    <button class="btn btn-outline btn-rubricado" data-dir-rubricar="${provName}" title="${hasRubricado ? 'Ver/Descargar Contrato Rubricado' : 'Subir Contrato Rubricado por Legal'}">
+                        ${hasRubricado ? '📜 Rubricado' : '📤 Rubricar'}
                     </button>
-                    <button class="btn btn-outline" data-dir-exp="${provName}" title="Ver Documentos">📁 Expediente</button>
-                    <button class="btn btn-outline" data-dir-tariffs="${provName}" title="Ver Tarifas">💲 Tarifas</button>
-                    <button class="btn btn-outline" data-dir-edit-wizard="${provName}" title="Reabrir en asistente para actualizar expediente, tarifas o adendas" style="color: #2563EB; border-color: rgba(37, 99, 235, 0.45); font-weight: 600;">✏️ Reabrir en Pasos</button>
-                    ${isDraft ? `<button class="btn btn-outline" data-dir-del="${provName}" title="Eliminar Borrador" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4); flex: 0.5;">🗑️</button>` : ''}
+                    <button class="btn btn-outline" data-dir-exp="${provName}" title="Ver Expediente Digital">📁 Expediente</button>
+                    <button class="btn btn-outline" data-dir-tariffs="${provName}" title="Ver Tarifas Acordadas">💲 Tarifas</button>
+                    <button class="btn btn-outline btn-edit-pencil" data-dir-edit-wizard="${provName}" title="Editar contratista y actualizar en asistente (Paso 1 al 4)">✏️</button>
+                    ${isDraft ? `<button class="btn btn-outline btn-del-draft" data-dir-del="${provName}" title="Eliminar Borrador">🗑️</button>` : ''}
                 </div>
                 ${isDraft ? `
                     <button class="btn directory-btn-resume" data-dir-resume="${provName}" title="Continuar llenando campos y recaudos pendientes">
@@ -7592,8 +7638,11 @@ function renderDirectory() {
             openTarifasModal(prov);
         });
 
-        card.querySelector(`[data-dir-edit-wizard="${provName}"]`)?.addEventListener('click', () => {
-            resumeProviderOnboarding(prov);
+        card.querySelectorAll(`[data-dir-edit-wizard="${provName}"]`).forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                resumeProviderOnboarding(prov);
+            });
         });
 
         card.querySelector(`[data-dir-resume="${provName}"]`)?.addEventListener('click', () => {

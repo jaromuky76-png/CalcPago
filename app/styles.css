@@ -1740,16 +1740,97 @@ body {
     padding-top: 1rem;
 }
 
+.directory-prov-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-card-edit-pencil {
+    background: rgba(37, 99, 235, 0.08);
+    border: 1px solid rgba(37, 99, 235, 0.35);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 2px 7px;
+    font-size: 0.85rem;
+    color: #2563EB;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.btn-card-edit-pencil:hover {
+    background: rgba(37, 99, 235, 0.2);
+    border-color: #2563EB;
+    transform: scale(1.08);
+}
+
 .directory-actions-row {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.35rem;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .directory-actions-row .btn {
-    flex: 1;
-    font-size: 0.8rem;
-    padding: 0.45rem;
+    flex: 1 1 auto;
+    font-size: 0.72rem;
+    padding: 0.4rem 0.28rem;
     text-align: center;
+    white-space: nowrap;
+    border-radius: 6px;
+    min-width: 0;
+}
+
+.directory-actions-row .btn.btn-ficha {
+    color: #059669;
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+.directory-actions-row .btn.btn-rubricado {
+    color: var(--primary);
+}
+
+.directory-actions-row .btn-edit-pencil {
+    flex: 0 0 34px !important;
+    min-width: 34px !important;
+    max-width: 34px !important;
+    padding: 0.4rem 0 !important;
+    font-size: 0.95rem !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(37, 99, 235, 0.08);
+    color: #2563EB !important;
+    border-color: rgba(37, 99, 235, 0.45) !important;
+    font-weight: 700;
+}
+
+.directory-actions-row .btn-edit-pencil:hover {
+    background: rgba(37, 99, 235, 0.2);
+    border-color: #2563EB !important;
+    transform: scale(1.05);
+}
+
+.directory-actions-row .btn-del-draft {
+    flex: 0 0 34px !important;
+    min-width: 34px !important;
+    max-width: 34px !important;
+    padding: 0.4rem 0 !important;
+    font-size: 0.85rem !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--danger) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+}
+
+.directory-actions-row .btn-del-draft:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--danger) !important;
 }
 
 .directory-btn-pay {
