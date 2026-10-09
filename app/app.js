@@ -40,7 +40,36 @@ function normalizeProviderName(name) {
     if (upper === 'ENERGY' || upper === 'ENERGY SYSTEMS' || upper === 'ENERGY SYSTEM') {
         return 'ENERGY SYSTEM';
     }
+    if (upper === 'GLOBAL' || upper === 'GLOBAL AIR' || upper === 'GLOBALAIR') {
+        return 'GLOBAL AIR';
+    }
     return name.trim();
+}
+
+// Comparación estricta y por alias comerciales de proveedores
+function areProviderNamesEqual(name1, name2) {
+    if (!name1 || !name2) return false;
+    const n1 = (name1 || '').trim().toUpperCase();
+    const n2 = (name2 || '').trim().toUpperCase();
+    if (n1 === n2) return true;
+
+    const norm1 = normalizeProviderName(n1).toUpperCase();
+    const norm2 = normalizeProviderName(n2).toUpperCase();
+    if (norm1 === norm2) return true;
+
+    const isEnergy1 = (norm1 === 'ENERGY' || norm1 === 'ENERGY SYSTEM' || norm1 === 'ENERGY SYSTEMS');
+    const isEnergy2 = (norm2 === 'ENERGY' || norm2 === 'ENERGY SYSTEM' || norm2 === 'ENERGY SYSTEMS');
+    if (isEnergy1 && isEnergy2) return true;
+
+    const isGlobal1 = (norm1 === 'GLOBAL' || norm1 === 'GLOBAL AIR' || norm1 === 'GLOBALAIR');
+    const isGlobal2 = (norm2 === 'GLOBAL' || norm2 === 'GLOBAL AIR' || norm2 === 'GLOBALAIR');
+    if (isGlobal1 && isGlobal2) return true;
+
+    const isBajoCero1 = (norm1 === 'BAJO CERO' || norm1 === 'BAJOCERO' || norm1.startsWith('BAJO CERO'));
+    const isBajoCero2 = (norm2 === 'BAJO CERO' || norm2 === 'BAJOCERO' || norm2.startsWith('BAJO CERO'));
+    if (isBajoCero1 && isBajoCero2) return true;
+
+    return false;
 }
 
 function setupEnergyAliases() {
@@ -56,6 +85,35 @@ function setupEnergyAliases() {
             Object.defineProperty(tablaOferta, 'ENERGY SYSTEMS', {
                 get: function() { return this['ENERGY SYSTEM']; },
                 set: function(v) { this['ENERGY SYSTEM'] = v; },
+                enumerable: false,
+                configurable: true
+            });
+        } catch (e) {}
+    }
+}
+
+function setupGlobalAliases() {
+    if (!tablaOferta || typeof tablaOferta !== 'object') return;
+    if (tablaOferta['GLOBAL AIR']) {
+        try {
+            Object.defineProperty(tablaOferta, 'GLOBAL', {
+                get: function() { return this['GLOBAL AIR']; },
+                set: function(v) { this['GLOBAL AIR'] = v; },
+                enumerable: false,
+                configurable: true
+            });
+            Object.defineProperty(tablaOferta, 'GLOBALAIR', {
+                get: function() { return this['GLOBAL AIR']; },
+                set: function(v) { this['GLOBAL AIR'] = v; },
+                enumerable: false,
+                configurable: true
+            });
+        } catch (e) {}
+    } else if (tablaOferta['GLOBAL']) {
+        try {
+            Object.defineProperty(tablaOferta, 'GLOBAL AIR', {
+                get: function() { return this['GLOBAL']; },
+                set: function(v) { this['GLOBAL'] = v; },
                 enumerable: false,
                 configurable: true
             });
@@ -148,17 +206,36 @@ function syncAllProvidersToTablaOferta() {
             if (!pName) return;
 
             if (prov.tarifas && Array.isArray(prov.tarifas) && prov.tarifas.length > 0) {
-                if (!tablaOferta[pName]) tablaOferta[pName] = {};
+                const newRates = {};
                 prov.tarifas.forEach(t => {
                     if (t && t.descripcion) {
-                        tablaOferta[pName][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
+                        newRates[t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
                     }
                 });
+                tablaOferta[pName] = newRates;
+                const normName = normalizeProviderName(pName);
+                if (normName && normName !== pName) {
+                    tablaOferta[normName] = newRates;
+                }
+                if (areProviderNamesEqual(pName, 'ENERGY')) {
+                    tablaOferta['ENERGY SYSTEM'] = newRates;
+                    tablaOferta['ENERGY'] = newRates;
+                }
+                if (areProviderNamesEqual(pName, 'GLOBAL')) {
+                    tablaOferta['GLOBAL AIR'] = newRates;
+                    tablaOferta['GLOBAL'] = newRates;
+                }
             }
         });
     }
 
     consolidateEnergyProvider();
+    setupEnergyAliases();
+    setupGlobalAliases();
+
+    if (typeof priceSearchCache !== 'undefined' && priceSearchCache) {
+        priceSearchCache.clear();
+    }
 
     try {
         localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
@@ -3095,6 +3172,31 @@ function loadDraftIntoForm(draft, targetStep = null) {
 
     wizardDocuments = draft.documentos ? JSON.parse(JSON.stringify(draft.documentos)) : {};
     wizardTarifas = draft.tarifas ? JSON.parse(JSON.stringify(draft.tarifas)) : [];
+
+    // Si draft.tarifas venía vacío, recuperar actividades existentes en tablaOferta para no perderlas
+    if ((!wizardTarifas || wizardTarifas.length === 0) && tablaOferta && typeof tablaOferta === 'object') {
+        const provName = (draft.nombre_comercial || draft.nombre || '').trim();
+        let acts = null;
+        if (provName) {
+            acts = tablaOferta[provName];
+            if (!acts) {
+                const norm = normalizeProviderName(provName);
+                acts = tablaOferta[norm];
+            }
+            if (!acts) {
+                const matchingKey = Object.keys(tablaOferta).find(k => areProviderNamesEqual(k, provName));
+                if (matchingKey) acts = tablaOferta[matchingKey];
+            }
+        }
+        if (acts && typeof acts === 'object' && Object.keys(acts).length > 0) {
+            wizardTarifas = Object.keys(acts).map(a => ({
+                rms: a.match(/^\d{9}/) ? a.match(/^\d{9}/)[0] : '',
+                descripcion: a,
+                tarifa: acts[a]
+            }));
+        }
+    }
+
     wizardMateriales = draft.materiales ? JSON.parse(JSON.stringify(draft.materiales)) : [];
     wizardContratoRubricado = draft.contrato_rubricado ? JSON.parse(JSON.stringify(draft.contrato_rubricado)) : null;
 
@@ -3140,12 +3242,12 @@ async function saveCurrentWizardAsDraft(goToDirectory = false) {
         let idx = -1;
         if (origName) {
             idx = proveedoresRegistrados.findIndex(p => 
-                (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === origName.trim().toUpperCase()
+                areProviderNamesEqual(p.nombre_comercial || p.nombre || '', origName)
             );
         }
         if (idx < 0) {
             idx = proveedoresRegistrados.findIndex(p => 
-                (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === name.toUpperCase()
+                areProviderNamesEqual(p.nombre_comercial || p.nombre || '', name)
             );
         }
 
@@ -3153,8 +3255,9 @@ async function saveCurrentWizardAsDraft(goToDirectory = false) {
         const isAlreadyActive = existingProv && existingProv.estado === 'ACTIVO';
 
         const draftRecord = {
+            ...(existingProv || {}),
             ...data,
-            estado: (isAlreadyActive && prog >= 90) ? 'ACTIVO' : 'BORRADOR',
+            estado: (isAlreadyActive && prog >= 90) ? 'ACTIVO' : ((existingProv && existingProv.estado) || 'BORRADOR'),
             progreso: prog,
             paso_actual: currentWizardStep,
             fecha_modificacion: new Date().toLocaleString()
@@ -3173,10 +3276,26 @@ async function saveCurrentWizardAsDraft(goToDirectory = false) {
         // Sincronizar tarifas en tablaOferta para el motor de cálculos
         if (data.tarifas && data.tarifas.length > 0) {
             try {
-                if (!tablaOferta[name]) tablaOferta[name] = {};
+                const newRates = {};
                 data.tarifas.forEach(t => {
-                    if (t.descripcion) tablaOferta[name][t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
+                    if (t.descripcion) newRates[t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
                 });
+                tablaOferta[name] = newRates;
+                const normName = normalizeProviderName(name);
+                if (normName && normName !== name) {
+                    tablaOferta[normName] = newRates;
+                }
+                if (areProviderNamesEqual(name, 'ENERGY')) {
+                    tablaOferta['ENERGY SYSTEM'] = newRates;
+                    tablaOferta['ENERGY'] = newRates;
+                }
+                if (areProviderNamesEqual(name, 'GLOBAL')) {
+                    tablaOferta['GLOBAL AIR'] = newRates;
+                    tablaOferta['GLOBAL'] = newRates;
+                }
+                if (typeof priceSearchCache !== 'undefined' && priceSearchCache) {
+                    priceSearchCache.clear();
+                }
                 syncAllProvidersToTablaOferta();
             } catch (errT) {
                 console.warn("Aviso al guardar tablaOferta:", errT);
@@ -3252,7 +3371,7 @@ async function deleteProviderDraft(provName) {
     }
 
     proveedoresRegistrados = proveedoresRegistrados.filter(p => 
-        (p.nombre_comercial || p.nombre || '').trim().toUpperCase() !== provName.trim().toUpperCase()
+        !areProviderNamesEqual(p.nombre_comercial || p.nombre || '', provName)
     );
     safeSaveProvidersLocally(proveedoresRegistrados);
 
@@ -3328,97 +3447,64 @@ async function loadProveedoresRegistrados() {
         }
     }
 
-    // 2. Intentar sincronizar con el servidor local
+    // 2. Intentar sincronizar con el archivo inicial proveedores_registrados.json o backend
+    let serverList = null;
     try {
-        const res = await fetch('/api/providers');
-        if (res.ok) {
-            const serverList = await res.json();
-            if (Array.isArray(serverList) && serverList.length > 0) {
-                // Merge without duplicates
-                serverList.forEach(sp => {
-                    const normSp = normalizeProviderName(sp.nombre_comercial || sp.nombre || '');
-                    const k = normSp.trim().toUpperCase();
-                    if (!proveedoresRegistrados.some(p => normalizeProviderName(p.nombre_comercial || p.nombre || '').trim().toUpperCase() === k)) {
-                        proveedoresRegistrados.push(sp);
-                    }
-                });
-            }
-        }
-    } catch (err) {
-        console.log("Modo offline o servidor local sin API de proveedores activa.");
+        const res = await fetch('proveedores_registrados.json');
+        if (res.ok) serverList = await res.json();
+    } catch(e) {}
+    if (!serverList) {
+        try {
+            const res2 = await fetch('/api/providers');
+            if (res2.ok) serverList = await res2.json();
+        } catch(e) {}
     }
 
-    // 2.5 Consolidar proveedor único oficial ENERGY SYSTEM
-    // Limpiar cualquier variación previa de ENERGY o ENERGY SYSTEMS para asegurar una única ficha limpia
-    proveedoresRegistrados = proveedoresRegistrados.filter(p => {
-        const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
-        return k !== 'ENERGY' && k !== 'ENERGY SYSTEMS' && k !== 'ENERGY SYSTEM';
-    });
-
-    const energyTarifas = [
-        { rms: '101016766', descripcion: 'INSTALACION BASICA DE AIRE ACONDICIONADO 12K Y 18K BTU', tarifa: 1500 },
-        { rms: '101016773', descripcion: 'INSTALACION BASICA DE AIRE ACONDICIONADO 24K BTU', tarifa: 1800 },
-        { rms: '101016781', descripcion: 'DESINSTALACION DE AIRE ACONDICIONADO 12K Y 18K BTU', tarifa: 800 },
-        { rms: '101016790', descripcion: 'DESINSTALACION DE AIRE ACONDICIONADO 24K BTU', tarifa: 900 },
-        { rms: '101016802', descripcion: 'MANTENIMIENTO PREVENTIVO DE AIRE ACONDICIONADO 12K Y 18K BTU', tarifa: 700 },
-        { rms: '101016810', descripcion: 'MANTENIMIENTO PREVENTIVO DE AIRE ACONDICIONADO 24K BTU', tarifa: 850 },
-        { rms: '101026007', descripcion: 'INSTALACION BASICA DE A/C 12000 BTU INVERTER Y CONVENCIONAL', tarifa: 1500 },
-        { rms: '101025389', descripcion: 'INSTALACION BASICA DE A/C 18000 BTU INVERTER Y CONVENCIONAL', tarifa: 1500 },
-        { rms: '145518214', descripcion: 'INSTALACION BASICA DE A/C 24000 BTU INVERTER Y CONVENCIONAL', tarifa: 1800 },
-        { rms: '130196460', descripcion: 'INSTALACION BASICA DE A/C 36000 BTU INVERTER Y CONVENCIONAL', tarifa: 2500 },
-        { rms: '130196451', descripcion: 'DESINSTALACION DE A/C DE 12,000 Y 18,000 BTU', tarifa: 800 },
-        { rms: '137301040', descripcion: 'DESINSTALACION DE A/C DE 24,000 Y 36,000 BTU', tarifa: 900 },
-        { rms: '101026023', descripcion: 'MANTENIMIENTO PREVENTIVO DE A/C 12000 Y 18000 BTU', tarifa: 700 },
-        { rms: '101026031', descripcion: 'MANTENIMIENTO PREVENTIVO DE A/C 24000 Y 36000 BTU', tarifa: 850 }
-    ];
-
-    const energyProv = {
-        nombre_comercial: 'ENERGY SYSTEM',
-        nombre_representante: 'JOSE ARMANDO VANEGAS SALAZAR',
-        cedula: '001-090987-0043X',
-        ruc: '0010909870043X',
-        estado_civil: 'Soltero',
-        profesion: 'Técnico Especialista en HVAC',
-        domicilio: 'Managua, Nicaragua',
-        regimen: 'Régimen General',
-        banco: 'Banco LAFISE Bancentro',
-        cuenta_bancaria: '102201948',
-        titular_cuenta: 'JOSE ARMANDO VANEGAS SALAZAR',
-        telefono: '8645-3129 / 8856-1234',
-        correo: 'energy.systems.ni@gmail.com',
-        direccion: 'Reparto San Antonio, de la Iglesia San Antonio 2 c al sur, 1 c al este, casa #D-12, Managua',
-        tarifa_combustible: 12.0,
-        tarifas: energyTarifas,
-        contrato_rubricado: {
-            fileName: 'CONTRADO ENERGY FIRMADO (2).pdf',
-            fileSize: '3.8 MB',
-            uploadDate: '23/09/2026',
-            observaciones: 'Contrato formal rubricado y legalizado por SILVA INTERNACIONAL S.A. y ENERGY SYSTEM'
-        },
-        documentos: {
-            cedula: { fileName: 'Cedula_Jose_Armando_Vanegas.pdf', validated: true, notRequired: false },
-            ruc: { fileName: 'RUC_Energy_Systems.pdf', validated: true, notRequired: false },
-            matricula: { fileName: 'Matricula_Alcaldia_Managua_2026.pdf', validated: true, notRequired: false },
-            solvencia_fiscal: { fileName: 'Solvencia_Fiscal_DGI_Vigente.pdf', validated: true, notRequired: false },
-            poder_legal: { notRequired: true, justification: 'Persona natural con negocio / Titular directo' },
-            certificacion_bancaria: { fileName: 'Certificacion_Cuenta_LAFISE.pdf', validated: true, notRequired: false },
-            antecedentes: { fileName: 'Record_Policia_Vanegas.pdf', validated: true, notRequired: false },
-            certificacion_tecnica: { fileName: 'Certificacion_Tecnica_Refrigeracion.pdf', validated: true, notRequired: false },
-            seguro_inss: { fileName: 'Constancia_Cumplimiento_INSS.pdf', validated: true, notRequired: false }
+    if (Array.isArray(serverList) && serverList.length > 0) {
+        if (!Array.isArray(proveedoresRegistrados) || proveedoresRegistrados.length === 0) {
+            proveedoresRegistrados = serverList;
+        } else {
+            // Incorporar proveedores base faltantes respetando lo que ya tiene guardado el usuario en localStorage
+            serverList.forEach(sp => {
+                const spName = sp.nombre_comercial || sp.nombre || '';
+                if (!proveedoresRegistrados.some(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', spName))) {
+                    proveedoresRegistrados.push(sp);
+                }
+            });
         }
-    };
-    proveedoresRegistrados.unshift(energyProv);
-
-    // Sincronizar también con tablaOferta para el motor de cálculo
-    if (!tablaOferta['ENERGY SYSTEM']) {
-        tablaOferta['ENERGY SYSTEM'] = {};
     }
-    energyTarifas.forEach(t => {
-        tablaOferta['ENERGY SYSTEM'][t.descripcion] = t.tarifa;
-    });
-    delete tablaOferta['ENERGY'];
-    delete tablaOferta['ENERGY SYSTEMS'];
-    setupEnergyAliases();
+
+    // 2.5 Respetar y asegurar proveedor ENERGY / ENERGY SYSTEM sin destruir ediciones del usuario
+    const hasEnergy = proveedoresRegistrados.some(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', 'ENERGY'));
+    if (!hasEnergy) {
+        const seedEnergy = {
+            nombre_comercial: 'ENERGY SYSTEM',
+            nombre_representante: 'Roberto Blandón Sánchez',
+            cedula: '001-200482-0001K',
+            ruc: 'J0310000847291',
+            regimen: 'Régimen General',
+            banco: 'Banco de la Producción (BANPRO)',
+            cuenta_bancaria: '10023819402',
+            titular_cuenta: 'Energy Soluciones S.A.',
+            telefono: '8455-2233',
+            correo: 'administracion@energy.com.ni',
+            direccion: 'Carretera Norte Km 5.5, Managua',
+            tarifa_combustible: 12.0,
+            tarifas: [
+                { rms: '101026007', descripcion: 'INSTALACION AIRE ACONDICIONADO DE 12-24 MIL BTU', tarifa: 3110.0 },
+                { rms: '101025389', descripcion: 'VISITA A DOMICILIO EN CONCEPTO DE DIAGNOSTICO', tarifa: 200.0 },
+                { rms: '145518214', descripcion: 'VISITA WHATSAPP PARA FUTURA INSTALACION DE AIRE ACONDICIONADO', tarifa: 200.0 },
+                { rms: '130196460', descripcion: 'INSTALACION DE PUNTO ELECTRICO', tarifa: 500.0 },
+                { rms: '130196451', descripcion: 'DESINTALACION DE AIRE ACONDICIONADO >24 MIL BTU', tarifa: 800.0 },
+                { rms: '137301040', descripcion: 'DESINSTALACION DE AIRE 12-18-24 MIL BTU', tarifa: 400.0 },
+                { rms: '101026023', descripcion: 'MANTENIMIENTO PREVENTIVO AIRE ACONDICIONADO', tarifa: 750.0 },
+                { rms: '101026031', descripcion: 'MANTENIMIENTO GENERAL DE AIRE ACONDICIONADO', tarifa: 2000.0 }
+            ],
+            estado: 'ACTIVO',
+            progreso: 100
+        };
+        proveedoresRegistrados.unshift(seedEnergy);
+    }
 
     // 2.6 Asegurar proveedor foráneo oficial BAJO CERO (Chinandega) en el Directorio
     const bajoCeroTarifas = [
@@ -3565,8 +3651,7 @@ async function loadProveedoresRegistrados() {
     // 3. Si tablaOferta tiene proveedores que no están en el directorio, agregarlos como base
     Object.keys(tablaOferta).forEach(rawPName => {
         const pName = normalizeProviderName(rawPName);
-        const k = pName.trim().toUpperCase();
-        if (!proveedoresRegistrados.some(p => normalizeProviderName(p.nombre_comercial || p.nombre || '').trim().toUpperCase() === k)) {
+        if (!proveedoresRegistrados.some(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', pName))) {
             const acts = tablaOferta[pName] || tablaOferta[rawPName] || {};
             const actList = Object.keys(acts).map(a => ({
                 rms: a.includes('101') || a.includes('130') || a.includes('145') || a.includes('137') ? a.substring(0, 9).trim() : '',
@@ -3777,7 +3862,10 @@ function initOnboardingWizard() {
     const dropZoneWiz = document.getElementById('drop-zone-wiz-oferta');
     const inputWizOferta = document.getElementById('input-wiz-oferta');
     if (dropZoneWiz && inputWizOferta) {
-        dropZoneWiz.addEventListener('click', () => inputWizOferta.click());
+        dropZoneWiz.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            inputWizOferta.click();
+        });
         dropZoneWiz.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZoneWiz.style.borderColor = 'var(--accent)';
@@ -3800,10 +3888,25 @@ function initOnboardingWizard() {
                 handleWizardExcelUpload(e.target.files[0]);
             }
         });
+
+        // Botón examinar dentro del drop zone
+        document.getElementById('btn-browse-wiz-oferta')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            inputWizOferta.click();
+        });
+
+        // Botón descargar plantilla dentro del drop zone
+        document.getElementById('btn-download-offer-template-drop')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            downloadContractorExcelTemplate();
+        });
     }
 
-    // Botón descargar plantilla Excel
-    document.getElementById('btn-download-offer-template')?.addEventListener('click', downloadContractorExcelTemplate);
+    // Botón descargar plantilla Excel en la cabecera del Paso 3
+    document.getElementById('btn-download-offer-template')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        downloadContractorExcelTemplate();
+    });
 
     // Botón descargar tabla de actividades pactadas
     document.getElementById('btn-download-wiz-tariffs')?.addEventListener('click', downloadAgreedTariffsExcel);
@@ -4619,18 +4722,25 @@ function handleWizardExcelUpload(file) {
             let descIndex = -1;
             let tarifaIndex = -1;
 
-            // Detectar encabezados
+            // Detectar encabezados por fila individual
             for (let i = 0; i < Math.min(json.length, 10); i++) {
                 const row = json[i];
                 if (!row) continue;
+                let curRms = -1;
+                let curDesc = -1;
+                let curTarifa = -1;
+
                 for (let j = 0; j < row.length; j++) {
                     const val = String(row[j] || '').toUpperCase().trim();
-                    if (val === 'RMS' || val === 'CODIGO' || val === 'CÓDIGO') rmsIndex = j;
-                    if (val.includes('DESCRIP') || val.includes('ACTIVIDAD')) descIndex = j;
-                    if (val.includes('TARIFA') || val.includes('PRECIO') || val.includes('VALOR')) tarifaIndex = j;
+                    if (val === 'RMS' || val === 'CODIGO' || val === 'CÓDIGO' || val.includes('CODIGO RMS') || val.includes('CÓDIGO RMS')) curRms = j;
+                    if (val.includes('DESCRIP') || val.includes('ACTIVIDAD')) curDesc = j;
+                    if (val.includes('TARIFA') || val.includes('PRECIO') || val.includes('VALOR')) curTarifa = j;
                 }
-                if (descIndex !== -1 && (tarifaIndex !== -1 || rmsIndex !== -1)) {
+                if (curDesc !== -1 && (curTarifa !== -1 || curRms !== -1)) {
                     headerRowIndex = i;
+                    rmsIndex = curRms;
+                    descIndex = curDesc;
+                    tarifaIndex = curTarifa;
                     break;
                 }
             }
@@ -4748,11 +4858,10 @@ function renderWizardTariffTable() {
     });
 }
 
-// Descargar plantilla Excel de oferta
+// Descargar plantilla Excel oficial de oferta de actividades para contratistas
 function downloadContractorExcelTemplate() {
     const wsData = [
-        ["TABLA DE OFERTA CONTRATISTA DE MAESTROS"],
-        ["RMS", "DESCRIPCION", "TARIFA"],
+        ["CÓDIGO RMS", "DESCRIPCIÓN DE LA ACTIVIDAD", "TARIFA PACTADA (C$)"],
         ["101026007", "INSTALACION AIRE ACONDICIONADO DE 12-24 MIL BTU", 2563.40],
         ["101025389", "VISITA A DOMICILIO EN CONCEPTO DE DIAGNOSTICO", 256.34],
         ["145518214", "VISITA WHATSAPP PARA FUTURA INSTALACION DE AIRE ACONDICIONADO", 200.00],
@@ -4765,9 +4874,14 @@ function downloadContractorExcelTemplate() {
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [
+        { wch: 18 },
+        { wch: 65 },
+        { wch: 24 }
+    ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Oferta");
-    XLSX.writeFile(wb, "PLANTILLA_OFERTA_MAESTROS_SINSA.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Oferta Actividades");
+    XLSX.writeFile(wb, "PLANTILLA_ACTIVIDADES_CONTRATISTA_MAESTROS.xlsx");
 }
 
 // Descargar la tabla de actividades pactadas actualmente configurada en el Paso 3
@@ -4858,6 +4972,22 @@ function downloadAgreedTariffsExcel() {
 
 // Obtener los datos actuales del formulario sin inventar valores por defecto si están vacíos
 function getWizardData() {
+    // Sincronizar inputs editados directamente en la tabla del DOM si existen
+    const tbody = document.getElementById('wiz-tariff-body');
+    if (tbody && Array.isArray(wizardTarifas) && wizardTarifas.length > 0) {
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((tr, idx) => {
+            if (wizardTarifas[idx]) {
+                const rmsInput = tr.querySelector(`[data-t-rms="${idx}"]`);
+                const descInput = tr.querySelector(`[data-t-desc="${idx}"]`);
+                const priceInput = tr.querySelector(`[data-t-price="${idx}"]`);
+                if (rmsInput) wizardTarifas[idx].rms = rmsInput.value.trim();
+                if (descInput) wizardTarifas[idx].descripcion = descInput.value.trim();
+                if (priceInput) wizardTarifas[idx].tarifa = parseFloat(priceInput.value) || 0;
+            }
+        });
+    }
+
     return {
         nombre_comercial: (document.getElementById('wiz-nombre-comercial')?.value || '').trim(),
         nombre_representante: (document.getElementById('wiz-nombre-rep')?.value || '').trim(),
@@ -8171,14 +8301,17 @@ async function finishProviderOnboarding() {
     const origName = window.currentEditingProviderOriginalName;
     let existingIdx = -1;
     if (origName) {
-        existingIdx = proveedoresRegistrados.findIndex(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === origName.trim().toUpperCase());
+        existingIdx = proveedoresRegistrados.findIndex(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', origName));
     }
     if (existingIdx < 0) {
-        existingIdx = proveedoresRegistrados.findIndex(p => (p.nombre_comercial || p.nombre || '').trim().toUpperCase() === provName.toUpperCase());
+        existingIdx = proveedoresRegistrados.findIndex(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', provName));
     }
 
     if (existingIdx >= 0) {
-        proveedoresRegistrados[existingIdx] = data;
+        proveedoresRegistrados[existingIdx] = {
+            ...proveedoresRegistrados[existingIdx],
+            ...data
+        };
     } else {
         proveedoresRegistrados.push(data);
     }
@@ -8202,6 +8335,26 @@ async function finishProviderOnboarding() {
     }
 
     // 4. SINCRONIZACIÓN INMEDIATA CON EL MOTOR DE PAGOS (tablaOferta)
+    if (data.tarifas && data.tarifas.length > 0) {
+        const newRates = {};
+        data.tarifas.forEach(t => {
+            if (t.descripcion) newRates[t.descripcion.trim()] = parseFloat(t.tarifa) || 0;
+        });
+        tablaOferta[provName] = newRates;
+        const normName = normalizeProviderName(provName);
+        if (normName && normName !== provName) tablaOferta[normName] = newRates;
+        if (areProviderNamesEqual(provName, 'ENERGY')) {
+            tablaOferta['ENERGY SYSTEM'] = newRates;
+            tablaOferta['ENERGY'] = newRates;
+        }
+        if (areProviderNamesEqual(provName, 'GLOBAL')) {
+            tablaOferta['GLOBAL AIR'] = newRates;
+            tablaOferta['GLOBAL'] = newRates;
+        }
+        if (typeof priceSearchCache !== 'undefined' && priceSearchCache) {
+            priceSearchCache.clear();
+        }
+    }
     syncAllProvidersToTablaOferta();
 
     // 5. Seleccionar este proveedor en el Resumen de Pagos

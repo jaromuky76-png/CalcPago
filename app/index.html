@@ -655,8 +655,8 @@
                                         <h3>📊 3. Tabla de Oferta de Tarifas del Contratista</h3>
                                         <p class="step-card-desc">Carga el archivo Excel con las tarifas pactadas o edita y agrega actividades manualmente.</p>
                                     </div>
-                                    <button id="btn-download-offer-template" class="btn btn-outline" style="font-size: 0.85rem;" title="Descargar archivo Excel modelo">
-                                        📥 Descargar Plantilla Excel
+                                    <button id="btn-download-offer-template" class="btn btn-outline" style="font-size: 0.85rem; color: #059669; border-color: #059669; display: inline-flex; align-items: center; gap: 0.4rem;" title="Descargar archivo Excel oficial con formato compatible">
+                                        <span>📥</span> <span>Descargar Plantilla Oficial (.xlsx)</span>
                                     </button>
                                 </div>
                             </div>
@@ -666,7 +666,15 @@
                                 <div class="drop-icon">📑</div>
                                 <div class="drop-text">
                                     <strong>Arrastra aquí el Excel de Tarifas del Proveedor</strong>
-                                    <p>Formato compatible con columnas: <code>RMS</code>, <code>DESCRIPCION</code>, <code>TARIFA</code> (o formato estándar de Maestros)</p>
+                                    <p>Columnas compatibles: <code>CÓDIGO RMS</code>, <code>DESCRIPCIÓN DE LA ACTIVIDAD</code>, <code>TARIFA PACTADA (C$)</code></p>
+                                </div>
+                                <div style="display: flex; gap: 0.75rem; margin-top: 0.9rem; flex-wrap: wrap; justify-content: center;">
+                                    <button type="button" id="btn-download-offer-template-drop" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1.1rem; display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" title="Descargar plantilla Excel oficial lista para completar y arrastrar">
+                                        <span>📥</span> <strong>Descargar Plantilla Oficial (.xlsx)</strong>
+                                    </button>
+                                    <button type="button" id="btn-browse-wiz-oferta" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.5rem 1rem; display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                                        <span>📂</span> Seleccionar Archivo
+                                    </button>
                                 </div>
                                 <input type="file" id="input-wiz-oferta" accept=".xlsx, .xls" hidden>
                             </div>
