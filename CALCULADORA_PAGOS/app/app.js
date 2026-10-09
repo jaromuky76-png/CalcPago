@@ -20,6 +20,19 @@ const inputOT = document.getElementById('input-ot');
 const tableBody = document.getElementById('table-body');
 const summaryCards = document.getElementById('summary-cards');
 
+// Utilidad de formateo de moneda con separador de miles
+function formatMoneyNIO(amount, prefix = 'C$') {
+    const num = Number(amount) || 0;
+    return `${prefix}${num.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Caché de búsqueda de tarifas para optimizar el rendimiento al procesar miles de OTs
+const priceSearchCache = new Map();
+
+function clearPriceSearchCache() {
+    priceSearchCache.clear();
+}
+
 // Normalizador global del nombre de proveedor
 function normalizeProviderName(name) {
     if (!name) return '';
@@ -626,114 +639,152 @@ function handleOTUpload(file) {
         return;
     }
 
+    const dropZone = document.getElementById('drop-zone-ot');
+    if (dropZone) {
+        dropZone.innerHTML = '<p style="color:var(--primary); font-weight:bold;">⏳ Procesando archivo de Estado de OT... Por favor espera un momento.</p>';
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            
-            const sheetName = workbook.SheetNames.find(s => s.trim().toUpperCase() === 'OT');
-            if (!sheetName) {
-                alert("No se encontró la hoja 'OT' en el archivo.");
-                return;
-            }
-
-            const worksheet = workbook.Sheets[sheetName];
-            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            
-            const extracted = [];
-            for (let i = 1; i < rows.length; i++) {
-                const row = rows[i];
-                if (!row) continue;
-                const providerRaw = row[31] ? normalizeProviderName(row[31].toString()) : '';
+        // Ejecutar en setTimeout para dar tiempo al navegador de renderizar el mensaje de carga
+        setTimeout(() => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true, dense: true });
                 
-                if (providerRaw) {
-                    const ordenStr = row[2] ? row[2].toString().trim() : 'N/A';
-                    // Saltar la fila de encabezados si se coló
-                    if (ordenStr.toUpperCase() === 'NO. OT/MR' || ordenStr.toUpperCase() === 'ORDEN' || ordenStr.toUpperCase() === 'ORDEN DE TRABAJO') {
-                        continue;
+                const sheetName = workbook.SheetNames.find(s => s.trim().toUpperCase() === 'OT');
+                if (!sheetName) {
+                    alert("No se encontró la hoja 'OT' en el archivo.");
+                    if (dropZone) {
+                        dropZone.innerHTML = '<p>Arrastra el archivo de <strong>Estado de OT</strong> aquí o haz clic para subir (.xlsx, .xls)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>';
+                        setupDragAndDrop(dropZone, document.getElementById('input-ot'), handleOTUpload);
                     }
-                    let fechaRaw = row[32];
-                    let fechaStr = 'N/A';
-                    let fechaObj = new Date(8640000000000000); // Max date so it goes to bottom if unknown
-                    if (typeof fechaRaw === 'number') {
-                        // Convertir número de serie de Excel a fecha JS
-                        fechaObj = new Date(Math.round((fechaRaw - 25569) * 86400 * 1000));
-                        // Asegurarnos de que no haya desajustes por zona horaria
-                        const d = fechaObj.getUTCDate();
-                        const m = fechaObj.getUTCMonth() + 1;
-                        const y = fechaObj.getUTCFullYear();
-                        fechaStr = `${d.toString().padStart(2, '0')}/${m.toString().padStart(2, '0')}/${y}`;
-                    } else if (fechaRaw) {
-                        fechaStr = fechaRaw.toString().trim();
-                        // Try to parse string DD/MM/YYYY
-                        const parts = fechaStr.split('/');
-                        if(parts.length === 3) {
-                            fechaObj = new Date(parts[2], parts[1]-1, parts[0]);
+                    return;
+                }
+
+                const worksheet = workbook.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                const fileNameUpper = file.name.toUpperCase();
+                const months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+                let fileMonth = 'NO DEFINIDO';
+                for (let mIdx = 0; mIdx < months.length; mIdx++) {
+                    if (fileNameUpper.includes(months[mIdx])) {
+                        fileMonth = months[mIdx];
+                        break;
+                    }
+                }
+
+                const extracted = [];
+                const maxDate = new Date(8640000000000000);
+                const baseId = Date.now();
+
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row) continue;
+                    const providerRaw = row[31] ? normalizeProviderName(row[31].toString()) : '';
+                    
+                    if (providerRaw) {
+                        const ordenStr = row[2] ? row[2].toString().trim() : 'N/A';
+                        // Saltar la fila de encabezados si se coló
+                        if (ordenStr.toUpperCase() === 'NO. OT/MR' || ordenStr.toUpperCase() === 'ORDEN' || ordenStr.toUpperCase() === 'ORDEN DE TRABAJO') {
+                            continue;
                         }
+                        let fechaRaw = row[32];
+                        let fechaStr = 'N/A';
+                        let fechaObj = maxDate;
+                        if (fechaRaw instanceof Date) {
+                            fechaObj = fechaRaw;
+                            const d = fechaObj.getDate();
+                            const m = fechaObj.getMonth() + 1;
+                            const y = fechaObj.getFullYear();
+                            fechaStr = `${d.toString().padStart(2, '0')}/${m.toString().padStart(2, '0')}/${y}`;
+                        } else if (typeof fechaRaw === 'number') {
+                            fechaObj = new Date(Math.round((fechaRaw - 25569) * 86400 * 1000));
+                            const d = fechaObj.getUTCDate();
+                            const m = fechaObj.getUTCMonth() + 1;
+                            const y = fechaObj.getUTCFullYear();
+                            fechaStr = `${d.toString().padStart(2, '0')}/${m.toString().padStart(2, '0')}/${y}`;
+                        } else if (fechaRaw) {
+                            fechaStr = fechaRaw.toString().trim();
+                            const parts = fechaStr.split('/');
+                            if (parts.length === 3) {
+                                fechaObj = new Date(parts[2], parts[1] - 1, parts[0]);
+                            }
+                        }
+
+                        extracted.push({
+                            id: baseId + i,
+                            orden: ordenStr,
+                            fecha: fechaStr,
+                            fechaObj: fechaObj,
+                            actividad: row[9] ? row[9].toString().trim() : 'Sin Especificar',
+                            proveedor: providerRaw,
+                            semana: null,
+                            mes: fileMonth,
+                            fileName: file.name
+                        });
                     }
+                }
 
-                    const fileNameUpper = file.name.toUpperCase();
-                    const months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
-                    let fileMonth = 'NO DEFINIDO';
-                    months.forEach(m => { if (fileNameUpper.includes(m)) fileMonth = m; });
+                if (extracted.length === 0) {
+                    alert("No se encontraron actividades en el archivo de OT.");
+                    if (dropZone) {
+                        dropZone.innerHTML = '<p>Arrastra el archivo de <strong>Estado de OT</strong> aquí o haz clic para subir (.xlsx, .xls)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>';
+                        setupDragAndDrop(dropZone, document.getElementById('input-ot'), handleOTUpload);
+                    }
+                    return;
+                }
 
-                    extracted.push({
-                        id: Date.now() + i, // Unique ID
-                        orden: ordenStr,
-                        fecha: fechaStr,
-                        fechaObj: fechaObj,
-                        actividad: row[9] ? row[9].toString().trim() : 'Sin Especificar',
-                        proveedor: providerRaw,
-                        semana: null,
-                        mes: fileMonth,
-                        fileName: file.name
-                    });
+                clearPriceSearchCache();
+
+                // Si se vuelve a subir un archivo del mismo mes o del mismo nombre,
+                // reemplazamos los registros automáticos anteriores de ese mes/archivo
+                const fileMonthDetected = extracted[0] ? extracted[0].mes : 'NO DEFINIDO';
+                let replacedCount = 0;
+                const beforeCount = currentOTData.length;
+
+                if (fileMonthDetected !== 'NO DEFINIDO') {
+                    currentOTData = currentOTData.filter(item => item.isManual || item.mes !== fileMonthDetected);
+                } else {
+                    currentOTData = currentOTData.filter(item => item.isManual || item.fileName !== file.name);
+                }
+                replacedCount = beforeCount - currentOTData.length;
+
+                currentOTData = currentOTData.concat(extracted);
+                currentOTData.sort((a, b) => a.fechaObj - b.fechaObj);
+                
+                updateMonthFilter();
+                
+                // Si hay un proveedor seleccionado, mantenemos ese, si no, se queda en ALL
+                const initialProviderSelect = document.getElementById('initial-provider-select');
+                selectedProvider = initialProviderSelect?.value || 'ALL';
+                
+                renderTable();
+                calculateAndRenderSummary();
+                updateProviderPricesTable();
+                saveWorkspaceState();
+
+                if (dropZone) {
+                    dropZone.innerHTML = `<p style="color:var(--accent); font-weight:bold;">✓ Archivo cargado: ${file.name} (${extracted.length} registros)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>`;
+                    setupDragAndDrop(dropZone, document.getElementById('input-ot'), handleOTUpload);
+                }
+
+                if (replacedCount > 0) {
+                    alert(`¡Estado de OT actualizado con éxito!\nSe reemplazaron ${replacedCount} registros anteriores del mes (${fileMonthDetected}) con la versión más reciente del archivo.`);
+                } else {
+                    alert(`¡Se cargaron ${extracted.length} órdenes de trabajo (${fileMonthDetected}) con éxito!`);
+                }
+                
+            } catch (err) {
+                console.error(err);
+                alert("Error al procesar el Estado de OT: " + err.message);
+                if (dropZone) {
+                    dropZone.innerHTML = '<p>Arrastra el archivo de <strong>Estado de OT</strong> aquí o haz clic para subir (.xlsx, .xls)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>';
+                    setupDragAndDrop(dropZone, document.getElementById('input-ot'), handleOTUpload);
                 }
             }
-
-            if (extracted.length === 0) {
-                alert("No se encontraron actividades en el archivo de OT.");
-                return;
-            }
-
-            // Si se vuelve a subir un archivo del mismo mes o del mismo nombre,
-            // reemplazamos los registros automáticos anteriores de ese mes/archivo
-            const fileMonthDetected = extracted[0] ? extracted[0].mes : 'NO DEFINIDO';
-            let replacedCount = 0;
-            const beforeCount = currentOTData.length;
-
-            if (fileMonthDetected !== 'NO DEFINIDO') {
-                currentOTData = currentOTData.filter(item => item.isManual || item.mes !== fileMonthDetected);
-            } else {
-                currentOTData = currentOTData.filter(item => item.isManual || item.fileName !== file.name);
-            }
-            replacedCount = beforeCount - currentOTData.length;
-
-            currentOTData = currentOTData.concat(extracted);
-            currentOTData.sort((a, b) => a.fechaObj - b.fechaObj);
-            
-            updateMonthFilter();
-            
-            // Si hay un proveedor seleccionado, mantenemos ese, si no, se queda en ALL
-            const initialProviderSelect = document.getElementById('initial-provider-select');
-            selectedProvider = initialProviderSelect.value || 'ALL';
-            
-            renderTable();
-            calculateAndRenderSummary();
-            updateProviderPricesTable();
-            saveWorkspaceState();
-
-            if (replacedCount > 0) {
-                alert(`¡Estado de OT actualizado con éxito!\nSe reemplazaron ${replacedCount} registros anteriores del mes (${fileMonthDetected}) con la versión más reciente del archivo.`);
-            } else {
-                alert(`¡Se cargaron ${extracted.length} órdenes de trabajo (${fileMonthDetected}) con éxito!`);
-            }
-            
-        } catch (err) {
-            console.error(err);
-            alert("Error al procesar el Estado de OT: " + err.message);
-        }
+        }, 20);
     };
     reader.readAsArrayBuffer(file);
 }
@@ -796,6 +847,7 @@ function updateInitialProviderSelect() {
 // Update initial provider select change listener to update table
 document.getElementById('initial-provider-select')?.addEventListener('change', (e) => {
     selectedProvider = e.target.value;
+    clearPriceSearchCache();
     renderTable();
     calculateAndRenderSummary();
     updateProviderPricesTable();
@@ -805,12 +857,16 @@ document.getElementById('initial-provider-select')?.addEventListener('change', (
 const searchTopInput = document.getElementById('search-ot');
 const searchTableInput = document.getElementById('table-search-ot');
 const btnTableSearch = document.getElementById('btn-table-search');
+let searchDebounceTimer = null;
 
 function triggerSearchSync(val) {
     if (searchTopInput && searchTopInput.value !== val) searchTopInput.value = val;
     if (searchTableInput && searchTableInput.value !== val) searchTableInput.value = val;
-    renderTable();
-    calculateAndRenderSummary();
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+        renderTable();
+        calculateAndRenderSummary();
+    }, 150);
 }
 
 searchTopInput?.addEventListener('input', (e) => triggerSearchSync(e.target.value));
@@ -920,11 +976,19 @@ function updateProviderPricesTable() {
     });
 }
 
+let saveWorkspaceDebounceTimer = null;
+function debouncedSaveWorkspaceState() {
+    if (saveWorkspaceDebounceTimer) clearTimeout(saveWorkspaceDebounceTimer);
+    saveWorkspaceDebounceTimer = setTimeout(() => {
+        saveWorkspaceState();
+    }, 350);
+}
+
 function renderTable() {
     const tableBody = document.getElementById('table-body');
-    tableBody.innerHTML = '';
+    if (!tableBody) return;
     
-    if(currentOTData.length === 0) {
+    if (currentOTData.length === 0) {
         tableBody.innerHTML = '<tr class="empty-row"><td colspan="8">No hay datos. Selecciona un proveedor y carga un Estado de OT.</td></tr>';
         return;
     }
@@ -940,7 +1004,7 @@ function renderTable() {
         return selectedProvider === 'ALL' || d.proveedor === selectedProvider;
     });
 
-    if(filteredData.length === 0) {
+    if (filteredData.length === 0) {
         tableBody.innerHTML = '<tr class="empty-row"><td colspan="8">No hay resultados.</td></tr>';
         return;
     }
@@ -948,13 +1012,8 @@ function renderTable() {
     // Ordenar OTs por número de orden de menor a mayor
     filteredData.sort((a, b) => a.orden.localeCompare(b.orden, undefined, { numeric: true, sensitivity: 'base' }));
 
-    filteredData.forEach(item => {
-        const tr = document.createElement('tr');
-        if (item.semana) {
-            tr.classList.add(`row-sem${item.semana}`);
-            tr.classList.add('row-validated');
-        }
-
+    // Construcción en bloque para máximo rendimiento en el navegador (evita miles de reflujos del DOM)
+    const rowsHtml = filteredData.map(item => {
         const provPrices = tablaOferta[item.proveedor];
         const priceInfo = findProviderPrice(item.actividad, provPrices);
         let activityHTML = '';
@@ -974,44 +1033,55 @@ function renderTable() {
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
                     <span>${item.actividad}</span>
                     <div style="display: flex; align-items: center; gap: 4px;">
-                        <span style="font-size: 0.75rem; color: #00A859; font-weight: 600; background: rgba(0, 168, 89, 0.08); padding: 1px 6px; border-radius: 6px;">C$${priceInfo.price.toFixed(2)}</span>
+                        <span style="font-size: 0.75rem; color: #00A859; font-weight: 600; background: rgba(0, 168, 89, 0.08); padding: 1px 6px; border-radius: 6px;">C$ ${priceInfo.price.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <button class="btn-edit-act btn-trigger-edit-act" data-id="${item.id}" title="Editar o corregir descripción">✏️</button>
                     </div>
                 </div>
             `;
         }
 
-        tr.innerHTML = `
-            <td>${item.orden}</td>
-            <td>${item.fecha}</td>
-            <td>${activityHTML}</td>
-            <td>${item.proveedor}</td>
-            <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="1" ${item.semana === 1 ? 'checked' : ''}></td>
-            <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="2" ${item.semana === 2 ? 'checked' : ''}></td>
-            <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="3" ${item.semana === 3 ? 'checked' : ''}></td>
-            <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="4" ${item.semana === 4 ? 'checked' : ''}></td>
+        const rowClasses = item.semana ? `row-sem${item.semana} row-validated` : '';
+
+        return `
+            <tr id="ot-row-${item.id}" class="${rowClasses}">
+                <td>${item.orden}</td>
+                <td>${item.fecha}</td>
+                <td>${activityHTML}</td>
+                <td>${item.proveedor}</td>
+                <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="1" ${item.semana === 1 ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="2" ${item.semana === 2 ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="3" ${item.semana === 3 ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="week-checkbox" data-id="${item.id}" data-sem="4" ${item.semana === 4 ? 'checked' : ''}></td>
+            </tr>
         `;
-        tableBody.appendChild(tr);
-    });
+    }).join('');
 
-    const checkboxes = document.querySelectorAll('.week-checkbox');
-    checkboxes.forEach(cb => {
-        cb.addEventListener('change', handleCheckboxChange);
-    });
+    tableBody.innerHTML = rowsHtml;
 
-    const editBtns = document.querySelectorAll('.btn-trigger-edit-act');
-    editBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = parseInt(e.currentTarget.getAttribute('data-id'));
-            openEditActivityModal(id);
+    // Delegación de eventos en tableBody: un solo escuchador para toda la tabla (ultra ligero)
+    if (!tableBody.dataset.eventsConfigured) {
+        tableBody.dataset.eventsConfigured = "true";
+
+        tableBody.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('week-checkbox')) {
+                handleCheckboxChange(e);
+            }
         });
-    });
+
+        tableBody.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-trigger-edit-act');
+            if (btn) {
+                const id = parseInt(btn.getAttribute('data-id'), 10);
+                if (!isNaN(id)) openEditActivityModal(id);
+            }
+        });
+    }
 }
 
 function handleCheckboxChange(e) {
     const cb = e.target;
-    const id = parseInt(cb.getAttribute('data-id'));
-    const sem = parseInt(cb.getAttribute('data-sem'));
+    const id = parseInt(cb.getAttribute('data-id'), 10);
+    const sem = parseInt(cb.getAttribute('data-sem'), 10);
     const isChecked = cb.checked;
 
     const item = currentOTData.find(d => d.id === id);
@@ -1059,9 +1129,21 @@ function handleCheckboxChange(e) {
         item.semana = null;
     }
 
-    renderTable(); // Re-render everything to move the row visually
+    // Actualización quirúrgica en pantalla (ultra-rápido, sin re-renderizar miles de filas de la tabla)
+    const rowEl = document.getElementById(`ot-row-${item.id}`) || cb.closest('tr');
+    if (rowEl) {
+        rowEl.classList.remove('row-sem1', 'row-sem2', 'row-sem3', 'row-sem4', 'row-validated');
+        if (item.semana) {
+            rowEl.classList.add(`row-sem${item.semana}`, 'row-validated');
+        }
+        rowEl.querySelectorAll('.week-checkbox').forEach(otherCb => {
+            const otherSem = parseInt(otherCb.getAttribute('data-sem'), 10);
+            otherCb.checked = (otherSem === item.semana);
+        });
+    }
+
     calculateAndRenderSummary();
-    saveWorkspaceState();
+    debouncedSaveWorkspaceState();
 }
 
 // Normalización de Abreviaturas y Términos Frecuentes
@@ -1086,16 +1168,30 @@ function normalizeActivityTerms(actStr) {
     return s;
 }
 
-// Function for 'Homologación de Términos'
+// Function for 'Homologación de Términos' con memorización en caché para máximo rendimiento
 function findProviderPrice(actividadStr, providerPrices) {
     if (!providerPrices || !actividadStr) return { price: 0, mappedName: actividadStr || 'Sin Especificar' };
     
+    // Consulta en caché instantánea O(1)
+    const cacheKey = (selectedProvider || 'ALL') + ':::' + actividadStr;
+    if (priceSearchCache.has(cacheKey)) {
+        return priceSearchCache.get(cacheKey);
+    }
+
     const providerKeys = Object.keys(providerPrices);
-    if (providerKeys.length === 0) return { price: 0, mappedName: actividadStr };
+    if (providerKeys.length === 0) {
+        const fallback = { price: 0, mappedName: actividadStr };
+        priceSearchCache.set(cacheKey, fallback);
+        return fallback;
+    }
+
+    let result = null;
 
     // 1. Exact match on raw string
     if (providerPrices[actividadStr] !== undefined) {
-        return { price: providerPrices[actividadStr], mappedName: actividadStr };
+        result = { price: providerPrices[actividadStr], mappedName: actividadStr };
+        priceSearchCache.set(cacheKey, result);
+        return result;
     }
 
     const normAct = normalizeActivityTerms(actividadStr);
@@ -1103,7 +1199,9 @@ function findProviderPrice(actividadStr, providerPrices) {
     // 2. Exact match on normalized string vs provider offer keys
     const exactNormKey = providerKeys.find(k => k.toUpperCase() === normAct || normalizeActivityTerms(k) === normAct);
     if (exactNormKey) {
-        return { price: providerPrices[exactNormKey], mappedName: exactNormKey };
+        result = { price: providerPrices[exactNormKey], mappedName: exactNormKey };
+        priceSearchCache.set(cacheKey, result);
+        return result;
     }
     
     // 3. Custom Business Rules (Homologación de Términos Avanzada)
@@ -1148,7 +1246,9 @@ function findProviderPrice(actividadStr, providerPrices) {
     }
 
     if (bestKey) {
-        return { price: providerPrices[bestKey], mappedName: bestKey };
+        result = { price: providerPrices[bestKey], mappedName: bestKey };
+        priceSearchCache.set(cacheKey, result);
+        return result;
     }
 
     // 4. Fallback partial match (normalized strings)
@@ -1157,10 +1257,14 @@ function findProviderPrice(actividadStr, providerPrices) {
         return normAct.includes(kn) || kn.includes(normAct);
     });
     if (keyMatch) {
-        return { price: providerPrices[keyMatch], mappedName: keyMatch };
+        result = { price: providerPrices[keyMatch], mappedName: keyMatch };
+        priceSearchCache.set(cacheKey, result);
+        return result;
     }
     
-    return { price: 0, mappedName: actividadStr };
+    result = { price: 0, mappedName: actividadStr };
+    priceSearchCache.set(cacheKey, result);
+    return result;
 }
 
 function calculateAndRenderSummary() {
@@ -1269,8 +1373,8 @@ function calculateAndRenderSummary() {
                             <tr>
                                 <td>${act}</td>
                                 <td style="text-align:center;">${row.cantidad}</td>
-                                <td style="text-align:right;">C$${row.precioUnitario.toFixed(2)}</td>
-                                <td style="text-align:right; font-weight:600; color:var(--accent);">C$${row.total.toFixed(2)}</td>
+                                <td style="text-align:right;">${formatMoneyNIO(row.precioUnitario)}</td>
+                                <td style="text-align:right; font-weight:600; color:var(--accent);">${formatMoneyNIO(row.total)}</td>
                             </tr>
                         `;
                     }
@@ -1291,7 +1395,7 @@ function calculateAndRenderSummary() {
                             <tr style="background-color: rgba(220, 38, 38, 0.05);">
                                 <td colspan="2" style="color: var(--danger);"><span style="font-size: 0.75rem; background: var(--danger); color: white; padding: 2px 6px; border-radius: 4px; margin-right: 8px;">Reclamo</span> ${ded.name}</td>
                                 <td style="text-align:right;"></td>
-                                <td style="text-align:right; font-weight:600; color:var(--danger);">-C$${ded.amount.toFixed(2)}
+                                <td style="text-align:right; font-weight:600; color:var(--danger);">-C$${ded.amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     <button class="btn-icon btn-remove-deduction" data-week="${w}" data-idx="${idx}" style="margin-left: 10px; color: var(--danger); padding: 0;" title="Eliminar deducción">✖</button>
                                 </td>
                             </tr>
@@ -1307,7 +1411,7 @@ function calculateAndRenderSummary() {
                             <ul style="list-style: none; padding: 0; margin: 0;">
                                 ${weekExtras.map((extra, idx) => `
                                     <li style="display: flex; justify-content: space-between; margin-bottom: 0.2rem; align-items: center;">
-                                        <span>[${extra.fecha}] Orden: ${extra.orden} - ${extra.actividad} (C$${extra.valor.toFixed(2)})</span>
+                                        <span>[${extra.fecha}] Orden: ${extra.orden} - ${extra.actividad} (${formatMoneyNIO(extra.valor)})</span>
                                         <button class="btn-icon btn-remove-extra" data-week="${w}" data-idx="${idx}" style="color: var(--danger); padding: 0 4px;" title="Eliminar extra">✖</button>
                                     </li>
                                 `).join('')}
@@ -1359,7 +1463,7 @@ function calculateAndRenderSummary() {
                                 <tfoot style="font-weight: 700; background: rgba(0,0,0,0.05);">
                                     <tr>
                                         <td colspan="3" style="text-align:right; color: ${wColor};">TOTAL A PAGAR SEMANA ${w}:</td>
-                                        <td style="text-align:right; color: ${wColor}; font-size: 1.1rem;">C$${finalTotal.toFixed(2)}</td>
+                                        <td style="text-align:right; color: ${wColor}; font-size: 1.1rem;">${formatMoneyNIO(finalTotal)}</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -1471,7 +1575,7 @@ function calculateAndRenderSummary() {
         div.className = 'card';
         div.innerHTML = `
             <div class="card-title">${title}</div>
-            <div class="card-value">C$${value.toFixed(2)}</div>
+            <div class="card-value">${formatMoneyNIO(value)}</div>
             <div class="card-subtitle">${subtitle}</div>
         `;
         return div;
@@ -1930,8 +2034,8 @@ function handlePDFGeneration(e) {
     const consBody = Object.keys(consolidatedData).map(act => [
         act,
         consolidatedData[act].cantidad.toString(),
-        `C$${consolidatedData[act].precioUnitario.toFixed(2)}`,
-        `C$${consolidatedData[act].total.toFixed(2)}`
+        formatMoneyNIO(consolidatedData[act].precioUnitario),
+        formatMoneyNIO(consolidatedData[act].total)
     ]);
     
     // Add deductions to PDF
@@ -1949,7 +2053,7 @@ function handlePDFGeneration(e) {
                 `[RECLAMO / DESCUENTO] ${ded.name}`,
                 '-',
                 '-',
-                `-C$${ded.amount.toFixed(2)}`
+                `-${formatMoneyNIO(ded.amount)}`
             ]);
         });
     }
@@ -1967,7 +2071,7 @@ function handlePDFGeneration(e) {
         head: [['Actividad', 'Cantidad', 'Valor Unitario', 'Total']],
         body: consBody,
         headStyles: { fillColor: naranjaSINSA },
-        foot: [['', '', 'TOTAL A PAGAR:', `C$${finalTotal.toFixed(2)}`]],
+        foot: [['', '', 'TOTAL A PAGAR:', formatMoneyNIO(finalTotal)]],
         footStyles: { fillColor: verdeSINSA, textColor: [255, 255, 255], fontStyle: 'bold' },
         styles: { textColor: grisOscuro, fontSize: 10 },
         columnStyles: { 
@@ -2058,11 +2162,35 @@ if (btnThemeToggle) {
 
 // -- Clear Data Logic --
 document.getElementById('btn-clear-data')?.addEventListener('click', () => {
-    if(confirm("¿Seguro que deseas limpiar TODOS los datos del Estado de OT y empezar de cero?\n(Tendrás que volver a subir el archivo Excel)")) {
+    if (confirm("¿Seguro que deseas limpiar TODOS los datos del Estado de OT y empezar de cero?\n(Tendrás que volver a subir el archivo Excel)")) {
         currentOTData = [];
         providerDeductions = {};
+        providerExtras = {};
+        providerFacturas = {};
+        clearPriceSearchCache();
+
         const inputOTElement = document.getElementById('input-ot');
         if (inputOTElement) inputOTElement.value = '';
+
+        const dropZoneOT = document.getElementById('drop-zone-ot');
+        if (dropZoneOT) {
+            dropZoneOT.innerHTML = '<p>Arrastra el archivo de <strong>Estado de OT</strong> aquí o haz clic para subir (.xlsx, .xls)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>';
+            setupDragAndDrop(dropZoneOT, document.getElementById('input-ot'), handleOTUpload);
+        }
+
+        // Limpiar inmediatamente tabla, consolidados y filtros en pantalla
+        renderTable();
+        calculateAndRenderSummary();
+        updateMonthFilter();
+        updateProviderPricesTable();
+
+        try {
+            localStorage.removeItem('calcPago_workspaceState');
+        } catch (e) {
+            console.warn("No se pudo limpiar localStorage:", e);
+        }
+
+        alert("✓ Todos los datos del Estado de OT se han limpiado correctamente.");
     }
 });
 
