@@ -548,38 +548,86 @@ function updateManageProviderSelect() {
 
 // Functions
 function setupDragAndDrop(dropZone, inputElement, handler) {
-    if(!dropZone || !inputElement) return;
-    dropZone.addEventListener('click', () => inputElement.click());
-    
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
-    
-    ['dragleave', 'dragend'].forEach(type => {
-        dropZone.addEventListener(type, () => {
-            dropZone.classList.remove('dragover');
-        });
-    });
-    
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) {
-            handler(e.dataTransfer.files[0]);
-        }
-    });
+    if (!dropZone || !inputElement) return;
 
+    // Solo inicializar los escuchadores sobre el contenedor dropZone una sola vez
+    if (!dropZone._dragDropInitialized) {
+        dropZone._dragDropInitialized = true;
+
+        dropZone.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            const currentInput = dropZone.querySelector('input[type="file"]') || inputElement;
+            if (currentInput) currentInput.click();
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        ['dragleave', 'dragend'].forEach(type => {
+            dropZone.addEventListener(type, () => {
+                dropZone.classList.remove('dragover');
+            });
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files || []);
+            if (files.length > 0) {
+                handler(files);
+            }
+        });
+    }
+
+    // Vincular el evento change al input de forma controlada sin duplicar
+    setupInputFileListener(inputElement, handler);
+}
+
+function setupInputFileListener(inputElement, handler) {
+    if (!inputElement || inputElement._changeListenerBound) return;
+    inputElement._changeListenerBound = true;
     inputElement.addEventListener('change', (e) => {
-        if (e.target.files.length) {
-            handler(e.target.files[0]);
-            e.target.value = ''; // Reset for re-uploading modified files with same name
+        const files = Array.from(e.target.files || []);
+        if (files.length > 0) {
+            handler(files);
+            e.target.value = '';
         }
     });
 }
 
+function updateOTDropZoneUI(contentHtml) {
+    const dropZone = document.getElementById('drop-zone-ot');
+    if (!dropZone) return;
+    const textEl = dropZone.querySelector('.drop-zone-text');
+    if (textEl) {
+        textEl.innerHTML = contentHtml;
+    } else {
+        dropZone.innerHTML = `
+            <div class="drop-zone-icon">📑</div>
+            <div class="drop-zone-text">${contentHtml}</div>
+            <input type="file" id="input-ot" accept=".xlsx, .xls" multiple hidden>
+        `;
+        const newInp = document.getElementById('input-ot');
+        if (newInp) setupInputFileListener(newInp, handleOTUpload);
+    }
+}
+
+function resetOTDropZoneUI() {
+    updateOTDropZoneUI(`
+        <strong>Arrastra tus archivos de Estado de OT aquí</strong>
+        <p>Haz clic para seleccionar o suelta tus archivos Excel (.xlsx, .xls) de cualquier mes</p>
+    `);
+    const inp = document.getElementById('input-ot');
+    if (inp) inp.value = '';
+}
+
 // 1. Parse Tabla Oferta
-function handleOfertaUpload(file) {
+function handleOfertaUpload(fileOrFiles) {
+    const file = Array.isArray(fileOrFiles) ? fileOrFiles[0] : (fileOrFiles instanceof FileList ? fileOrFiles[0] : fileOrFiles);
+    if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
@@ -697,7 +745,8 @@ function handleOfertaUpload(file) {
                 
                 // Reset dropzone text
                 dropZoneOferta.innerHTML = '<p>Arrastra el archivo aquí o haz clic</p><input type="file" id="input-oferta" accept=".xlsx, .xls" hidden>';
-                setupDragAndDrop(dropZoneOferta, document.getElementById('input-oferta'), handleOfertaUpload);
+                const newOfertaInp = document.getElementById('input-oferta');
+                if (newOfertaInp) setupInputFileListener(newOfertaInp, handleOfertaUpload);
             }, 1500);
 
         } catch (err) {
@@ -709,41 +758,70 @@ function handleOfertaUpload(file) {
 }
 
 // 2. Parse Estado de OT
-function handleOTUpload(file) {
-    if (Object.keys(tablaOferta).length === 0) {
-        alert("Por favor configura la Tabla de Oferta primero.");
-        setupOverlay.classList.remove('hidden');
+let isProcessingOTFiles = false;
+
+async function handleOTUpload(fileOrFiles) {
+    if (isProcessingOTFiles) {
+        console.warn("Procesamiento de OT ya en curso, ignorando llamada duplicada.");
         return;
     }
 
-    const dropZone = document.getElementById('drop-zone-ot');
-    if (dropZone) {
-        dropZone.innerHTML = '<p style="color:var(--primary); font-weight:bold;">⏳ Procesando archivo de Estado de OT... Por favor espera un momento.</p>';
+    if (Object.keys(tablaOferta).length === 0) {
+        alert("Por favor configura la Tabla de Oferta primero.");
+        const setupOverlay = document.getElementById('setup-overlay');
+        if (setupOverlay) setupOverlay.classList.remove('hidden');
+        return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        // Ejecutar en setTimeout para dar tiempo al navegador de renderizar el mensaje de carga
-        setTimeout(() => {
+    const files = Array.isArray(fileOrFiles) 
+        ? fileOrFiles 
+        : (fileOrFiles instanceof FileList ? Array.from(fileOrFiles) : [fileOrFiles]);
+
+    const validFiles = files.filter(f => f && typeof f.name === 'string' && (f.name.toLowerCase().endsWith('.xlsx') || f.name.toLowerCase().endsWith('.xls')));
+
+    if (validFiles.length === 0) {
+        return;
+    }
+
+    isProcessingOTFiles = true;
+
+    updateOTDropZoneUI(`<p style="color:var(--primary); font-weight:bold;">⏳ Procesando ${validFiles.length} archivo(s) de Estado de OT... Por favor espera un momento.</p>`);
+
+    // Pausa breve para permitir que el navegador dibuje el mensaje en pantalla antes del trabajo intensivo
+    await new Promise(resolve => setTimeout(resolve, 60));
+
+    try {
+        const months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+        const results = [];
+        let totalLoaded = 0;
+        let totalReplaced = 0;
+
+        for (const file of validFiles) {
             try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array', cellDates: true, dense: true });
-                
+                const dataBuffer = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(new Uint8Array(e.target.result));
+                    reader.onerror = (e) => reject(new Error(`Error al leer ${file.name}`));
+                    reader.readAsArrayBuffer(file);
+                });
+
+                const workbook = XLSX.read(dataBuffer, { type: 'array', cellDates: true, dense: true });
                 const sheetName = workbook.SheetNames.find(s => s.trim().toUpperCase() === 'OT');
+
                 if (!sheetName) {
-                    alert("No se encontró la hoja 'OT' en el archivo.");
-                    if (dropZone) {
-                        dropZone.innerHTML = '<p>Arrastra el archivo de <strong>Estado de OT</strong> aquí o haz clic para subir (.xlsx, .xls)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>';
-                        setupDragAndDrop(dropZone, document.getElementById('input-ot'), handleOTUpload);
-                    }
-                    return;
+                    results.push({
+                        fileName: file.name,
+                        month: 'DESCONOCIDO',
+                        success: false,
+                        error: "No se encontró la hoja 'OT'"
+                    });
+                    continue;
                 }
 
                 const worksheet = workbook.Sheets[sheetName];
                 const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                
+
                 const fileNameUpper = file.name.toUpperCase();
-                const months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
                 let fileMonth = 'NO DEFINIDO';
                 for (let mIdx = 0; mIdx < months.length; mIdx++) {
                     if (fileNameUpper.includes(months[mIdx])) {
@@ -754,16 +832,15 @@ function handleOTUpload(file) {
 
                 const extracted = [];
                 const maxDate = new Date(8640000000000000);
-                const baseId = Date.now();
+                const baseId = Date.now() + Math.floor(Math.random() * 100000);
 
                 for (let i = 1; i < rows.length; i++) {
                     const row = rows[i];
                     if (!row) continue;
                     const providerRaw = row[31] ? normalizeProviderName(row[31].toString()) : '';
-                    
+
                     if (providerRaw) {
                         const ordenStr = row[2] ? row[2].toString().trim() : 'N/A';
-                        // Saltar la fila de encabezados si se coló
                         if (ordenStr.toUpperCase() === 'NO. OT/MR' || ordenStr.toUpperCase() === 'ORDEN' || ordenStr.toUpperCase() === 'ORDEN DE TRABAJO') {
                             continue;
                         }
@@ -805,65 +882,110 @@ function handleOTUpload(file) {
                 }
 
                 if (extracted.length === 0) {
-                    alert("No se encontraron actividades en el archivo de OT.");
-                    if (dropZone) {
-                        dropZone.innerHTML = '<p>Arrastra el archivo de <strong>Estado de OT</strong> aquí o haz clic para subir (.xlsx, .xls)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>';
-                        setupDragAndDrop(dropZone, document.getElementById('input-ot'), handleOTUpload);
-                    }
-                    return;
+                    results.push({
+                        fileName: file.name,
+                        month: fileMonth,
+                        success: false,
+                        error: "No se encontraron actividades válidas en el archivo"
+                    });
+                    continue;
                 }
 
-                clearPriceSearchCache();
-
-                // Si se vuelve a subir un archivo del mismo mes o del mismo nombre,
-                // reemplazamos los registros automáticos anteriores de ese mes/archivo
-                const fileMonthDetected = extracted[0] ? extracted[0].mes : 'NO DEFINIDO';
-                let replacedCount = 0;
+                // Reemplazo de registros anteriores del mismo mes o archivo
                 const beforeCount = currentOTData.length;
-
-                if (fileMonthDetected !== 'NO DEFINIDO') {
-                    currentOTData = currentOTData.filter(item => item.isManual || item.mes !== fileMonthDetected);
+                if (fileMonth !== 'NO DEFINIDO') {
+                    currentOTData = currentOTData.filter(item => item.isManual || item.mes !== fileMonth);
                 } else {
                     currentOTData = currentOTData.filter(item => item.isManual || item.fileName !== file.name);
                 }
-                replacedCount = beforeCount - currentOTData.length;
+                const replaced = beforeCount - currentOTData.length;
 
                 currentOTData = currentOTData.concat(extracted);
-                currentOTData.sort((a, b) => a.fechaObj - b.fechaObj);
-                
-                updateMonthFilter();
-                
-                // Si hay un proveedor seleccionado, mantenemos ese, si no, se queda en ALL
-                const initialProviderSelect = document.getElementById('initial-provider-select');
-                selectedProvider = initialProviderSelect?.value || 'ALL';
-                
-                renderTable();
-                calculateAndRenderSummary();
-                updateProviderPricesTable();
-                saveWorkspaceState();
+                totalLoaded += extracted.length;
+                totalReplaced += replaced;
 
-                if (dropZone) {
-                    dropZone.innerHTML = `<p style="color:var(--accent); font-weight:bold;">✓ Archivo cargado: ${file.name} (${extracted.length} registros)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>`;
-                    setupDragAndDrop(dropZone, document.getElementById('input-ot'), handleOTUpload);
-                }
+                results.push({
+                    fileName: file.name,
+                    month: fileMonth,
+                    success: true,
+                    count: extracted.length,
+                    replaced: replaced
+                });
 
-                if (replacedCount > 0) {
-                    alert(`¡Estado de OT actualizado con éxito!\nSe reemplazaron ${replacedCount} registros anteriores del mes (${fileMonthDetected}) con la versión más reciente del archivo.`);
-                } else {
-                    alert(`¡Se cargaron ${extracted.length} órdenes de trabajo (${fileMonthDetected}) con éxito!`);
-                }
-                
-            } catch (err) {
-                console.error(err);
-                alert("Error al procesar el Estado de OT: " + err.message);
-                if (dropZone) {
-                    dropZone.innerHTML = '<p>Arrastra el archivo de <strong>Estado de OT</strong> aquí o haz clic para subir (.xlsx, .xls)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>';
-                    setupDragAndDrop(dropZone, document.getElementById('input-ot'), handleOTUpload);
-                }
+            } catch (fileErr) {
+                console.error(`Error procesando archivo ${file.name}:`, fileErr);
+                results.push({
+                    fileName: file.name,
+                    month: 'ERROR',
+                    success: false,
+                    error: fileErr.message
+                });
             }
-        }, 20);
-    };
-    reader.readAsArrayBuffer(file);
+        }
+
+        clearPriceSearchCache();
+        currentOTData.sort((a, b) => a.fechaObj - b.fechaObj);
+
+        updateMonthFilter();
+
+        const initialProviderSelect = document.getElementById('initial-provider-select');
+        selectedProvider = initialProviderSelect?.value || 'ALL';
+
+        renderTable();
+        calculateAndRenderSummary();
+        updateProviderPricesTable();
+        saveWorkspaceState();
+
+        const successful = results.filter(r => r.success);
+        if (successful.length > 0) {
+            const summaryHtml = `
+                <p style="color:var(--accent); font-weight:bold; margin-bottom: 0.25rem;">✓ ${successful.length} archivo(s) procesado(s) exitosamente (${totalLoaded} registros)</p>
+                <div style="font-size:0.85rem; color:var(--text-muted); line-height: 1.4;">
+                    ${successful.map(s => `<div>• <strong>${s.month}</strong> (${s.fileName}): ${s.count} registros ${s.replaced > 0 ? `(reemplazó ${s.replaced} previos)` : ''}</div>`).join('')}
+                </div>
+            `;
+            updateOTDropZoneUI(summaryHtml);
+        } else {
+            resetOTDropZoneUI();
+        }
+
+        // UN SOLO ALERT CONSOLIDADO
+        let alertMessage = "";
+        if (successful.length > 0) {
+            alertMessage += `¡Estado de OT actualizado con éxito!\n\n`;
+            successful.forEach(s => {
+                alertMessage += `• ${s.month} (${s.fileName}): ${s.count} registros`;
+                if (s.replaced > 0) {
+                    alertMessage += ` (se reemplazaron ${s.replaced} registros anteriores)`;
+                }
+                alertMessage += `\n`;
+            });
+            const failed = results.filter(r => !r.success);
+            if (failed.length > 0) {
+                alertMessage += `\nArchivos con observaciones:\n`;
+                failed.forEach(f => {
+                    alertMessage += `• ${f.fileName}: ${f.error}\n`;
+                });
+            }
+            alert(alertMessage.trim());
+        } else {
+            const failed = results.filter(r => !r.success);
+            let errMsg = "No se pudieron cargar los archivos seleccionados:\n";
+            failed.forEach(f => {
+                errMsg += `• ${f.fileName}: ${f.error}\n`;
+            });
+            alert(errMsg);
+        }
+
+    } catch (err) {
+        console.error(err);
+        alert("Error al procesar el Estado de OT: " + err.message);
+        resetOTDropZoneUI();
+    } finally {
+        isProcessingOTFiles = false;
+        const inp = document.getElementById('input-ot');
+        if (inp) inp.value = '';
+    }
 }
 
 // Botón de Refrescar Datos
@@ -2246,14 +2368,7 @@ document.getElementById('btn-clear-data')?.addEventListener('click', () => {
         providerFacturas = {};
         clearPriceSearchCache();
 
-        const inputOTElement = document.getElementById('input-ot');
-        if (inputOTElement) inputOTElement.value = '';
-
-        const dropZoneOT = document.getElementById('drop-zone-ot');
-        if (dropZoneOT) {
-            dropZoneOT.innerHTML = '<p>Arrastra el archivo de <strong>Estado de OT</strong> aquí o haz clic para subir (.xlsx, .xls)</p><input type="file" id="input-ot" accept=".xlsx, .xls" hidden>';
-            setupDragAndDrop(dropZoneOT, document.getElementById('input-ot'), handleOTUpload);
-        }
+        resetOTDropZoneUI();
 
         // Limpiar inmediatamente tabla, consolidados y filtros en pantalla
         renderTable();
