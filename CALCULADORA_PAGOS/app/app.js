@@ -3236,8 +3236,23 @@ function loadDraftIntoForm(draft, targetStep = null) {
     setVal('wiz-geocerca-modalidad', effectiveModalidad);
     setVal('wiz-geocerca-url', draft.geocerca_url || '');
 
-    if (draft.geocerca_data && draft.geocerca_data.zones && draft.geocerca_data.zones.length > 0) {
-        currentGeocercaData = JSON.parse(JSON.stringify(draft.geocerca_data));
+    let rawGeoSource = draft.geocerca_data;
+    if ((!rawGeoSource || !rawGeoSource.zones || rawGeoSource.zones.length === 0) && typeof proveedoresRegistrados !== 'undefined' && Array.isArray(proveedoresRegistrados)) {
+        const pName = (draft.nombre_comercial || draft.nombre || '').trim();
+        const foundP = proveedoresRegistrados.find(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', pName));
+        if (foundP && foundP.geocerca_data && foundP.geocerca_data.zones && foundP.geocerca_data.zones.length > 0) {
+            rawGeoSource = foundP.geocerca_data;
+        }
+    }
+
+    if (rawGeoSource && rawGeoSource.zones && rawGeoSource.zones.length > 0) {
+        currentGeocercaData = JSON.parse(JSON.stringify(rawGeoSource));
+        currentGeocercaData.zones.forEach(z => {
+            if (!z.coordinates && z.coords) z.coordinates = z.coords;
+            if (!z.coords && z.coordinates) z.coords = z.coordinates;
+            if (!z.description && z.desc) z.description = z.desc;
+            if (!z.desc && z.description) z.desc = z.description;
+        });
         updateWizardGeocercaStatusPill(currentGeocercaData);
     } else if (draft.geocerca_url) {
         updateWizardGeocercaFromUrl(draft.geocerca_url, false);
@@ -5129,7 +5144,19 @@ function getWizardData() {
         departamentos: (document.getElementById('wiz-departamentos')?.value || '').trim() || 'Managua',
         geocerca_modalidad: document.getElementById('wiz-geocerca-modalidad')?.value || 'RADIO_KM',
         geocerca_url: (document.getElementById('wiz-geocerca-url')?.value || '').trim(),
-        geocerca_data: (currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0) ? JSON.parse(JSON.stringify(currentGeocercaData)) : null,
+        geocerca_data: (() => {
+            if (currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0) {
+                return JSON.parse(JSON.stringify(currentGeocercaData));
+            }
+            if (typeof proveedoresRegistrados !== 'undefined' && Array.isArray(proveedoresRegistrados)) {
+                const curName = (document.getElementById('wiz-nombre-comercial')?.value || '').trim();
+                const found = proveedoresRegistrados.find(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', curName));
+                if (found && found.geocerca_data && found.geocerca_data.zones && found.geocerca_data.zones.length > 0) {
+                    return JSON.parse(JSON.stringify(found.geocerca_data));
+                }
+            }
+            return null;
+        })(),
         geocerca_km: parseFloat(document.getElementById('wiz-geocerca-km')?.value) || 14.0,
         condicion_pago: document.getElementById('wiz-condicion-pago')?.value || 'SEMANAL',
         garantia_instalacion: parseInt(document.getElementById('wiz-garantia-instalacion')?.value, 10) || 12,
@@ -6149,34 +6176,51 @@ function renderContractPreview() {
                 <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: #F1F5F9; border-radius: 6px; font-size: 0.82rem; color: #334155; line-height: 1.4;">
                     <strong>VALOR TOTAL EN LETRAS:</strong> ${matTotals.totalLetras}
                 </div>
+                <div style="margin-top: 2rem; display: flex; justify-content: space-around; padding-top: 1.5rem;">
+                    <div style="text-align: center; width: 40%;">
+                        <div style="border-top: 1.5px solid #000000; margin-bottom: 0.3rem;"></div>
+                        <div style="font-weight: 700; font-size: 0.88rem;">POR SINSA</div>
+                        <div style="font-size: 0.78rem; color: #64748B;">Centro de Servicios</div>
+                    </div>
+                    <div style="text-align: center; width: 40%;">
+                        <div style="border-top: 1.5px solid #000000; margin-bottom: 0.3rem;"></div>
+                        <div style="font-weight: 700; font-size: 0.88rem;">POR EL CONTRATISTA</div>
+                        <div style="font-size: 0.78rem; color: #64748B;">${repNameDisplay}</div>
+                    </div>
+                </div>
             </div>
         `;
     }
 
     // Construcción del Anexo III de Geocercas Periciales si aplica delimitación por polígonos
     let anexoIIIHtml = '';
-    if (isPoligono) {
-        let geoData = (typeof currentGeocercaData !== 'undefined' && currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0)
-            ? currentGeocercaData
-            : null;
+    let geoData = (typeof currentGeocercaData !== 'undefined' && currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0)
+        ? currentGeocercaData
+        : (data.geocerca_data && data.geocerca_data.zones && data.geocerca_data.zones.length > 0)
+            ? data.geocerca_data
+            : (typeof proveedoresRegistrados !== 'undefined' && Array.isArray(proveedoresRegistrados) && proveedoresRegistrados.find(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', data.nombre_comercial || data.nombre || ''))?.geocerca_data)
+                || null;
 
+    if (isPoligono || (geoData && geoData.zones && geoData.zones.length > 0)) {
         if (geoData && geoData.zones && geoData.zones.length > 0) {
             let zonesHtml = '';
             geoData.zones.forEach((z, zIdx) => {
+                const coords = (z.coordinates && z.coordinates.length > 0) ? z.coordinates : (z.coords || []);
+                const desc = z.description || z.desc || 'Delimitación perimetral pactada en contrato.';
                 let coordRows = '';
-                const half = Math.ceil(z.coordinates.length / 2);
+                const half = Math.ceil(coords.length / 2);
                 for (let i = 0; i < half; i++) {
-                    const pt1 = z.coordinates[i];
+                    const pt1 = coords[i];
                     const v1 = `V-${String(i + 1).padStart(2, '0')}`;
-                    const lat1 = `${pt1.lat.toFixed(6)}° N`;
-                    const lng1 = `${Math.abs(pt1.lng).toFixed(6)}° W`;
+                    const lat1 = `${(typeof pt1.lat === 'number' ? pt1.lat.toFixed(6) : pt1.lat)}° N`;
+                    const lng1 = `${Math.abs(typeof pt1.lng === 'number' ? pt1.lng : parseFloat(pt1.lng) || 0).toFixed(6)}° W`;
 
                     let v2 = '', lat2 = '', lng2 = '';
-                    if (i + half < z.coordinates.length) {
-                        const pt2 = z.coordinates[i + half];
+                    if (i + half < coords.length) {
+                        const pt2 = coords[i + half];
                         v2 = `V-${String(i + half + 1).padStart(2, '0')}`;
-                        lat2 = `${pt2.lat.toFixed(6)}° N`;
-                        lng2 = `${Math.abs(pt2.lng).toFixed(6)}° W`;
+                        lat2 = `${(typeof pt2.lat === 'number' ? pt2.lat.toFixed(6) : pt2.lat)}° N`;
+                        lng2 = `${Math.abs(typeof pt2.lng === 'number' ? pt2.lng : parseFloat(pt2.lng) || 0).toFixed(6)}° W`;
                     }
 
                     coordRows += `
@@ -6194,9 +6238,9 @@ function renderContractPreview() {
                 zonesHtml += `
                     <div style="margin-top: 1.5rem;">
                         <div style="font-weight: 700; font-size: 0.95rem; color: #059669; margin-bottom: 0.3rem;">
-                            📍 POLÍGONO ${zIdx + 1}: ${z.name.toUpperCase()} (${z.coordinates.length} VÉRTICES GPS CERTIFICADOS)
+                            📍 POLÍGONO ${zIdx + 1}: ${z.name.toUpperCase()} (${coords.length} VÉRTICES GPS CERTIFICADOS)
                         </div>
-                        <div style="font-size: 0.8rem; color: #64748B; margin-bottom: 0.6rem;"><em>${escapeHtml(z.description)}</em></div>
+                        <div style="font-size: 0.8rem; color: #64748B; margin-bottom: 0.6rem;"><em>${escapeHtml(desc)}</em></div>
                         <table class="contract-annex-table" style="font-size: 0.8rem;">
                             <thead>
                                 <tr style="background: #059669; color: white;">
@@ -6233,16 +6277,17 @@ function renderContractPreview() {
                     ${zonesHtml}
                     <div style="margin-top: 2rem; display: flex; justify-content: space-around; padding-top: 2rem;">
                         <div style="text-align: center; width: 40%;">
-                            <div style="border-top: 1px solid #475569; margin-bottom: 0.3rem;"></div>
-                            <div style="font-weight: 700; font-size: 0.85rem;">POR SINSA</div>
-                            <div style="font-size: 0.78rem; color: #64748B;">Rúbrica & Sello</div>
+                            <div style="border-top: 1.5px solid #000000; margin-bottom: 0.3rem;"></div>
+                            <div style="font-weight: 700; font-size: 0.88rem;">POR SINSA</div>
+                            <div style="font-size: 0.78rem; color: #64748B;">Centro de Servicios / Rúbrica & Sello</div>
                         </div>
                         <div style="text-align: center; width: 40%;">
-                            <div style="border-top: 1px solid #475569; margin-bottom: 0.3rem;"></div>
-                            <div style="font-weight: 700; font-size: 0.85rem;">POR EL CONTRATISTA</div>
-                            <div style="font-size: 0.78rem; color: #64748B;">Firma & Rúbrica</div>
+                            <div style="border-top: 1.5px solid #000000; margin-bottom: 0.3rem;"></div>
+                            <div style="font-weight: 700; font-size: 0.88rem;">POR EL CONTRATISTA</div>
+                            <div style="font-size: 0.78rem; color: #64748B;">${repNameDisplay}</div>
                         </div>
                     </div>
+                </div>
             `;
         } else {
             anexoIIIHtml = `
@@ -6259,6 +6304,18 @@ function renderContractPreview() {
                     <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-left: 4px solid #F59E0B; border-radius: 8px; padding: 1.2rem; font-size: 0.88rem; color: #92400E; line-height: 1.5;">
                         <p style="margin: 0 0 0.5rem 0; font-weight: bold;">⚠️ Delimitación Satelital Pendiente de Vinculación:</p>
                         <p style="margin: 0;">Para incorporar los polígonos periciales y las coordenadas GPS inmutables de este contratista, ingresa el enlace de Google My Maps o sube el archivo KML en el <strong>Paso 1: Delimitación Territorial</strong> del asistente preliminar.</p>
+                    </div>
+                    <div style="margin-top: 2rem; display: flex; justify-content: space-around; padding-top: 2rem;">
+                        <div style="text-align: center; width: 40%;">
+                            <div style="border-top: 1.5px solid #000000; margin-bottom: 0.3rem;"></div>
+                            <div style="font-weight: 700; font-size: 0.88rem;">POR SINSA</div>
+                            <div style="font-size: 0.78rem; color: #64748B;">Centro de Servicios</div>
+                        </div>
+                        <div style="text-align: center; width: 40%;">
+                            <div style="border-top: 1.5px solid #000000; margin-bottom: 0.3rem;"></div>
+                            <div style="font-weight: 700; font-size: 0.88rem;">POR EL CONTRATISTA</div>
+                            <div style="font-size: 0.78rem; color: #64748B;">${repNameDisplay}</div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -6500,6 +6557,18 @@ function renderContractPreview() {
                     ${tableRowsHtml}
                 </tbody>
             </table>
+            <div style="margin-top: 2rem; display: flex; justify-content: space-around; padding-top: 1.5rem;">
+                <div style="text-align: center; width: 40%;">
+                    <div style="border-top: 1.5px solid #000000; margin-bottom: 0.3rem;"></div>
+                    <div style="font-weight: 700; font-size: 0.88rem;">POR SINSA</div>
+                    <div style="font-size: 0.78rem; color: #64748B;">Centro de Servicios</div>
+                </div>
+                <div style="text-align: center; width: 40%;">
+                    <div style="border-top: 1.5px solid #000000; margin-bottom: 0.3rem;"></div>
+                    <div style="font-weight: 700; font-size: 0.88rem;">POR EL CONTRATISTA</div>
+                    <div style="font-size: 0.78rem; color: #64748B;">${repNameDisplay}</div>
+                </div>
+            </div>
         </div>
 
         ${anexoIIHtml}
@@ -6626,7 +6695,102 @@ async function buildDocxFromContractData(data) {
     const isForaneo = (data.contract_variant === 'FORANEO');
     const hasConsignacion = (isForaneo && data.consignacion_activa);
     const matTotals = calculateConsignacionTotalsFromList(data.materiales);
-    const isPoligono = (data.geocerca_modalidad === 'MAPA_POLIGONO' || (isForaneo && (!data.geocerca_modalidad || data.geocerca_modalidad === 'MAPA_POLIGONO')));
+    let geoData = (typeof currentGeocercaData !== 'undefined' && currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0)
+        ? currentGeocercaData
+        : (data.geocerca_data && data.geocerca_data.zones && data.geocerca_data.zones.length > 0)
+            ? data.geocerca_data
+            : (typeof proveedoresRegistrados !== 'undefined' && Array.isArray(proveedoresRegistrados) && proveedoresRegistrados.find(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', data.nombre_comercial || data.nombre || ''))?.geocerca_data)
+                || null;
+    const isPoligono = (data.geocerca_modalidad === 'MAPA_POLIGONO' || (isForaneo && (!data.geocerca_modalidad || data.geocerca_modalidad === 'MAPA_POLIGONO')) || (geoData && geoData.zones && geoData.zones.length > 0));
+
+    const sigBorderNone = {
+        top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        right: { style: BorderStyle.NONE, size: 0, color: 'auto' }
+    };
+
+    function createDocxSignatureTable(isAnnex = false, isCompact = false) {
+        const leftTitle = isAnnex ? 'POR SINSA' : 'EL CONTRATANTE';
+        const leftSub1 = isAnnex ? 'Centro de Servicios' : 'Oscar René Vargas Reyes';
+        const leftSub2 = 'SILVA INTERNACIONAL S.A. (SINSA)';
+
+        const rightTitle = isAnnex ? 'POR EL CONTRATISTA' : 'EL CONTRATISTA';
+        const rightSub1 = nomRep;
+        const rightSub2 = nomCom;
+
+        const blankSpace = isCompact ? 350 : 650;
+        const titleSize = isCompact ? 16 : 20;
+        const subSize = isCompact ? 14 : 18;
+
+        return new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: sigBorderNone,
+            rows: [
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            width: { size: 45, type: WidthType.PERCENTAGE },
+                            borders: sigBorderNone,
+                            children: [
+                                new Paragraph({
+                                    spacing: { before: blankSpace, after: 0 },
+                                    children: []
+                                }),
+                                new Paragraph({
+                                    alignment: AlignmentType.CENTER,
+                                    border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
+                                    spacing: { before: 50, after: 15 },
+                                    children: [new TextRun({ text: leftTitle, bold: true, font, size: titleSize })]
+                                }),
+                                new Paragraph({
+                                    alignment: AlignmentType.CENTER,
+                                    spacing: { before: 0, after: 10 },
+                                    children: [new TextRun({ text: leftSub1, font, size: subSize })]
+                                }),
+                                new Paragraph({
+                                    alignment: AlignmentType.CENTER,
+                                    spacing: { before: 0, after: 15 },
+                                    children: [new TextRun({ text: leftSub2, font, size: subSize, color: '555555' })]
+                                })
+                            ]
+                        }),
+                        new TableCell({
+                            width: { size: 10, type: WidthType.PERCENTAGE },
+                            borders: sigBorderNone,
+                            children: [new Paragraph({ children: [] })]
+                        }),
+                        new TableCell({
+                            width: { size: 45, type: WidthType.PERCENTAGE },
+                            borders: sigBorderNone,
+                            children: [
+                                new Paragraph({
+                                    spacing: { before: blankSpace, after: 0 },
+                                    children: []
+                                }),
+                                new Paragraph({
+                                    alignment: AlignmentType.CENTER,
+                                    border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
+                                    spacing: { before: 50, after: 15 },
+                                    children: [new TextRun({ text: rightTitle, bold: true, font, size: titleSize })]
+                                }),
+                                new Paragraph({
+                                    alignment: AlignmentType.CENTER,
+                                    spacing: { before: 0, after: 10 },
+                                    children: [new TextRun({ text: rightSub1, font, size: subSize })]
+                                }),
+                                new Paragraph({
+                                    alignment: AlignmentType.CENTER,
+                                    spacing: { before: 0, after: 15 },
+                                    children: [new TextRun({ text: rightSub2, font, size: subSize, color: '555555' })]
+                                })
+                            ]
+                        })
+                    ]
+                })
+            ]
+        });
+    }
 
     // Helper para estructurar cláusulas oficiales
     function addClause(numTitle, bodyParagraphs) {
@@ -6886,100 +7050,16 @@ async function buildDocxFromContractData(data) {
         );
     }
 
-    // Tabla de Firmas (Fiel al documento oficial: espacio para firma autógrafa y línea superior)
-    const sigBorderNone = {
-        top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-        bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-        left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-        right: { style: BorderStyle.NONE, size: 0, color: 'auto' }
-    };
+    // Tabla de Firmas Principal del Contrato
+    sectionsChildren.push(createDocxSignatureTable(false, false));
 
-    const sigTable = new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: sigBorderNone,
-        rows: [
-            new TableRow({
-                children: [
-                    new TableCell({
-                        width: { size: 45, type: WidthType.PERCENTAGE },
-                        borders: sigBorderNone,
-                        children: [
-                            new Paragraph({
-                                spacing: { before: 800, after: 80 },
-                                children: []
-                            }),
-                            new Paragraph({
-                                alignment: AlignmentType.CENTER,
-                                border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
-                                spacing: { before: 80, after: 40 },
-                                children: [
-                                    new TextRun({ text: 'EL CONTRATANTE', bold: true, font, size: sizeBody })
-                                ]
-                            }),
-                            new Paragraph({
-                                alignment: AlignmentType.CENTER,
-                                spacing: { after: 20 },
-                                children: [
-                                    new TextRun({ text: 'Oscar René Vargas Reyes', font, size: sizeBody })
-                                ]
-                            }),
-                            new Paragraph({
-                                alignment: AlignmentType.CENTER,
-                                children: [
-                                    new TextRun({ text: 'SILVA INTERNACIONAL S.A. (SINSA)', font, size: 18, color: '555555' })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 10, type: WidthType.PERCENTAGE },
-                        borders: sigBorderNone,
-                        children: [new Paragraph({})]
-                    }),
-                    new TableCell({
-                        width: { size: 45, type: WidthType.PERCENTAGE },
-                        borders: sigBorderNone,
-                        children: [
-                            new Paragraph({
-                                spacing: { before: 800, after: 80 },
-                                children: []
-                            }),
-                            new Paragraph({
-                                alignment: AlignmentType.CENTER,
-                                border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } },
-                                spacing: { before: 80, after: 40 },
-                                children: [
-                                    new TextRun({ text: 'EL CONTRATISTA', bold: true, font, size: sizeBody })
-                                ]
-                            }),
-                            new Paragraph({
-                                alignment: AlignmentType.CENTER,
-                                spacing: { after: 20 },
-                                children: [
-                                    new TextRun({ text: nomRep, font, size: sizeBody })
-                                ]
-                            }),
-                            new Paragraph({
-                                alignment: AlignmentType.CENTER,
-                                children: [
-                                    new TextRun({ text: nomCom, font, size: 18, color: '555555' })
-                                ]
-                            })
-                        ]
-                    })
-                ]
-            })
-        ]
-    });
-    sectionsChildren.push(sigTable);
-
-    // Salto de página para el Anexo I
+    // Salto de página para el Anexo I (Garantizado en UNA SOLA PÁGINA)
     sectionsChildren.push(new Paragraph({
         pageBreakBefore: true,
         alignment: AlignmentType.CENTER,
-        spacing: { before: 200, after: 200 },
+        spacing: { before: 100, after: 60 },
         children: [
-            new TextRun({ text: 'ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS - ' + nomCom, bold: true, size: 22, font })
+            new TextRun({ text: 'ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS - ' + nomCom, bold: true, size: 20, font })
         ]
     }));
 
@@ -6995,25 +7075,25 @@ async function buildDocxFromContractData(data) {
         tableHeader: true,
         children: [
             new TableCell({
-                width: { size: 20, type: WidthType.PERCENTAGE },
+                width: { size: 18, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
                 shading: { fill: '0F172A' },
-                margins: { top: 100, bottom: 100, left: 120, right: 120 },
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CODIGO', bold: true, font, size: 18, color: 'FFFFFF' })] })]
+                margins: { top: 40, bottom: 40, left: 80, right: 80 },
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: 'CODIGO', bold: true, font, size: 16, color: 'FFFFFF' })] })]
             }),
             new TableCell({
-                width: { size: 55, type: WidthType.PERCENTAGE },
+                width: { size: 58, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
                 shading: { fill: '0F172A' },
-                margins: { top: 100, bottom: 100, left: 120, right: 120 },
-                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DESCRIPCION', bold: true, font, size: 18, color: 'FFFFFF' })] })]
+                margins: { top: 40, bottom: 40, left: 80, right: 80 },
+                children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: 'DESCRIPCION', bold: true, font, size: 16, color: 'FFFFFF' })] })]
             }),
             new TableCell({
-                width: { size: 25, type: WidthType.PERCENTAGE },
+                width: { size: 24, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
                 shading: { fill: '0F172A' },
-                margins: { top: 100, bottom: 100, left: 120, right: 120 },
-                children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'PRECIO (C$)', bold: true, font, size: 18, color: 'FFFFFF' })] })]
+                margins: { top: 40, bottom: 40, left: 80, right: 80 },
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: 'PRECIO (C$)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
             })
         ]
     });
@@ -7026,25 +7106,25 @@ async function buildDocxFromContractData(data) {
         tableRows.push(new TableRow({
             children: [
                 new TableCell({
-                    width: { size: 20, type: WidthType.PERCENTAGE },
+                    width: { size: 18, type: WidthType.PERCENTAGE },
                     borders: cellBorderSolid,
                     shading: { fill: bg },
-                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
-                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(t.rms || '-'), font, size: 18 })] })]
+                    margins: { top: 30, bottom: 30, left: 80, right: 80 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: String(t.rms || '-'), font, size: 16 })] })]
                 }),
                 new TableCell({
-                    width: { size: 55, type: WidthType.PERCENTAGE },
+                    width: { size: 58, type: WidthType.PERCENTAGE },
                     borders: cellBorderSolid,
                     shading: { fill: bg },
-                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
-                    children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: String(t.descripcion || ''), font, size: 18 })] })]
+                    margins: { top: 30, bottom: 30, left: 80, right: 80 },
+                    children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: String(t.descripcion || ''), font, size: 16 })] })]
                 }),
                 new TableCell({
-                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    width: { size: 24, type: WidthType.PERCENTAGE },
                     borders: cellBorderSolid,
                     shading: { fill: bg },
-                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
-                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: priceStr, bold: true, font, size: 18 })] })]
+                    margins: { top: 30, bottom: 30, left: 80, right: 80 },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: priceStr, bold: true, font, size: 16 })] })]
                 })
             ]
         }));
@@ -7061,19 +7141,19 @@ async function buildDocxFromContractData(data) {
     tableRows.push(new TableRow({
         children: [
             new TableCell({
-                width: { size: 75, type: WidthType.PERCENTAGE },
+                width: { size: 76, type: WidthType.PERCENTAGE },
                 columnSpan: 2,
                 borders: cellBorderSolid,
                 shading: { fill: 'F1F5F9' },
-                margins: { top: 90, bottom: 90, left: 100, right: 100 },
-                children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: fuelLabelDocx, bold: true, font, size: 18 })] })]
+                margins: { top: 35, bottom: 35, left: 80, right: 80 },
+                children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: fuelLabelDocx, bold: true, font, size: 16 })] })]
             }),
             new TableCell({
-                width: { size: 25, type: WidthType.PERCENTAGE },
+                width: { size: 24, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
                 shading: { fill: 'F1F5F9' },
-                margins: { top: 90, bottom: 90, left: 100, right: 100 },
-                children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: fuelPriceStr, bold: true, font, size: 18, color: '00A859' })] })]
+                margins: { top: 35, bottom: 35, left: 80, right: 80 },
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: fuelPriceStr, bold: true, font, size: 16, color: '00A859' })] })]
             })
         ]
     }));
@@ -7083,6 +7163,15 @@ async function buildDocxFromContractData(data) {
         rows: tableRows
     });
     sectionsChildren.push(annexTable);
+
+    // Bloque de Firmas para Anexo I (Compacto para encajar en 1 sola hoja)
+    sectionsChildren.push(new Paragraph({
+        spacing: { before: 80, after: 20 },
+        children: [
+            new TextRun({ text: 'Suscrito y ratificado en señal de plena conformidad de tarifas por ambas partes:', italics: true, font, size: 15, color: '555555' })
+        ]
+    }));
+    sectionsChildren.push(createDocxSignatureTable(true, true));
 
     // ======================================================================
     // ANEXO II: TABLA DE MATERIALES EN CONSIGNACIÓN (SI APLICA)
@@ -7248,6 +7337,15 @@ async function buildDocxFromContractData(data) {
                 new TextRun({ text: matTotals.totalLetras, italics: true, font, size: 17 })
             ]
         }));
+
+        // Bloque de Firmas para Anexo II (Consignación)
+        sectionsChildren.push(new Paragraph({
+            spacing: { before: 140, after: 40 },
+            children: [
+                new TextRun({ text: 'Suscrito y ratificado en prueba de entrega y custodia en consignación:', italics: true, font, size: 15, color: '555555' })
+            ]
+        }));
+        sectionsChildren.push(createDocxSignatureTable(true, false));
     }
 
     // ======================================================================
@@ -7256,44 +7354,67 @@ async function buildDocxFromContractData(data) {
     if (isPoligono) {
         let geoData = (typeof currentGeocercaData !== 'undefined' && currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0)
             ? currentGeocercaData
-            : null;
+            : (data.geocerca_data && data.geocerca_data.zones && data.geocerca_data.zones.length > 0 ? data.geocerca_data : null);
+
+        if (!geoData && typeof proveedoresRegistrados !== 'undefined' && Array.isArray(proveedoresRegistrados)) {
+            const curProvName = (data.nombre_comercial || data.nombre || '').trim();
+            const p = proveedoresRegistrados.find(x => (x.codigo && data.codigo_proveedor && String(x.codigo).trim() === String(data.codigo_proveedor).trim()) || (curProvName && areProviderNamesEqual(x.nombre_comercial || x.nombre || '', curProvName)));
+            if (p) {
+                if (p.geocerca_data && p.geocerca_data.zones && p.geocerca_data.zones.length > 0) {
+                    geoData = p.geocerca_data;
+                } else if (p.geocercas && p.geocercas.zones && p.geocercas.zones.length > 0) {
+                    geoData = p.geocercas;
+                }
+            }
+        }
 
         if (geoData && geoData.zones && geoData.zones.length > 0) {
             sectionsChildren.push(new Paragraph({
                 pageBreakBefore: true,
                 alignment: AlignmentType.CENTER,
-                spacing: { before: 200, after: 100 },
+                spacing: { before: 180, after: 80 },
                 children: [
-                    new TextRun({ text: 'ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES', bold: true, size: 22, font, color: '059669' })
+                    new TextRun({ text: 'ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES', bold: true, size: 21, font, color: '059669' })
                 ]
             }));
 
             sectionsChildren.push(new Paragraph({
                 alignment: AlignmentType.CENTER,
-                spacing: { after: 160 },
+                spacing: { after: 140 },
                 children: [
-                    new TextRun({ text: 'CONTRATISTA: ' + nomCom + ' | BASE OPERATIVA: ' + (data.base_operativa || 'OCCIDENTE').toUpperCase(), font, size: 18, color: '555555' })
+                    new TextRun({ text: 'CONTRATISTA: ' + nomCom + ' | BASE OPERATIVA: ' + (data.base_operativa || 'OCCIDENTE').toUpperCase(), font, size: 17, color: '555555' })
                 ]
             }));
 
             sectionsChildren.push(new Paragraph({
                 alignment: AlignmentType.JUSTIFIED,
-                spacing: { after: 200, line: 276 },
+                spacing: { after: 180, line: 260 },
                 border: { left: { style: BorderStyle.SINGLE, size: 16, color: '059669' } },
                 indent: { left: 160 },
                 children: [
-                    new TextRun({ text: 'DECLARACIÓN CONTRACTUAL DE INMUTABILIDAD CARTOGRÁFICA: ', bold: true, font, size: 18 }),
-                    new TextRun({ text: 'El presente anexo fija de manera pericial e inalterable la delimitación territorial aplicable al contrato suscrito con ' + nomCom + '. Toda orden de trabajo cuya ubicación física comprobada mediante coordenadas GPS se ubique dentro de los polígonos certificados a continuación se liquidará exclusivamente bajo las tarifas unitarias ordinarias del Anexo I sin cobro adicional de transporte. Cualquier servicio fuera de estos vértices se liquidará aplicando la tarifa de combustible por kilómetro pactada.', font, size: 18 })
+                    new TextRun({ text: 'DECLARACIÓN CONTRACTUAL DE INMUTABILIDAD CARTOGRÁFICA: ', bold: true, font, size: 17 }),
+                    new TextRun({ text: 'El presente anexo fija de manera pericial e inalterable la delimitación territorial aplicable al contrato suscrito con ' + nomCom + '. Toda orden de trabajo cuya ubicación física comprobada mediante coordenadas GPS se ubique dentro de los polígonos certificados a continuación se liquidará exclusivamente bajo las tarifas unitarias ordinarias del Anexo I sin cobro adicional de transporte. Cualquier servicio fuera de estos vértices se liquidará aplicando la tarifa de combustible por kilómetro pactada.', font, size: 17 })
                 ]
             }));
 
             geoData.zones.forEach((z, zIdx) => {
+                const coords = z.coordinates || z.coords || [];
+                const desc = z.description || z.desc || '';
                 sectionsChildren.push(new Paragraph({
-                    spacing: { before: 180, after: 80 },
+                    spacing: { before: 160, after: 50 },
                     children: [
-                        new TextRun({ text: 'POLÍGONO ' + (zIdx + 1) + ': ' + z.name.toUpperCase() + ' (' + z.coordinates.length + ' VÉRTICES GPS CERTIFICADOS)', bold: true, font, size: 19, color: '059669' })
+                        new TextRun({ text: 'POLÍGONO ' + (zIdx + 1) + ': ' + (z.name || 'ZONA').toUpperCase() + ' (' + coords.length + ' VÉRTICES GPS CERTIFICADOS)', bold: true, font, size: 18, color: '059669' })
                     ]
                 }));
+
+                if (desc) {
+                    sectionsChildren.push(new Paragraph({
+                        spacing: { before: 15, after: 50 },
+                        children: [
+                            new TextRun({ text: 'Descripción pericial: ' + desc, italics: true, font, size: 15, color: '64748B' })
+                        ]
+                    }));
+                }
 
                 const geoTableHeaders = new TableRow({
                     tableHeader: true,
@@ -7302,72 +7423,72 @@ async function buildDocxFromContractData(data) {
                             width: { size: 14, type: WidthType.PERCENTAGE },
                             borders: cellBorderSolid,
                             shading: { fill: '059669' },
-                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
-                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Vértice', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                            margins: { top: 40, bottom: 40, left: 60, right: 60 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: 'Vértice', bold: true, font, size: 15, color: 'FFFFFF' })] })]
                         }),
                         new TableCell({
                             width: { size: 18, type: WidthType.PERCENTAGE },
                             borders: cellBorderSolid,
                             shading: { fill: '059669' },
-                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
-                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Latitud (N)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                            margins: { top: 40, bottom: 40, left: 60, right: 60 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: 'Latitud (N)', bold: true, font, size: 15, color: 'FFFFFF' })] })]
                         }),
                         new TableCell({
                             width: { size: 18, type: WidthType.PERCENTAGE },
                             borders: cellBorderSolid,
                             shading: { fill: '059669' },
-                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
-                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Longitud (W)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                            margins: { top: 40, bottom: 40, left: 60, right: 60 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: 'Longitud (W)', bold: true, font, size: 15, color: 'FFFFFF' })] })]
                         }),
                         new TableCell({
                             width: { size: 14, type: WidthType.PERCENTAGE },
                             borders: cellBorderSolid,
                             shading: { fill: '059669' },
-                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
-                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Vértice', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                            margins: { top: 40, bottom: 40, left: 60, right: 60 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: 'Vértice', bold: true, font, size: 15, color: 'FFFFFF' })] })]
                         }),
                         new TableCell({
                             width: { size: 18, type: WidthType.PERCENTAGE },
                             borders: cellBorderSolid,
                             shading: { fill: '059669' },
-                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
-                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Latitud (N)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                            margins: { top: 40, bottom: 40, left: 60, right: 60 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: 'Latitud (N)', bold: true, font, size: 15, color: 'FFFFFF' })] })]
                         }),
                         new TableCell({
                             width: { size: 18, type: WidthType.PERCENTAGE },
                             borders: cellBorderSolid,
                             shading: { fill: '059669' },
-                            margins: { top: 70, bottom: 70, left: 80, right: 80 },
-                            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Longitud (W)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                            margins: { top: 40, bottom: 40, left: 60, right: 60 },
+                            children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: 'Longitud (W)', bold: true, font, size: 15, color: 'FFFFFF' })] })]
                         })
                     ]
                 });
 
                 const geoRows = [geoTableHeaders];
-                const half = Math.ceil(z.coordinates.length / 2);
+                const half = Math.ceil(coords.length / 2);
                 for (let i = 0; i < half; i++) {
-                    const pt1 = z.coordinates[i];
+                    const pt1 = coords[i] || {};
+                    const lat1 = (typeof pt1.lat === 'number') ? pt1.lat.toFixed(6) + '° N' : (pt1[0] !== undefined ? Number(pt1[0]).toFixed(6) + '° N' : '-');
+                    const lng1 = (typeof pt1.lng === 'number') ? Math.abs(pt1.lng).toFixed(6) + '° W' : (pt1[1] !== undefined ? Math.abs(Number(pt1[1])).toFixed(6) + '° W' : '-');
                     const v1 = 'V-' + String(i + 1).padStart(2, '0');
-                    const lat1 = pt1.lat.toFixed(6) + '° N';
-                    const lng1 = Math.abs(pt1.lng).toFixed(6) + '° W';
 
                     let v2 = '', lat2 = '', lng2 = '';
-                    if (i + half < z.coordinates.length) {
-                        const pt2 = z.coordinates[i + half];
+                    if (i + half < coords.length) {
+                        const pt2 = coords[i + half] || {};
                         v2 = 'V-' + String(i + half + 1).padStart(2, '0');
-                        lat2 = pt2.lat.toFixed(6) + '° N';
-                        lng2 = Math.abs(pt2.lng).toFixed(6) + '° W';
+                        lat2 = (typeof pt2.lat === 'number') ? pt2.lat.toFixed(6) + '° N' : (pt2[0] !== undefined ? Number(pt2[0]).toFixed(6) + '° N' : '-');
+                        lng2 = (typeof pt2.lng === 'number') ? Math.abs(pt2.lng).toFixed(6) + '° W' : (pt2[1] !== undefined ? Math.abs(Number(pt2[1])).toFixed(6) + '° W' : '-');
                     }
 
                     const bg = i % 2 === 0 ? 'F8FAFC' : 'FFFFFF';
                     geoRows.push(new TableRow({
                         children: [
-                            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: v1, bold: true, font, size: 16, color: '1E3A8A' })] })] }),
-                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lat1, font, size: 16 })] })] }),
-                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lng1, font, size: 16 })] })] }),
-                            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: v2, bold: true, font, size: 16, color: '1E3A8A' })] })] }),
-                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lat2, font, size: 16 })] })] }),
-                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lng2, font, size: 16 })] })] })
+                            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 30, bottom: 30, left: 60, right: 60 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 8, after: 8, line: 220 }, children: [new TextRun({ text: v1, bold: true, font, size: 15, color: '1E3A8A' })] })] }),
+                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 30, bottom: 30, left: 60, right: 60 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 8, after: 8, line: 220 }, children: [new TextRun({ text: lat1, font, size: 15 })] })] }),
+                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 30, bottom: 30, left: 60, right: 60 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 8, after: 8, line: 220 }, children: [new TextRun({ text: lng1, font, size: 15 })] })] }),
+                            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 30, bottom: 30, left: 60, right: 60 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 8, after: 8, line: 220 }, children: [new TextRun({ text: v2, bold: true, font, size: 15, color: '1E3A8A' })] })] }),
+                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 30, bottom: 30, left: 60, right: 60 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 8, after: 8, line: 220 }, children: [new TextRun({ text: lat2, font, size: 15 })] })] }),
+                            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 30, bottom: 30, left: 60, right: 60 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 8, after: 8, line: 220 }, children: [new TextRun({ text: lng2, font, size: 15 })] })] })
                         ]
                     }));
                 }
@@ -7381,67 +7502,40 @@ async function buildDocxFromContractData(data) {
 
             // Bloque de Firmas para Anexo III
             sectionsChildren.push(new Paragraph({
-                spacing: { before: 240, after: 120 },
+                spacing: { before: 160, after: 40 },
                 children: [
-                    new TextRun({ text: 'Suscrito de conformidad por ambas partes en prueba de aceptación pericial inmutable:', italics: true, font, size: 16, color: '64748B' })
+                    new TextRun({ text: 'Suscrito de conformidad por ambas partes en prueba de aceptación pericial inmutable:', italics: true, font, size: 15, color: '64748B' })
                 ]
             }));
-
-            sectionsChildren.push(new Table({
-                width: { size: 100, type: WidthType.PERCENTAGE },
-                borders: sigBorderNone,
-                rows: [
-                    new TableRow({
-                        children: [
-                            new TableCell({
-                                width: { size: 45, type: WidthType.PERCENTAGE },
-                                borders: sigBorderNone,
-                                children: [
-                                    new Paragraph({ spacing: { before: 600, after: 60 }, children: [] }),
-                                    new Paragraph({ alignment: AlignmentType.CENTER, border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } }, spacing: { before: 60, after: 30 }, children: [new TextRun({ text: 'POR SINSA', bold: true, font, size: 17 })] }),
-                                    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Rúbrica & Sello', font, size: 15, color: '64748B' })] })
-                                ]
-                            }),
-                            new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, borders: sigBorderNone, children: [new Paragraph({})] }),
-                            new TableCell({
-                                width: { size: 45, type: WidthType.PERCENTAGE },
-                                borders: sigBorderNone,
-                                children: [
-                                    new Paragraph({ spacing: { before: 600, after: 60 }, children: [] }),
-                                    new Paragraph({ alignment: AlignmentType.CENTER, border: { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' } }, spacing: { before: 60, after: 30 }, children: [new TextRun({ text: 'POR EL CONTRATISTA', bold: true, font, size: 17 })] }),
-                                    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: nomRep, font, size: 15, color: '64748B' })] })
-                                ]
-                            })
-                        ]
-                    })
-                ]
-            }));
+            sectionsChildren.push(createDocxSignatureTable(true, false));
         } else {
             sectionsChildren.push(new Paragraph({
                 pageBreakBefore: true,
                 alignment: AlignmentType.CENTER,
-                spacing: { before: 200, after: 100 },
+                spacing: { before: 180, after: 80 },
                 children: [
-                    new TextRun({ text: 'ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES', bold: true, size: 22, font, color: '059669' })
+                    new TextRun({ text: 'ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES', bold: true, size: 21, font, color: '059669' })
                 ]
             }));
 
             sectionsChildren.push(new Paragraph({
                 alignment: AlignmentType.CENTER,
-                spacing: { after: 160 },
+                spacing: { after: 140 },
                 children: [
-                    new TextRun({ text: 'CONTRATISTA: ' + nomCom + ' | BASE OPERATIVA: ' + (data.base_operativa || 'FORÁNEA').toUpperCase(), font, size: 18, color: '555555' })
+                    new TextRun({ text: 'CONTRATISTA: ' + nomCom + ' | BASE OPERATIVA: ' + (data.base_operativa || 'FORÁNEA').toUpperCase(), font, size: 17, color: '555555' })
                 ]
             }));
 
             sectionsChildren.push(new Paragraph({
                 alignment: AlignmentType.JUSTIFY,
-                spacing: { before: 140, after: 140 },
+                spacing: { before: 120, after: 120 },
                 children: [
-                    new TextRun({ text: 'NOTA OPERATIVA: ', bold: true, font, size: 18 }),
-                    new TextRun({ text: 'La cartografía pericial y la tabla de vértices satelitales GPS correspondientes a la delimitación territorial del contratista ' + nomCom + ' se incorporarán al presente instrumento mediante adenda suscrita con base en el levantamiento geográfico acordado.', italics: true, font, size: 18 })
+                    new TextRun({ text: 'NOTA OPERATIVA: ', bold: true, font, size: 17 }),
+                    new TextRun({ text: 'La cartografía pericial y la tabla de vértices satelitales GPS correspondientes a la delimitación territorial del contratista ' + nomCom + ' se incorporarán al presente instrumento mediante adenda suscrita con base en el levantamiento geográfico acordado.', italics: true, font, size: 17 })
                 ]
             }));
+
+            sectionsChildren.push(createDocxSignatureTable(true, false));
         }
     }
 
@@ -7457,7 +7551,7 @@ async function buildDocxFromContractData(data) {
         sections: [{
             properties: {
                 page: {
-                    margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+                    margin: { top: 720, right: 720, bottom: 720, left: 720 }
                 }
             },
             headers: headerChildren.length > 0 ? { default: new Header({ children: headerChildren }) } : undefined,
@@ -8186,16 +8280,48 @@ function downloadWordMLContract(data) {
         `;
     });
 
-    const fuelLabel = isForaneo 
-        ? `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE ${(data.base_operativa || 'LA CIUDAD').toUpperCase()} (${data.geocerca_km || 14} KM)`
-        : `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)`;
+    const isPoligono = (data.geocerca_modalidad === 'MAPA_POLIGONO' || (isForaneo && (!data.geocerca_modalidad || data.geocerca_modalidad === 'MAPA_POLIGONO')));
+
+    const fuelLabel = isPoligono
+        ? `TARIFA DE COMBUSTIBLE POR KM FUERA DE LA GEOCERCA CONTRACTUAL (${(data.base_operativa || 'OCCIDENTE').toUpperCase()} - ANEXO III DE GEOCERCAS)`
+        : (isForaneo 
+            ? `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE ${(data.base_operativa || 'LA CIUDAD').toUpperCase()} (${data.geocerca_km || 14} KM)`
+            : `TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)`);
 
     tableRowsHtml += `
         <tr style="background-color: #F1F5F9; font-weight: bold;">
-            <td colspan="2" style="border: 1pt solid #cbd5e1; padding: 5pt;">${fuelLabel}</td>
-            <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt; color: #00A859;">C$ ${Number(data.tarifa_combustible || 12.0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+            <td colspan="2" style="border: 1pt solid #cbd5e1; padding: 4pt 6pt;">${fuelLabel}</td>
+            <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 4pt 6pt; color: #00A859;">C$ ${Number(data.tarifa_combustible || 12.0).toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
         </tr>
     `;
+
+    function createWordMLSignatureTable(isAnnex = false) {
+        const leftTitle = isAnnex ? 'POR SINSA' : 'EL CONTRATANTE';
+        const leftSub1 = 'Oscar René Vargas Reyes';
+        const leftSub2 = isAnnex ? 'SILVA INTERNACIONAL S.A.' : 'SILVA INTERNACIONAL S.A. (SINSA)';
+        const rightTitle = isAnnex ? 'POR EL CONTRATISTA' : 'EL CONTRATISTA';
+        const rightSub1 = nomRep;
+        const rightSub2 = nomCom;
+        return `
+            <table class="sig-table">
+                <tr>
+                    <td>
+                        <div class="sig-space"></div>
+                        <div class="sig-bar">${leftTitle}</div>
+                        <div class="sig-name">${leftSub1}</div>
+                        <div class="sig-sub">${leftSub2}</div>
+                    </td>
+                    <td class="sig-table-spacer"></td>
+                    <td>
+                        <div class="sig-space"></div>
+                        <div class="sig-bar">${rightTitle}</div>
+                        <div class="sig-name">${rightSub1}</div>
+                        <div class="sig-sub">${rightSub2}</div>
+                    </td>
+                </tr>
+            </table>
+        `;
+    }
 
     const logoHtml = (typeof SINSA_LOGO_BASE64 !== 'undefined' && SINSA_LOGO_BASE64)
         ? `<div style="text-align: right; border-bottom: 2pt solid #000000; padding-bottom: 6pt; margin-bottom: 18pt;">
@@ -8213,8 +8339,6 @@ function downloadWordMLContract(data) {
             </div>
         </div>
     ` : '';
-
-    const isPoligono = (data.geocerca_modalidad === 'MAPA_POLIGONO' || (isForaneo && (!data.geocerca_modalidad || data.geocerca_modalidad === 'MAPA_POLIGONO')));
 
     let paymentClauseText = '';
     if (isForaneo) {
@@ -8268,12 +8392,12 @@ function downloadWordMLContract(data) {
                 const sub = qty * cost;
                 matRowsHtml += `
                     <tr>
-                        <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 5pt;">${m.rms || '-'}</td>
-                        <td style="border: 1pt solid #cbd5e1; padding: 5pt;">${m.descripcion || ''}</td>
-                        <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 5pt;">${m.unidad || 'UND'}</td>
-                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">${qty}</td>
-                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">C$ ${cost.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
-                        <td style="text-align: right; font-weight: bold; border: 1pt solid #cbd5e1; padding: 5pt;">C$ ${sub.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 4pt 6pt;">${m.rms || '-'}</td>
+                        <td style="border: 1pt solid #cbd5e1; padding: 4pt 6pt;">${m.descripcion || ''}</td>
+                        <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 4pt 6pt;">${m.unidad || 'UND'}</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 4pt 6pt;">${qty}</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 4pt 6pt;">C$ ${cost.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        <td style="text-align: right; font-weight: bold; border: 1pt solid #cbd5e1; padding: 4pt 6pt;">C$ ${sub.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
                     </tr>
                 `;
             });
@@ -8282,10 +8406,10 @@ function downloadWordMLContract(data) {
         anexoIIHtml = `
             <br style="page-break-before: always;">
             ${logoHtml}
-            <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 20pt; margin-bottom: 6pt;">
+            <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 16pt; margin-bottom: 4pt;">
                 ANEXO II: TABLA DE MATERIALES E INVENTARIO INICIAL EN CONSIGNACIÓN MERCANTIL
             </div>
-            <div style="text-align: center; font-size: 9.5pt; color: #475569; margin-bottom: 12pt;">
+            <div style="text-align: center; font-size: 9pt; color: #475569; margin-bottom: 10pt;">
                 CONTRATISTA: <strong>${nomCom}</strong> &bull; BASE OPERATIVA: <strong>${(data.base_operativa || 'DEPARTAMENTAL').toUpperCase()}</strong>
             </div>
             <table>
@@ -8302,23 +8426,133 @@ function downloadWordMLContract(data) {
                 <tbody>
                     ${matRowsHtml}
                     <tr style="background-color: #F8FAFC; font-weight: bold;">
-                        <td colspan="5" style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">SUBTOTAL NETO DE MATERIALES:</td>
-                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">C$ ${matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        <td colspan="5" style="text-align: right; border: 1pt solid #cbd5e1; padding: 4pt 6pt;">SUBTOTAL NETO DE MATERIALES:</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 4pt 6pt;">C$ ${matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     <tr style="background-color: #F8FAFC; font-weight: bold;">
-                        <td colspan="5" style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">IMPUESTO AL VALOR AGREGADO (IVA 15%):</td>
-                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt;">C$ ${matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        <td colspan="5" style="text-align: right; border: 1pt solid #cbd5e1; padding: 4pt 6pt;">IMPUESTO AL VALOR AGREGADO (IVA 15%):</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 4pt 6pt;">C$ ${matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     <tr style="background-color: #EFF6FF; font-weight: bold;">
-                        <td colspan="5" style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt; color: #1E40AF;">TOTAL VALORIZADO EN CONSIGNACIÓN:</td>
-                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 5pt; color: #1E40AF;">C$ ${matTotals.total.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
+                        <td colspan="5" style="text-align: right; border: 1pt solid #cbd5e1; padding: 4pt 6pt; color: #1E40AF;">TOTAL VALORIZADO EN CONSIGNACIÓN:</td>
+                        <td style="text-align: right; border: 1pt solid #cbd5e1; padding: 4pt 6pt; color: #1E40AF;">C$ ${matTotals.total.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</td>
                     </tr>
                 </tbody>
             </table>
-            <div style="margin-top: 10pt; padding: 8pt; background-color: #F1F5F9; border: 1pt solid #CBD5E1; font-size: 9pt;">
+            <div style="margin-top: 8pt; padding: 6pt 8pt; background-color: #F1F5F9; border: 1pt solid #CBD5E1; font-size: 8.5pt;">
                 <strong>VALOR TOTAL EN LETRAS:</strong> ${matTotals.totalLetras}
             </div>
+            <p style="font-size: 8.5pt; font-style: italic; color: #555555; margin-top: 10pt; margin-bottom: 2pt;">Suscrito y ratificado en prueba de entrega y custodia en consignación:</p>
+            ${createWordMLSignatureTable(true)}
         `;
+    }
+
+    let anexoIIIHtml = '';
+    if (isPoligono) {
+        let geoData = (typeof currentGeocercaData !== 'undefined' && currentGeocercaData && currentGeocercaData.zones && currentGeocercaData.zones.length > 0)
+            ? currentGeocercaData
+            : (data.geocerca_data && data.geocerca_data.zones && data.geocerca_data.zones.length > 0 ? data.geocerca_data : null);
+
+        if (!geoData && typeof proveedoresRegistrados !== 'undefined' && Array.isArray(proveedoresRegistrados)) {
+            const curProvName = (data.nombre_comercial || data.nombre || '').trim();
+            const p = proveedoresRegistrados.find(x => (x.codigo && data.codigo_proveedor && String(x.codigo).trim() === String(data.codigo_proveedor).trim()) || (curProvName && areProviderNamesEqual(x.nombre_comercial || x.nombre || '', curProvName)));
+            if (p) {
+                if (p.geocerca_data && p.geocerca_data.zones && p.geocerca_data.zones.length > 0) {
+                    geoData = p.geocerca_data;
+                } else if (p.geocercas && p.geocercas.zones && p.geocercas.zones.length > 0) {
+                    geoData = p.geocercas;
+                }
+            }
+        }
+
+        if (geoData && geoData.zones && geoData.zones.length > 0) {
+            let zonesHtml = '';
+            geoData.zones.forEach((z, zIdx) => {
+                const coords = z.coordinates || z.coords || [];
+                const desc = z.description || z.desc || '';
+                let rowsHtml = '';
+                const half = Math.ceil(coords.length / 2);
+                for (let i = 0; i < half; i++) {
+                    const pt1 = coords[i] || {};
+                    const latVal1 = (typeof pt1.lat === 'number') ? pt1.lat.toFixed(6) + '° N' : (pt1[0] !== undefined ? Number(pt1[0]).toFixed(6) + '° N' : '-');
+                    const lngVal1 = (typeof pt1.lng === 'number') ? Math.abs(pt1.lng).toFixed(6) + '° W' : (pt1[1] !== undefined ? Math.abs(Number(pt1[1])).toFixed(6) + '° W' : '-');
+                    const v1 = 'V-' + String(i + 1).padStart(2, '0');
+
+                    let v2 = '', latVal2 = '', lngVal2 = '';
+                    if (i + half < coords.length) {
+                        const pt2 = coords[i + half] || {};
+                        v2 = 'V-' + String(i + half + 1).padStart(2, '0');
+                        latVal2 = (typeof pt2.lat === 'number') ? pt2.lat.toFixed(6) + '° N' : (pt2[0] !== undefined ? Number(pt2[0]).toFixed(6) + '° N' : '-');
+                        lngVal2 = (typeof pt2.lng === 'number') ? Math.abs(pt2.lng).toFixed(6) + '° W' : (pt2[1] !== undefined ? Math.abs(Number(pt2[1])).toFixed(6) + '° W' : '-');
+                    }
+                    const bg = i % 2 === 0 ? '#F8FAFC' : '#FFFFFF';
+                    rowsHtml += `
+                        <tr style="background-color: ${bg}; font-size: 8.5pt;">
+                            <td style="text-align: center; font-weight: bold; color: #1E3A8A; border: 1pt solid #cbd5e1; padding: 3pt;">${v1}</td>
+                            <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 3pt;">${latVal1}</td>
+                            <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 3pt;">${lngVal1}</td>
+                            <td style="text-align: center; font-weight: bold; color: #1E3A8A; border: 1pt solid #cbd5e1; padding: 3pt;">${v2}</td>
+                            <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 3pt;">${latVal2}</td>
+                            <td style="text-align: center; border: 1pt solid #cbd5e1; padding: 3pt;">${lngVal2}</td>
+                        </tr>
+                    `;
+                }
+
+                zonesHtml += `
+                    <div style="font-weight: bold; font-size: 10pt; color: #059669; margin-top: 12pt; margin-bottom: 4pt;">
+                        POLÍGONO ${zIdx + 1}: ${(z.name || 'ZONA').toUpperCase()} (${coords.length} VÉRTICES GPS CERTIFICADOS)
+                    </div>
+                    ${desc ? `<div style="font-size: 8.5pt; font-style: italic; color: #64748B; margin-bottom: 6pt;">Descripción pericial: ${desc}</div>` : ''}
+                    <table>
+                        <thead>
+                            <tr style="background-color: #059669; color: #ffffff;">
+                                <th style="width: 14%; text-align: center; background-color: #059669; padding: 4pt;">Vértice</th>
+                                <th style="width: 18%; text-align: center; background-color: #059669; padding: 4pt;">Latitud (N)</th>
+                                <th style="width: 18%; text-align: center; background-color: #059669; padding: 4pt;">Longitud (W)</th>
+                                <th style="width: 14%; text-align: center; background-color: #059669; padding: 4pt;">Vértice</th>
+                                <th style="width: 18%; text-align: center; background-color: #059669; padding: 4pt;">Latitud (N)</th>
+                                <th style="width: 18%; text-align: center; background-color: #059669; padding: 4pt;">Longitud (W)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                `;
+            });
+
+            anexoIIIHtml = `
+                <br style="page-break-before: always;">
+                ${logoHtml}
+                <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 16pt; margin-bottom: 4pt; color: #059669;">
+                    ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES
+                </div>
+                <div style="text-align: center; font-size: 9pt; color: #475569; margin-bottom: 10pt;">
+                    CONTRATISTA: <strong>${nomCom}</strong> &bull; BASE OPERATIVA: <strong>${(data.base_operativa || 'OCCIDENTE').toUpperCase()}</strong>
+                </div>
+                <div style="border-left: 3pt solid #059669; padding-left: 8pt; margin-bottom: 10pt; font-size: 8.5pt; text-align: justify; line-height: 1.35; color: #334155;">
+                    <strong>DECLARACIÓN CONTRACTUAL DE INMUTABILIDAD CARTOGRÁFICA:</strong> El presente anexo fija de manera pericial e inalterable la delimitación territorial aplicable al contrato suscrito con ${nomCom}. Toda orden de trabajo cuya ubicación física comprobada mediante coordenadas GPS se ubique dentro de los polígonos certificados a continuación se liquidará exclusivamente bajo las tarifas unitarias ordinarias del Anexo I sin cobro adicional de transporte. Cualquier servicio fuera de estos vértices se liquidará aplicando la tarifa de combustible por kilómetro pactada.
+                </div>
+                ${zonesHtml}
+                <p style="font-size: 8.5pt; font-style: italic; color: #555555; margin-top: 10pt; margin-bottom: 2pt;">Suscrito de conformidad por ambas partes en prueba de aceptación pericial inmutable:</p>
+                ${createWordMLSignatureTable(true)}
+            `;
+        } else {
+            anexoIIIHtml = `
+                <br style="page-break-before: always;">
+                ${logoHtml}
+                <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 16pt; margin-bottom: 4pt; color: #059669;">
+                    ANEXO III: DELIMITACIÓN TERRITORIAL Y GEOCERCAS CONTRACTUALES PERICIALES
+                </div>
+                <div style="text-align: center; font-size: 9pt; color: #475569; margin-bottom: 10pt;">
+                    CONTRATISTA: <strong>${nomCom}</strong> &bull; BASE OPERATIVA: <strong>${(data.base_operativa || 'FORÁNEA').toUpperCase()}</strong>
+                </div>
+                <p style="font-size: 9pt; font-style: italic; color: #334155;">
+                    <strong>NOTA OPERATIVA:</strong> La cartografía pericial y la tabla de vértices satelitales GPS correspondientes a la delimitación territorial del contratista ${nomCom} se incorporarán al presente instrumento mediante adenda suscrita con base en el levantamiento geográfico acordado.
+                </p>
+                ${createWordMLSignatureTable(true)}
+            `;
+        }
     }
 
     // Cláusula Primera para WordML
@@ -8427,17 +8661,22 @@ function downloadWordMLContract(data) {
             </xml>
             <![endif]-->
             <style>
-                @page { size: 8.5in 11in; margin: 1in; }
+                @page { size: 8.5in 11in; margin: 0.5in; }
                 body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; line-height: 1.45; color: #000000; text-align: justify; }
                 h1 { text-align: center; font-size: 13pt; font-weight: bold; margin-bottom: 16pt; }
                 .clause-title { font-weight: bold; margin-top: 12pt; margin-bottom: 3pt; }
                 ul, ol { margin: 4pt 0 8pt 20pt; padding-left: 0; }
                 li { margin-bottom: 3pt; text-align: justify; }
-                table { width: 100%; border-collapse: collapse; margin-top: 12pt; margin-bottom: 12pt; font-size: 9.5pt; }
-                th { background-color: #0F172A; color: #FFFFFF; font-weight: bold; border: 1pt solid #000000; padding: 6pt; }
-                .sig-table { width: 100%; border: none; margin-top: 36pt; }
-                .sig-table td { width: 48%; border: none; text-align: center; vertical-align: top; }
-                .sig-bar { border-top: 1pt solid #000000; width: 75%; margin: 0 auto; padding-top: 4pt; font-weight: bold; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10pt; margin-bottom: 10pt; font-size: 9pt; }
+                th { background-color: #0F172A; color: #FFFFFF; font-weight: bold; border: 1pt solid #000000; padding: 5pt; }
+                td { border: 1pt solid #cbd5e1; padding: 4pt 6pt; }
+                .sig-table { width: 100%; border-collapse: collapse; margin-top: 25pt; page-break-inside: avoid; }
+                .sig-table td { width: 45%; border: none !important; text-align: center; vertical-align: top; padding: 0; }
+                .sig-table-spacer { width: 10% !important; border: none !important; }
+                .sig-space { height: 45pt; }
+                .sig-bar { border-top: 1.5pt solid #000000; width: 80%; margin: 0 auto; padding-top: 4pt; font-weight: bold; font-size: 10pt; }
+                .sig-name { font-size: 9.5pt; color: #1E293B; margin-top: 2pt; }
+                .sig-sub { font-size: 8.5pt; color: #555555; }
             </style>
         </head>
         <body>
@@ -8446,7 +8685,7 @@ function downloadWordMLContract(data) {
 
             <h1>CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRE ACONDICIONADO${isForaneo ? ' (VARIANTE FORÁNEA)' : ''}.</h1>
 
-            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; ${preambleContractorWordML}</p>
+            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos濁treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; ${preambleContractorWordML}</p>
 
             <div class="clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
             <p>${primeraWordMLText}</p>
@@ -8516,24 +8755,11 @@ function downloadWordMLContract(data) {
             <div class="clause-title">${acceptanceClauseNum} [ACEPTACIÓN]:</div>
             <p>Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ${dia} días del mes de ${mes} del año ${anio}.</p>
 
-            <table class="sig-table">
-                <tr>
-                    <td>
-                        <div class="sig-bar">EL CONTRATANTE</div>
-                        <div>Oscar René Vargas Reyes</div>
-                        <div style="font-size: 8.5pt; color: #555555;">SILVA INTERNACIONAL S.A. (SINSA)</div>
-                    </td>
-                    <td>
-                        <div class="sig-bar">EL CONTRATISTA</div>
-                        <div>${nomRep}</div>
-                        <div style="font-size: 8.5pt; color: #555555;">${nomCom}</div>
-                    </td>
-                </tr>
-            </table>
+            ${createWordMLSignatureTable(false)}
 
             <br style="page-break-before: always;">
             ${logoHtml}
-            <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 20pt; margin-bottom: 12pt;">
+            <div style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 16pt; margin-bottom: 10pt;">
                 ANEXO I: TABLA DE OFERTA Y TARIFAS DE SERVICIOS - ${nomCom}
             </div>
 
@@ -8550,7 +8776,11 @@ function downloadWordMLContract(data) {
                 </tbody>
             </table>
 
+            <p style="font-size: 8.5pt; font-style: italic; color: #555555; margin-top: 6pt; margin-bottom: 2pt;">Suscrito y ratificado en señal de plena conformidad de tarifas por ambas partes:</p>
+            ${createWordMLSignatureTable(true)}
+
             ${anexoIIHtml}
+            ${anexoIIIHtml}
         </body>
         </html>
     `;
