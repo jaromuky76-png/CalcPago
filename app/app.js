@@ -3076,6 +3076,7 @@ function saveActiveDraftToStorage() {
                            (data.telefono && data.telefono.trim()) ||
                            (data.cuenta_bancaria && data.cuenta_bancaria.trim()) ||
                            (data.tarifas && data.tarifas.length > 0) ||
+                           (data.materiales && data.materiales.length > 0) ||
                            (data.documentos && Object.keys(data.documentos).length > 0);
 
         const ind = document.getElementById('wizard-autosave-indicator');
@@ -3139,15 +3140,6 @@ function checkActiveWizardDraft() {
     try {
         const draft = JSON.parse(draftJson);
 
-        // Si el borrador contiene materiales consignados que aún no han sido subidos, limpiarlos
-        if (draft.materiales && draft.materiales.length > 0) {
-            draft.materiales = [];
-            draft.consignacion_activa = false;
-            try {
-                localStorage.setItem(STORAGE_KEY_WIZARD_DRAFT, JSON.stringify(draft));
-            } catch(e) {}
-        }
-
         const name = draft.nombre_comercial || draft.nombre_representante || 'Contratista en proceso';
         const prog = draft.progreso !== undefined ? draft.progreso : calculateOnboardingProgress(draft);
 
@@ -3159,7 +3151,7 @@ function checkActiveWizardDraft() {
 
         // Si el formulario actual está vacío pero hay un borrador activo, restaurarlo automáticamente
         const currentName = document.getElementById('wiz-nombre-comercial')?.value.trim();
-        if (!currentName && (draft.nombre_comercial || draft.nombre_representante || (draft.tarifas && draft.tarifas.length > 0))) {
+        if (!currentName && (draft.nombre_comercial || draft.nombre_representante || (draft.tarifas && draft.tarifas.length > 0) || (draft.materiales && draft.materiales.length > 0))) {
             loadDraftIntoForm(draft, draft.paso_actual || 1);
         }
     } catch (e) {
@@ -3724,49 +3716,19 @@ async function loadProveedoresRegistrados() {
         const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
         return k === 'BAJO CERO' || k === 'BAJOCERO' || k === 'BAJO CERO CHINANDEGA';
     });
-    if (bajoCeroExistingIdx >= 0) {
-        const curProv = proveedoresRegistrados[bajoCeroExistingIdx];
-        // Limpiar cualquier residuo de datos ficticios previos de Somarriba o documentos simulados
-        if (curProv.nombre_representante && curProv.nombre_representante.includes('Somarriba')) {
-            curProv.nombre_representante = '';
-            curProv.cedula = '';
-            curProv.ruc = '';
-            curProv.matricula = '';
-            curProv.profesion = '';
-            curProv.telefono = '';
-            curProv.correo = '';
-            curProv.contacto_operativo = '';
-            curProv.direccion = '';
-            curProv.cuenta_bancaria = '';
-            curProv.titular_cuenta = '';
-            curProv.inss = '';
-            curProv.tarifa_combustible = 0;
-            curProv.documentos = {};
-            curProv.estado = 'BORRADOR';
-            curProv.progreso = 45;
-        }
-        curProv.materiales = [];
-        curProv.consignacion_activa = false;
-    } else {
+    if (bajoCeroExistingIdx < 0) {
         proveedoresRegistrados.splice(1, 0, bajoCeroProv);
     }
-
-    // Purgar borrador residual en localStorage si tiene los datos ficticios
-    try {
-        const activeDraftJson = localStorage.getItem(STORAGE_KEY_WIZARD_DRAFT);
-        if (activeDraftJson) {
-            const d = JSON.parse(activeDraftJson);
-            if (d.nombre_representante && d.nombre_representante.includes('Somarriba')) {
-                localStorage.removeItem(STORAGE_KEY_WIZARD_DRAFT);
-            }
-        }
-    } catch(e) {}
 
     if (!tablaOferta['BAJO CERO']) {
         tablaOferta['BAJO CERO'] = {};
     }
-    if (bajoCeroExistingIdx >= 0 && proveedoresRegistrados[bajoCeroExistingIdx].tarifas && proveedoresRegistrados[bajoCeroExistingIdx].tarifas.length > 0) {
-        proveedoresRegistrados[bajoCeroExistingIdx].tarifas.forEach(t => {
+    const idxBajoCero = proveedoresRegistrados.findIndex(p => {
+        const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
+        return k === 'BAJO CERO' || k === 'BAJOCERO' || k === 'BAJO CERO CHINANDEGA';
+    });
+    if (idxBajoCero >= 0 && proveedoresRegistrados[idxBajoCero].tarifas && proveedoresRegistrados[idxBajoCero].tarifas.length > 0) {
+        proveedoresRegistrados[idxBajoCero].tarifas.forEach(t => {
             if (t.descripcion) tablaOferta['BAJO CERO'][t.descripcion] = parseFloat(t.tarifa) || 0;
         });
     } else {
@@ -6804,6 +6766,7 @@ async function buildDocxFromContractData(data) {
             borders: sigBorderNone,
             rows: [
                 new TableRow({
+                    cantSplit: true,
                     children: [
                         new TableCell({
                             width: { size: 45, type: WidthType.PERCENTAGE },
@@ -6867,6 +6830,8 @@ async function buildDocxFromContractData(data) {
             ]
         });
     }
+
+    const sectionsChildren = [];
 
     // Helper para estructurar cláusulas oficiales
     function addClause(numTitle, bodyParagraphs) {
@@ -7149,27 +7114,28 @@ async function buildDocxFromContractData(data) {
 
     const tableHeaderRow = new TableRow({
         tableHeader: true,
+        cantSplit: true,
         children: [
             new TableCell({
                 width: { size: 18, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
                 shading: { fill: '0F172A' },
-                margins: { top: 40, bottom: 40, left: 80, right: 80 },
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: 'CODIGO', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                margins: { top: 30, bottom: 30, left: 60, right: 60 },
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: 'CODIGO', bold: true, font, size: 15, color: 'FFFFFF' })] })]
             }),
             new TableCell({
                 width: { size: 58, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
                 shading: { fill: '0F172A' },
-                margins: { top: 40, bottom: 40, left: 80, right: 80 },
-                children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: 'DESCRIPCION', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                margins: { top: 30, bottom: 30, left: 60, right: 60 },
+                children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: 'DESCRIPCION', bold: true, font, size: 15, color: 'FFFFFF' })] })]
             }),
             new TableCell({
                 width: { size: 24, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
                 shading: { fill: '0F172A' },
-                margins: { top: 40, bottom: 40, left: 80, right: 80 },
-                children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: 'PRECIO (C$)', bold: true, font, size: 16, color: 'FFFFFF' })] })]
+                margins: { top: 30, bottom: 30, left: 60, right: 60 },
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: 'PRECIO (C$)', bold: true, font, size: 15, color: 'FFFFFF' })] })]
             })
         ]
     });
@@ -7180,27 +7146,28 @@ async function buildDocxFromContractData(data) {
         const bg = idx % 2 === 0 ? 'F8FAFC' : 'FFFFFF';
         const priceStr = 'C$ ' + Number(t.tarifa || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 });
         tableRows.push(new TableRow({
+            cantSplit: true,
             children: [
                 new TableCell({
                     width: { size: 18, type: WidthType.PERCENTAGE },
                     borders: cellBorderSolid,
                     shading: { fill: bg },
-                    margins: { top: 30, bottom: 30, left: 80, right: 80 },
-                    children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: String(t.rms || '-'), font, size: 16 })] })]
+                    margins: { top: 25, bottom: 25, left: 60, right: 60 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: String(t.rms || '-'), font, size: 15 })] })]
                 }),
                 new TableCell({
                     width: { size: 58, type: WidthType.PERCENTAGE },
                     borders: cellBorderSolid,
                     shading: { fill: bg },
-                    margins: { top: 30, bottom: 30, left: 80, right: 80 },
-                    children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: String(t.descripcion || ''), font, size: 16 })] })]
+                    margins: { top: 25, bottom: 25, left: 60, right: 60 },
+                    children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: String(t.descripcion || ''), font, size: 15 })] })]
                 }),
                 new TableCell({
                     width: { size: 24, type: WidthType.PERCENTAGE },
                     borders: cellBorderSolid,
                     shading: { fill: bg },
-                    margins: { top: 30, bottom: 30, left: 80, right: 80 },
-                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: priceStr, bold: true, font, size: 16 })] })]
+                    margins: { top: 25, bottom: 25, left: 60, right: 60 },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: priceStr, bold: true, font, size: 15 })] })]
                 })
             ]
         }));
@@ -7215,21 +7182,22 @@ async function buildDocxFromContractData(data) {
             : 'TARIFA DE COMBUSTIBLE POR KM FUERA DEL RADIO DE LA CIUDAD (14 KM MANAGUA)');
 
     tableRows.push(new TableRow({
+        cantSplit: true,
         children: [
             new TableCell({
                 width: { size: 76, type: WidthType.PERCENTAGE },
                 columnSpan: 2,
                 borders: cellBorderSolid,
                 shading: { fill: 'F1F5F9' },
-                margins: { top: 35, bottom: 35, left: 80, right: 80 },
-                children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: fuelLabelDocx, bold: true, font, size: 16 })] })]
+                margins: { top: 25, bottom: 25, left: 60, right: 60 },
+                children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: fuelLabelDocx, bold: true, font, size: 15 })] })]
             }),
             new TableCell({
                 width: { size: 24, type: WidthType.PERCENTAGE },
                 borders: cellBorderSolid,
                 shading: { fill: 'F1F5F9' },
-                margins: { top: 35, bottom: 35, left: 80, right: 80 },
-                children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 15, after: 15, line: 240 }, children: [new TextRun({ text: fuelPriceStr, bold: true, font, size: 16, color: '00A859' })] })]
+                margins: { top: 25, bottom: 25, left: 60, right: 60 },
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 10, after: 10, line: 220 }, children: [new TextRun({ text: fuelPriceStr, bold: true, font, size: 15, color: '00A859' })] })]
             })
         ]
     }));
@@ -7271,6 +7239,7 @@ async function buildDocxFromContractData(data) {
 
         const matTableHeaders = new TableRow({
             tableHeader: true,
+            cantSplit: true,
             children: [
                 new TableCell({
                     width: { size: 15, type: WidthType.PERCENTAGE },
@@ -7326,6 +7295,7 @@ async function buildDocxFromContractData(data) {
             const sub = qty * cost;
 
             matTableRows.push(new TableRow({
+                cantSplit: true,
                 children: [
                     new TableCell({
                         width: { size: 15, type: WidthType.PERCENTAGE },
@@ -7376,6 +7346,7 @@ async function buildDocxFromContractData(data) {
         // Filas de Resumen Subtotal, IVA y Total
         const addSummaryRow = (lbl, valStr, isTotal = false) => {
             matTableRows.push(new TableRow({
+                cantSplit: true,
                 children: [
                     new TableCell({
                         width: { size: 87, type: WidthType.PERCENTAGE },
@@ -7494,6 +7465,7 @@ async function buildDocxFromContractData(data) {
 
                 const geoTableHeaders = new TableRow({
                     tableHeader: true,
+                    cantSplit: true,
                     children: [
                         new TableCell({
                             width: { size: 14, type: WidthType.PERCENTAGE },
@@ -7558,6 +7530,7 @@ async function buildDocxFromContractData(data) {
 
                     const bg = i % 2 === 0 ? 'F8FAFC' : 'FFFFFF';
                     geoRows.push(new TableRow({
+                        cantSplit: true,
                         children: [
                             new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 15, bottom: 15, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 200 }, children: [new TextRun({ text: v1, bold: true, font, size: 13, color: '1E3A8A' })] })] }),
                             new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 15, bottom: 15, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 200 }, children: [new TextRun({ text: lat1, font, size: 13 })] })] }),
@@ -7613,7 +7586,7 @@ async function buildDocxFromContractData(data) {
                     children: [
                         new ImageRun({
                             data: mapBytes,
-                            transformation: { width: 620, height: 380 }
+                            transformation: { width: 540, height: 330 }
                         })
                     ]
                 }));
@@ -7681,7 +7654,8 @@ async function buildDocxFromContractData(data) {
         sections: [{
             properties: {
                 page: {
-                    margin: { top: 720, right: 720, bottom: 720, left: 720 }
+                    size: { width: 12240, height: 15840 },
+                    margin: { top: 720, right: 720, bottom: 720, left: 720, header: 360, footer: 360 }
                 }
             },
             headers: headerChildren.length > 0 ? { default: new Header({ children: headerChildren }) } : undefined,
@@ -8821,12 +8795,18 @@ function downloadWordMLContract(data) {
             </xml>
             <![endif]-->
             <style>
-                @page Section1 {
-                    size: 8.5in 11in;
+                @page {
+                    size: 8.5in 11.0in;
                     margin: 0.5in 0.5in 0.5in 0.5in;
-                    mso-header-margin: 0.5in;
-                    mso-footer-margin: 0.5in;
+                    mso-header-margin: 0.25in;
+                    mso-footer-margin: 0.25in;
                     mso-paper-source: 0;
+                }
+                @page Section1 {
+                    size: 8.5in 11.0in;
+                    margin: 0.5in 0.5in 0.5in 0.5in;
+                    mso-header-margin: 0.25in;
+                    mso-footer-margin: 0.25in;
                 }
                 div.Section1 {
                     page: Section1;
@@ -8836,10 +8816,11 @@ function downloadWordMLContract(data) {
                 .clause-title { font-weight: bold; margin-top: 10pt; margin-bottom: 3pt; }
                 ul, ol { margin: 4pt 0 8pt 20pt; padding-left: 0; }
                 li { margin-bottom: 3pt; text-align: justify; }
-                table { width: 100%; border-collapse: collapse; margin-top: 8pt; margin-bottom: 8pt; font-size: 9pt; }
-                th { background-color: #0F172A; color: #FFFFFF; font-weight: bold; border: 1pt solid #000000; padding: 4pt 5pt; }
-                td { border: 1pt solid #cbd5e1; padding: 3pt 5pt; }
-                .sig-table { width: 100%; border-collapse: collapse; margin-top: 20pt; page-break-inside: avoid; }
+                table { width: 100%; border-collapse: collapse; margin-top: 4pt; margin-bottom: 4pt; font-size: 8pt; mso-yfti-tblcellspacing: 0; }
+                th { background-color: #0F172A; color: #FFFFFF; font-weight: bold; border: 1pt solid #000000; padding: 2.5pt 4pt; font-size: 8pt; }
+                td { border: 1pt solid #cbd5e1; padding: 2.5pt 4pt; font-size: 8pt; }
+                tr { page-break-inside: avoid; mso-yfti-irow: 0; }
+                .sig-table { width: 100%; border-collapse: collapse; margin-top: 16pt; page-break-inside: avoid; }
                 .sig-table td { width: 45%; border: none !important; text-align: center; vertical-align: top; padding: 0; }
                 .sig-table-spacer { width: 10% !important; border: none !important; }
                 .sig-space { height: 42pt; }
