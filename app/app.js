@@ -6275,9 +6275,9 @@ function renderContractPreview() {
         renderedPrimeraText = data.clausulas_custom.PRIMERA;
     } else {
         const customScope = (data.objeto_servicio_custom || (document.getElementById('wiz-objeto-servicio-descripcion')?.value || '')).trim();
-        const baseScope = customScope || 'labores de instalación, desinstalación, mantenimiento preventivo y mantenimiento general de equipos de aires acondicionados';
+        const baseScope = customScope || 'labores de instalación, desinstalación, mantenimiento preventivo, mantenimiento general, diagnóstico técnico y levantamiento previo de equipos de aire acondicionado';
         const territorialHtml = isForaneo 
-            ? (isPoligono ? ` en las zonas y polígonos delimitados en el Anexo III de Delimitación Territorial (${(data.base_operativa || 'Occidente').toUpperCase()})` : ` en las zonas y municipios autorizados del departamento de <strong>${data.base_operativa || 'la circunscripción foránea'}</strong>`) 
+            ? (isPoligono ? ` en las zonas y polígonos delimitados en el Anexo III de Delimitación Territorial (${(data.base_operativa || 'Occidente').toUpperCase()}) que le sean asignadas mediante las respectivas OT. La delimitación territorial y las geocercas aplicables se incorporan formalmente en el Anexo III del presente instrumento.` : ` en las zonas de <strong>${(data.base_operativa || data.domicilio || 'Chinandega').toUpperCase()}</strong> que le sean asignadas mediante las respectivas OT. La delimitación territorial y las geocercas aplicables se incorporarán posteriormente en el Anexo III mediante adenda suscrita por ambas partes.`) 
             : '.';
         renderedPrimeraText = `Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute ${baseScope} que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>${territorialHtml}`;
     }
@@ -6299,6 +6299,89 @@ function renderContractPreview() {
         `;
     }
 
+    const preambleContractorHtml = isForaneo
+        ? `y por otra parte, <strong>${data.nombre_representante ? data.nombre_representante.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>'}</strong>, mayor de edad, ${(data.estado_civil || 'casado').toLowerCase()}, ${(data.profesion || 'ingeniero industrial').toLowerCase()}, con domicilio en ${data.domicilio || data.base_operativa || 'Chinandega'}, con cédula de identidad nicaragüense número: ${data.cedula ? `<strong>${data.cedula}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>'}${data.ruc ? ` y cédula RUC: <strong>${data.ruc}</strong>` : ''}, quien desarrolla actividades comerciales por cuenta propia bajo el nombre comercial <strong>${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</strong>, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRE ACONDICIONADO</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:`
+        : `y por otra parte, <strong>${data.nombre_representante ? data.nombre_representante.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>'}</strong>, mayor de edad, ${(data.estado_civil || 'soltero').toLowerCase()}, ${(data.profesion || 'técnico').toLowerCase()}, con domicilio en ${data.domicilio || data.base_operativa || 'la ciudad de Managua'}, con cédula de identidad nicaragüense número: ${data.cedula ? `<strong>${data.cedula}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>'}, quien actúa en nombre y representación del negocio mercantil bajo ${data.regimen || 'régimen tributario'} denominado <strong>${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</strong>${data.ruc ? ` con número RUC: <strong>${data.ruc}</strong>` : ''}, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:`;
+
+    const docsIntegralesHtml = isForaneo ? `
+        <ol class="contract-clause-numbered">
+            <li>El Anexo I que contiene la Tabla Oficial de Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional ${isPoligono ? 'fuera de la geocerca contractual pactada en el Anexo III' : 'fuera de la geocerca contractual que se delimite en el Anexo III'}.</li>
+            <li>Las Órdenes de Trabajo (OT), las cuales serán creadas y asignadas exclusivamente por el personal de MAESTROS de <strong>EL CONTRATANTE</strong> mediante la plataforma o sistema digital autorizado. Cada OT identificará el servicio adjudicado a <strong>EL CONTRATISTA</strong> y constituirá la instrucción formal para su ejecución. Una vez que <strong>EL CONTRATISTA</strong> se encuentre en el lugar realizando la actividad, deberá iniciar el proceso de ejecución en la plataforma. Culminado el servicio y completadas las evidencias requeridas, deberá registrar la finalización de la actividad; seguidamente, la plataforma habilitará el espacio para que el cliente final firme directamente en el dispositivo móvil, dejando constancia de la recepción del servicio.</li>
+            <li>Las evidencias de ejecución incorporadas a cada OT y la firma del cliente final capturada en el dispositivo móvil al concluir el servicio. Ambas constituirán requisitos concurrentes y tendrán el mismo valor para efectos de validación, liquidación y pago de la OT; por consiguiente, la falta de las evidencias requeridas o de la firma del cliente impedirá que la OT sea procesada para pago. El único documento físico será la Hoja de Levantamiento, cuando corresponda, la cual deberá ser firmada por el cliente; <strong>EL CONTRATISTA</strong> deberá tomar una imagen clara, completa y legible de dicha hoja y cargarla en la OT respectiva como parte de las evidencias obligatorias.</li>
+            <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
+            <li>El Anexo III de Delimitación Territorial y Geocercas Contractuales, ${isPoligono ? 'cuya cartografía y tabla de vértices GPS certificados delimitan la zona geográfica obligatoria' : 'cuya cartografía y tabla de vértices GPS se encuentran pendientes de elaboración y se incorporarán posteriormente al presente contrato mediante adenda suscrita por ambas partes'}.</li>
+            ${hasConsignacion ? '<li>El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.</li>' : ''}
+        </ol>
+    ` : `
+        <ol class="contract-clause-numbered">
+            <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de Managua.</li>
+            <li>Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por <strong>EL CONTRATANTE</strong> para cada labor asignada.</li>
+            <li>El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de <strong>EL CONTRATANTE</strong>.</li>
+            <li>Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.</li>
+            <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
+            ${hasConsignacion ? '<li>El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.</li>' : ''}
+        </ol>
+    `;
+
+    const obligacionesListHtml = isForaneo ? `
+        <ol class="contract-clause-numbered">
+            <li>Portar, durante la prestación de los servicios, el uniforme corporativo de <strong>${provNameDisplay}</strong>, el cual deberá encontrarse en buen estado, limpio y permitir la identificación visible de la empresa, manteniendo en todo momento una imagen pulcra y profesional.</li>
+            <li>Portar de manera visible el gafete o credencial oficial emitido por SINSA, que identificará al personal de <strong>EL CONTRATISTA</strong> ante el cliente final como representante operativo autorizado de SINSA. Sus facultades estarán estrictamente limitadas a la atención y ejecución de la actividad autorizada en el presente contrato y especificada en la OT asignada; en consecuencia, no podrá celebrar contratos, asumir obligaciones, efectuar cobros ni representar legalmente a SINSA para ningún otro acto.</li>
+            <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
+            <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de <strong>EL CONTRATANTE</strong> y las normas técnicas aplicables en Nicaragua.</li>
+            <li>Reportar inmediatamente a los coordinadores de <strong>EL CONTRATANTE</strong> cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
+            <li>Planificar y programar la ejecución de las OT que le hayan sido asignadas, coordinando con el cliente final las fechas y horarios de atención. <strong>EL CONTRATISTA</strong> deberá realizar el primer contacto con el cliente dentro de las cuarenta y ocho (48) horas siguientes a la asignación cuando el servicio se ubique en la ciudad de <strong>${(data.base_operativa || 'la ciudad base').toUpperCase()}</strong>, y dentro de las setenta y seis (76) horas hábiles siguientes cuando se ubique fuera de dicha ciudad. La asignación o adjudicación de una OT por <strong>EL CONTRATANTE</strong> no constituirá, por sí misma, la programación de su ejecución ni una instrucción de inicio inmediato. La planificación y programación serán responsabilidad de <strong>EL CONTRATISTA</strong>, quien deberá comunicarlas y mantenerlas disponibles para revisión del personal de SINSA, así como informar oportunamente cualquier modificación.</li>
+            <li>Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de <strong>EL CONTRATANTE</strong>.</li>
+            <li>Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.</li>
+            <li>Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para <strong>EL CONTRATANTE</strong> ni para el cliente.</li>
+            <li>Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.</li>
+        </ol>
+    ` : `
+        <ol class="contract-clause-numbered">
+            <li>${uniformClauseText}</li>
+            <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
+            <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de <strong>EL CONTRATANTE</strong> y las normas técnicas aplicables en Nicaragua.</li>
+            <li>Reportar inmediatamente a los coordinadores de <strong>EL CONTRATANTE</strong> cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
+            <li>Cumplir estrictamente con la programación de citas y horarios previamente coordinados con el cliente y notificados por <strong>EL CONTRATANTE</strong>.</li>
+            <li>Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de <strong>EL CONTRATANTE</strong>.</li>
+            <li>Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.</li>
+            <li>Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para <strong>EL CONTRATANTE</strong> ni para el cliente.</li>
+            <li>Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.</li>
+        </ol>
+    `;
+
+    const paymentTextDisplay = isForaneo ? `
+        El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán bajo la modalidad de crédito comercial de ${data.condicion_pago && data.condicion_pago.includes('30') ? 'treinta (30)' : 'quince (15)'} días calendario contados a partir de la presentación y radicación formal y completa de la factura comercial debidamente autorizada por la DGI. Las evidencias y la firma del cliente tendrán el mismo valor como requisitos de pago; la ausencia de cualquiera de ellas impedirá el inicio del plazo de pago respecto de la OT incompleta. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: <strong>${cuentaDisplay}</strong> del banco <strong>${(data.banco || 'Banco').toUpperCase()}</strong> en moneda córdobas a nombre de <strong>${titularDisplay}</strong>.
+    ` : paymentClauseText;
+
+    const valorMantenimientoText = isForaneo ? `
+        Las partes convienen que las tarifas pactadas en moneda nacional toman como base un tipo de cambio de treinta y seis córdobas con seis mil doscientas cuarenta y tres diezmilésimas (C$ 36.6243) por un dólar de los Estados Unidos de América (US$ 1.00), el cual se mantendrá como referencia durante el año calendario correspondiente. Si el Banco Central de Nicaragua establece un tipo de cambio oficial distinto para un año calendario posterior, las tarifas sujetas a mantenimiento de valor se actualizarán a partir del inicio de dicho año en la misma proporción de variación entre el nuevo tipo de cambio oficial y el tipo de cambio base aquí indicado, salvo acuerdo escrito distinto entre las partes.
+    ` : `
+        Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).
+    `;
+
+    const garantiaTextDisplay = isForaneo ? `
+        <strong>EL CONTRATISTA</strong> otorga una garantía de doce (12) meses calendario sobre la mano de obra y los servicios técnicos ejecutados, contados a partir de la fecha de ejecución de cada actividad registrada en la OT correspondiente. Si durante este plazo se presentaren fallas atribuibles a una instalación, mantenimiento o servicio técnico deficiente, incluyendo fugas de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> deberá corregirlas de inmediato y sin costo alguno para <strong>EL CONTRATANTE</strong> ni para el cliente. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.
+    ` : warrantyClauseText;
+
+    const confidencialidadTextDisplay = isForaneo ? `
+        <strong>EL CONTRATISTA</strong> se obliga a guardar estricta confidencialidad sobre toda información técnica, comercial, operativa o personal a la que tenga acceso con motivo del presente contrato, incluyendo datos de clientes, Órdenes de Trabajo, tarifas, procedimientos internos, fotografías, firmas, Hojas de Levantamiento, credenciales de acceso y demás evidencias. Dicha información únicamente podrá utilizarse para la planificación y ejecución de los servicios asignados, quedando prohibida su divulgación, reproducción, extracción o utilización para contactar, captar u ofrecer servicios directamente a los clientes de <strong>EL CONTRATANTE</strong>. <strong>EL CONTRATISTA</strong> limitará el acceso al personal estrictamente necesario, responderá por las actuaciones de sus empleados y técnicos, adoptará medidas razonables de seguridad y notificará inmediatamente cualquier pérdida, acceso o divulgación no autorizada. Al terminar el contrato deberá devolver o eliminar la información que conserve, salvo obligación legal de mantenerla. Estas obligaciones permanecerán vigentes durante el contrato y por cinco (5) años después de su terminación; su incumplimiento constituirá causa grave para suspender las OT, cancelar accesos y terminar anticipadamente el contrato, sin perjuicio de la reclamación de los daños y perjuicios comprobados.
+    ` : `
+        <strong>EL CONTRATISTA</strong> se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.
+    `;
+
+    const terminacionAnticipadaHtml = `
+        <div class="contract-clause-title">DÉCIMA NOVENA [TERMINACIÓN ANTICIPADA]:</div>
+        <p style="text-align: justify;"><strong>EL CONTRATANTE</strong> podrá terminar anticipadamente el presente contrato, mediante notificación escrita, cuando <strong>EL CONTRATISTA</strong> incurra en incumplimiento grave o reiterado de sus obligaciones, abandone o suspenda injustificadamente los servicios, ceda trabajos sin autorización, incumpla las normas de seguridad, confidencialidad o atención al cliente, pierda la capacidad técnica o legal necesaria, o entre en estado de insolvencia, disolución o cese de operaciones. Cuando el incumplimiento sea subsanable, <strong>EL CONTRATANTE</strong> podrá conceder un plazo de cinco (5) días hábiles para su corrección. Asimismo, cualquiera de las partes podrá terminar el contrato sin expresión de causa mediante aviso escrito con treinta (30) días calendario de anticipación. La terminación no liberará a las partes de completar o liquidar las OT previamente ejecutadas, ni extinguirá las obligaciones de garantía, confidencialidad, pago o responsabilidad que deban subsistir por su naturaleza.</p>
+    `;
+
+    const clausulaConsignacionIndexedHtml = hasConsignacion ? `
+        <div class="contract-clause-title">VIGÉSIMA [CONSIGNACIÓN DE MATERIALES E INVENTARIO INICIAL]:</div>
+        <p style="text-align: justify;">Por medio de la presente cláusula, <strong>EL CONTRATANTE</strong> entrega a <strong>EL CONTRATISTA</strong> en calidad de consignación mercantil, y éste recibe a su entera satisfacción en depósito responsable, el inventario inicial de materiales, accesorios y repuestos para instalación de aires acondicionados detallado en el <strong>ANEXO II</strong> del presente contrato. Las partes declaran expresamente que el valor total del inventario consignado asciende a la suma de <strong>${calculateConsignacionTotalsFromList(data.materiales).totalLetras}</strong>, compuesto por un Subtotal Neto de <strong>C$ ${calculateConsignacionTotalsFromList(data.materiales).subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</strong> más el quince por ciento (15%) correspondiente al Impuesto al Valor Agregado (IVA) por la suma de <strong>C$ ${calculateConsignacionTotalsFromList(data.materiales).iva.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</strong>. <strong>EL CONTRATISTA</strong> se constituye en custodio legal y depositario mercantil de dichos bienes, asumiendo plena responsabilidad civil, comercial y penal por mermas injustificadas, pérdidas o extravíos, obligándose a utilizarlos exclusivamente en la ejecución de las Órdenes de Trabajo encomendadas por <strong>EL CONTRATANTE</strong> y a reponerlos o liquidarlos contra cada servicio facturado.</p>
+    ` : '';
+
+    const aceptacionFinalNum = hasConsignacion ? 'VIGÉSIMA PRIMERA' : 'VIGÉSIMA';
+
     viewer.innerHTML = `
         ${variantBannerHtml}
         <div class="contract-header-logo-row">
@@ -6306,11 +6389,11 @@ function renderContractPreview() {
         </div>
 
         <div class="contract-header-title">
-            CONTRATO DE SERVICIOS DE INSTALACION DE AIRES<br>ACONDICIONADOS${isForaneo ? ' (VARIANTE FORÁNEA)' : ''}.
+            CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRE ACONDICIONADO${isForaneo ? ' (VARIANTE FORÁNEA)' : ''}.
         </div>
 
         <p style="text-align: justify; text-justify: inter-word;">
-            Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; y por otra parte, <strong>${data.nombre_representante ? data.nombre_representante.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: REPRESENTANTE LEGAL]</span>'}</strong>, mayor de edad, ${(data.estado_civil || 'soltero').toLowerCase()}, ${(data.profesion || 'técnico').toLowerCase()}, con domicilio en ${data.domicilio || data.base_operativa || 'la ciudad de Managua'}, con cédula de identidad nicaragüense número: ${data.cedula ? `<strong>${data.cedula}</strong>` : '<span class="missing-field-highlight">[PENDIENTE: CÉDULA]</span>'}, quien actúa en nombre y representación del negocio mercantil bajo ${data.regimen || 'régimen tributario'} denominado <strong>${data.nombre_comercial ? data.nombre_comercial.toUpperCase() : '<span class="missing-field-highlight">[PENDIENTE: NOMBRE COMERCIAL]</span>'}</strong>${data.ruc ? ` con número RUC: <strong>${data.ruc}</strong>` : ''}, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:
+            Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; ${preambleContractorHtml}
         </p>
 
         <div class="contract-clause-title" data-clause-title="PRIMERA">PRIMERA [OBJETO DEL CONTRATO]:</div>
@@ -6323,38 +6406,20 @@ function renderContractPreview() {
 
         <div class="contract-clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
         <p>Forman parte integrante del presente contrato los siguientes documentos:</p>
-        <ol class="contract-clause-numbered">
-            <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional ${isPoligono ? 'fuera de la geocerca contractual pactada en el Anexo III' : `fuera del radio de ${isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua'}`}.</li>
-            <li>Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por <strong>EL CONTRATANTE</strong> para cada labor asignada.</li>
-            <li>El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de <strong>EL CONTRATANTE</strong>.</li>
-            <li>Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.</li>
-            <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
-            ${hasConsignacion ? '<li>El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.</li>' : ''}
-            ${isPoligono ? '<li>El Anexo III de Delimitación Territorial y Geocercas Periciales Satelitales (Google My Maps) que fija de manera inmutable los polígonos y vértices GPS certificados dentro de los cuales aplica la tarifa ordinaria pactada sin cobro de kilometraje.</li>' : ''}
-        </ol>
+        ${docsIntegralesHtml}
 
         <div class="contract-clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
         <p><strong>EL CONTRATISTA</strong> se compromete formalmente a:</p>
-        <ol class="contract-clause-numbered">
-            <li>${uniformClauseText}</li>
-            <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
-            <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de <strong>EL CONTRATANTE</strong> y las normas técnicas aplicables en Nicaragua.</li>
-            <li>Reportar inmediatamente a los coordinadores de <strong>EL CONTRATANTE</strong> cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
-            <li>Cumplir estrictamente con la programación de citas y horarios previamente coordinados con el cliente y notificados por <strong>EL CONTRATANTE</strong>.</li>
-            <li>Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de <strong>EL CONTRATANTE</strong>.</li>
-            <li>Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.</li>
-            <li>Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para <strong>EL CONTRATANTE</strong> ni para el cliente.</li>
-            <li>Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.</li>
-        </ol>
+        ${obligacionesListHtml}
 
         <div class="contract-clause-title">QUINTA [PLAZO DEL CONTRATO]:</div>
         <p style="text-align: justify;">El plazo del presente contrato es de DOCE (12) MESES calendario, contados a partir de la fecha de su suscripción. Este plazo se prorrogará automáticamente por períodos sucesivos de igual duración, salvo que cualquiera de las partes notifique por escrito a la otra su decisión de no renovarlo con al menos treinta (30) días de anticipación a la fecha de vencimiento.</p>
 
         <div class="contract-clause-title">SEXTA [VALOR DEL CONTRATO Y FORMA DE PAGO]:</div>
-        <p style="text-align: justify;">${paymentClauseText}</p>
+        <p style="text-align: justify;">${paymentTextDisplay}</p>
 
         <div class="contract-clause-title">SÉPTIMA [MANTENIMIENTO DE VALOR]:</div>
-        <p style="text-align: justify;">Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).</p>
+        <p style="text-align: justify;">${valorMantenimientoText}</p>
 
         <div class="contract-clause-title">OCTAVA [RELACIÓN COMERCIAL Y RESPONSABILIDAD LABORAL]:</div>
         <p style="text-align: justify;">Queda claramente convenido que la relación jurídica que une a las partes es de naturaleza estrictamente civil y mercantil independiente, por lo que no existe ni existirá ningún vínculo de subordinación laboral ni relación obrero-patronal entre <strong>EL CONTRATANTE</strong> y el personal dependiente o subcontratado por <strong>EL CONTRATISTA</strong>. En consecuencia, <strong>EL CONTRATISTA</strong> asume la responsabilidad exclusiva por el pago de salarios, prestaciones sociales, seguro social (INSS), aportes al INATEC y demás obligaciones laborales vigentes en la República de Nicaragua respecto a su personal.</p>
@@ -6363,7 +6428,7 @@ function renderContractPreview() {
         <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> declara bajo promesa de ley que cuenta con los conocimientos técnicos, experiencia profesional comprobada, personal idóneo y licencias necesarias para desempeñar cabalmente los servicios encomendados, obligándose a ejecutar cada trabajo bajo las mejores prácticas de la ingeniería y refrigeración.</p>
 
         <div class="contract-clause-title">DÉCIMA [GARANTÍA DE LOS TRABAJOS Y RESPONSABILIDAD CIVIL]:</div>
-        <p style="text-align: justify;">${warrantyClauseText}</p>
+        <p style="text-align: justify;">${garantiaTextDisplay}</p>
 
         <div class="contract-clause-title">DÉCIMA PRIMERA [PENALIZACIONES Y MULTAS]:</div>
         <p style="text-align: justify;">El incumplimiento injustificado en los tiempos de entrega, retrasos en la atención de visitas o inasistencia a citas concertadas con los clientes facultará a <strong>EL CONTRATANTE</strong> a deducir una penalidad equivalente al uno punto veinticinco por ciento (1.25%) diario sobre el valor total de la orden de trabajo correspondiente, hasta por un período máximo de ocho (8) días hábiles, tras lo cual <strong>EL CONTRATANTE</strong> podrá rescindir unilateralmente el servicio y reasignarlo a otro proveedor, deduciendo los costos sobrevenidos a <strong>EL CONTRATISTA</strong>.</p>
@@ -6375,12 +6440,12 @@ function renderContractPreview() {
         <p style="text-align: justify;">Cualquier modificación a los términos, condiciones, alcances o tarifas de este contrato deberá constar por escrito mediante Adenda debidamente rubricada y suscrita por los representantes autorizados de ambas partes.</p>
 
         <div class="contract-clause-title">DÉCIMA CUARTA [CONFIDENCIALIDAD]:</div>
-        <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.</p>
+        <p style="text-align: justify;">${confidencialidadTextDisplay}</p>
 
         <div class="contract-clause-title">DÉCIMA QUINTA [AVISOS Y NOTIFICACIONES]:</div>
         <p>Todas las comunicaciones, avisos y notificaciones entre las partes se considerarán válidamente efectuadas en las siguientes direcciones:</p>
         <ul class="contract-clause-list">
-            <li><strong>EL CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: <strong>JOSE ALFREDO RAUDES ORTIZ / ÁNGEL CAMPOS</strong> (Tel: 7886-2226 / 8267-2246 - Correo: jose.raudes@sinsa.com.ni).</li>
+            <li><strong>EL CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: <strong>JOSE ALFREDO RAUDES ORTIZ</strong> (Tel: 7886-2226 - Correo: jose.raudes@sinsa.com.ni).</li>
             <li><strong>EL CONTRATISTA:</strong> ${provNameDisplay}, con domicilio en ${direccionDisplay}. Con Atención a: ${repNameDisplay}${data.contacto_operativo ? ` / Contacto Operativo: ${escapeHtml(data.contacto_operativo)}` : ''} (Teléfono: ${telefonoDisplay} - Correo Electrónico: ${correoDisplay}).</li>
         </ul>
         <p style="text-align: justify;">Cualquier cambio de domicilio o datos de contacto deberá notificarse formalmente por escrito con al menos veinticuatro (24) horas de anticipación para que surta plenos efectos legales.</p>
@@ -6394,9 +6459,11 @@ function renderContractPreview() {
         <div class="contract-clause-title">DÉCIMA OCTAVA [EQUIPOS, HERRAMIENTAS E INSUMOS]:</div>
         <p style="text-align: justify;"><strong>EL CONTRATISTA</strong> suministrará a su propia costa todos los medios de transporte y movilización adecuados, así como las herramientas e instrumentos técnicos necesarios para la debida ejecución de los servicios (escaleras certificadas, bombas de vacío, manómetros digitales o análogos para refrigerantes R410A y R32, abocardadores excéntricos, llaves dinamométricas, amperímetros y multímetros). Cuando los materiales o repuestos de instalación sean provistos por <strong>EL CONTRATANTE</strong>, <strong>EL CONTRATISTA</strong> deberá retirarlos formalmente de las bodegas designadas presentando la orden respectiva.</p>
 
-        ${clausulaConsignacionHtml}
+        ${terminacionAnticipadaHtml}
 
-        <div class="contract-clause-title">${acceptanceClauseNum} [ACEPTACIÓN]:</div>
+        ${clausulaConsignacionIndexedHtml}
+
+        <div class="contract-clause-title">${aceptacionFinalNum} [ACEPTACIÓN]:</div>
         <p style="text-align: justify;">Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ${data.dia || new Date().getDate()} días del mes de ${data.mes || 'septiembre'} del año ${data.anio || 2026}.</p>
 
         <div class="contract-signatures-grid">
@@ -6556,43 +6623,10 @@ async function buildDocxFromContractData(data) {
         })
     ];
 
-    const sectionsChildren = [];
-
-    // Título Principal Centrado
-    sectionsChildren.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 240 },
-        children: [
-            new TextRun({ text: 'CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS.', bold: true, size: sizeTitle, font })
-        ]
-    }));
-
-    // Preámbulo / Comparecencia Oficial Completa (con Escrituras 12 y 192)
-    sectionsChildren.push(new Paragraph({
-        alignment: AlignmentType.JUSTIFIED,
-        spacing: paragraphSpacing,
-        children: [
-            new TextRun({ text: 'Nosotros, ', font, size: sizeBody }),
-            new TextRun({ text: 'OSCAR RENÉ VARGAS REYES', bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada ', font, size: sizeBody }),
-            new TextRun({ text: 'SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA', bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', que se abrevia ', font, size: sizeBody }),
-            new TextRun({ text: '"SINSA"', bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como ', font, size: sizeBody }),
-            new TextRun({ text: '"EL CONTRATANTE"', bold: true, font, size: sizeBody }),
-            new TextRun({ text: '; y por otra parte, ', font, size: sizeBody }),
-            new TextRun({ text: nomRep, bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', mayor de edad, ' + estCivil + ', ' + prof + ', con domicilio en ' + dom + ', con cédula de identidad nicaragüense número: ', font, size: sizeBody }),
-            new TextRun({ text: cedula, bold: true, font, size: sizeBody }),
-            new TextRun({ text: ruc + ', quien actúa en nombre y representación del negocio mercantil bajo ' + reg + ' denominado ', font, size: sizeBody }),
-            new TextRun({ text: nomCom, bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', quien en adelante se denominará simplemente como ', font, size: sizeBody }),
-            new TextRun({ text: '"EL CONTRATISTA"', bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', acordamos celebrar el presente ', font, size: sizeBody }),
-            new TextRun({ text: 'CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS', bold: true, font, size: sizeBody }),
-            new TextRun({ text: ', el que se regirá bajo las siguientes cláusulas y estipulaciones:', font, size: sizeBody })
-        ]
-    }));
+    const isForaneo = (data.contract_variant === 'FORANEO');
+    const hasConsignacion = (isForaneo && data.consignacion_activa);
+    const matTotals = calculateConsignacionTotalsFromList(data.materiales);
+    const isPoligono = (data.geocerca_modalidad === 'MAPA_POLIGONO' || (isForaneo && (!data.geocerca_modalidad || data.geocerca_modalidad === 'MAPA_POLIGONO')));
 
     // Helper para estructurar cláusulas oficiales
     function addClause(numTitle, bodyParagraphs) {
@@ -6611,10 +6645,6 @@ async function buildDocxFromContractData(data) {
         });
     }
 
-    const isForaneo = (data.contract_variant === 'FORANEO');
-    const hasConsignacion = (isForaneo && data.consignacion_activa);
-    const matTotals = calculateConsignacionTotalsFromList(data.materiales);
-
     // Banner en encabezado si es propuesta foránea
     if (isForaneo) {
         sectionsChildren.push(new Paragraph({
@@ -6627,7 +6657,57 @@ async function buildDocxFromContractData(data) {
         }));
     }
 
-    const isPoligono = (data.geocerca_modalidad === 'MAPA_POLIGONO' || (isForaneo && (!data.geocerca_modalidad || data.geocerca_modalidad === 'MAPA_POLIGONO')));
+    // Título Principal Centrado
+    sectionsChildren.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 240 },
+        children: [
+            new TextRun({ text: isForaneo ? 'CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRE ACONDICIONADO.' : 'CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS.', bold: true, size: sizeTitle, font })
+        ]
+    }));
+
+    // Preámbulo / Comparecencia Oficial Completa (con Escrituras 12 y 192)
+    const preambleContractorRuns = isForaneo ? [
+        new TextRun({ text: '; y por otra parte, ', font, size: sizeBody }),
+        new TextRun({ text: nomRep, bold: true, font, size: sizeBody }),
+        new TextRun({ text: ', mayor de edad, ' + estCivil + ', ' + prof + ', con domicilio en ' + dom + ', con cédula de identidad nicaragüense número: ', font, size: sizeBody }),
+        new TextRun({ text: cedula, bold: true, font, size: sizeBody }),
+        new TextRun({ text: ruc + ', quien desarrolla actividades comerciales por cuenta propia bajo el nombre comercial ', font, size: sizeBody }),
+        new TextRun({ text: nomCom, bold: true, font, size: sizeBody }),
+        new TextRun({ text: ', quien en adelante se denominará simplemente como ', font, size: sizeBody }),
+        new TextRun({ text: '"EL CONTRATISTA"', bold: true, font, size: sizeBody }),
+        new TextRun({ text: ', acordamos celebrar el presente ', font, size: sizeBody }),
+        new TextRun({ text: 'CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRE ACONDICIONADO', bold: true, font, size: sizeBody }),
+        new TextRun({ text: ', el que se regirá bajo las siguientes cláusulas y estipulaciones:', font, size: sizeBody })
+    ] : [
+        new TextRun({ text: '; y por otra parte, ', font, size: sizeBody }),
+        new TextRun({ text: nomRep, bold: true, font, size: sizeBody }),
+        new TextRun({ text: ', mayor de edad, ' + estCivil + ', ' + prof + ', con domicilio en ' + dom + ', con cédula de identidad nicaragüense número: ', font, size: sizeBody }),
+        new TextRun({ text: cedula, bold: true, font, size: sizeBody }),
+        new TextRun({ text: ruc + ', quien actúa en nombre y representación del negocio mercantil bajo ' + reg + ' denominado ', font, size: sizeBody }),
+        new TextRun({ text: nomCom, bold: true, font, size: sizeBody }),
+        new TextRun({ text: ', quien en adelante se denominará simplemente como ', font, size: sizeBody }),
+        new TextRun({ text: '"EL CONTRATISTA"', bold: true, font, size: sizeBody }),
+        new TextRun({ text: ', acordamos celebrar el presente ', font, size: sizeBody }),
+        new TextRun({ text: 'CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS', bold: true, font, size: sizeBody }),
+        new TextRun({ text: ', el que se regirá bajo las siguientes cláusulas y estipulaciones:', font, size: sizeBody })
+    ];
+
+    sectionsChildren.push(new Paragraph({
+        alignment: AlignmentType.JUSTIFIED,
+        spacing: paragraphSpacing,
+        children: [
+            new TextRun({ text: 'Nosotros, ', font, size: sizeBody }),
+            new TextRun({ text: 'OSCAR RENÉ VARGAS REYES', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada ', font, size: sizeBody }),
+            new TextRun({ text: 'SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', que se abrevia ', font, size: sizeBody }),
+            new TextRun({ text: '"SINSA"', bold: true, font, size: sizeBody }),
+            new TextRun({ text: ', sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como ', font, size: sizeBody }),
+            new TextRun({ text: '"EL CONTRATANTE"', bold: true, font, size: sizeBody }),
+            ...preambleContractorRuns
+        ]
+    }));
 
     // CLÁUSULAS DEL CONTRATO
     let primeraText = '';
@@ -6637,9 +6717,9 @@ async function buildDocxFromContractData(data) {
         primeraText = data.clausulas_custom.PRIMERA;
     } else {
         const customScope = (data.objeto_servicio_custom || (document.getElementById('wiz-objeto-servicio-descripcion')?.value || '')).trim();
-        const baseScope = customScope || 'labores de instalación, desinstalación, mantenimiento preventivo y mantenimiento general de equipos de aires acondicionados';
+        const baseScope = customScope || 'labores de instalación, desinstalación, mantenimiento preventivo, mantenimiento general, diagnóstico técnico y levantamiento previo de equipos de aire acondicionado';
         const territorialDocx = isForaneo 
-            ? (isPoligono ? (' en las zonas y polígonos delimitados en el Anexo III de Delimitación Territorial (' + (data.base_operativa || 'Occidente').toUpperCase() + ').') : (' en las circunscripciones y municipios autorizados del departamento de ' + (data.base_operativa || 'la base operativa asignada') + '.')) 
+            ? (isPoligono ? (' en las zonas y polígonos delimitados en el Anexo III de Delimitación Territorial (' + (data.base_operativa || 'Occidente').toUpperCase() + ') que le sean asignadas mediante las respectivas OT. La delimitación territorial y las geocercas aplicables se incorporan formalmente en el Anexo III del presente instrumento.') : (' en las zonas de ' + (data.base_operativa || data.domicilio || 'Chinandega').toUpperCase() + ' que le sean asignadas mediante las respectivas OT. La delimitación territorial y las geocercas aplicables se incorporarán posteriormente en el Anexo III mediante adenda suscrita por ambas partes.')) 
             : '.';
         primeraText = 'Por medio del presente documento, EL CONTRATANTE contrata los servicios profesionales independientes de EL CONTRATISTA para que ejecute ' + baseScope + ' que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de EL CONTRATANTE' + territorialDocx;
     }
@@ -6662,19 +6742,23 @@ async function buildDocxFromContractData(data) {
 
     addClause('SEGUNDA [ALCANCES DEL CONTRATO]:', segundaLines);
 
-    const docsIntegrales = [
+    const docsIntegrales = isForaneo ? [
         'Forman parte integrante del presente contrato los siguientes documentos:',
-        '1. El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional ' + (isPoligono ? 'fuera de la geocerca contractual pactada en el Anexo III.' : ('fuera del radio de ' + (isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua') + '.')),
+        '1. El Anexo I que contiene la Tabla Oficial de Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional ' + (isPoligono ? 'fuera de la geocerca contractual pactada en el Anexo III.' : 'fuera de la geocerca contractual que se delimite en el Anexo III.'),
+        '2. Las Órdenes de Trabajo (OT), las cuales serán creadas y asignadas exclusivamente por el personal de MAESTROS de EL CONTRATANTE mediante la plataforma o sistema digital autorizado. Cada OT identificará el servicio adjudicado a EL CONTRATISTA y constituirá la instrucción formal para su ejecución. Una vez que EL CONTRATISTA se encuentre en el lugar realizando la actividad, deberá iniciar el proceso de ejecución en la plataforma. Culminado el servicio y completadas las evidencias requeridas, deberá registrar la finalización de la actividad; seguidamente, la plataforma habilitará el espacio para que el cliente final firme directamente en el dispositivo móvil, dejando constancia de la recepción del servicio.',
+        '3. Las evidencias de ejecución incorporadas a cada OT y la firma del cliente final capturada en el dispositivo móvil al concluir el servicio. Ambas constituirán requisitos concurrentes y tendrán el mismo valor para efectos de validación, liquidación y pago de la OT; por consiguiente, la falta de las evidencias requeridas o de la firma del cliente impedirá que la OT sea procesada para pago. El único documento físico será la Hoja de Levantamiento, cuando corresponda, la cual deberá ser firmada por el cliente; EL CONTRATISTA deberá tomar una imagen clara, completa y legible de dicha hoja y cargarla en la OT respectiva como parte de las evidencias obligatorias.',
+        '4. Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.',
+        '5. El Anexo III de Delimitación Territorial y Geocercas Contractuales, ' + (isPoligono ? 'cuya cartografía y tabla de vértices GPS certificados delimitan la zona geográfica obligatoria.' : 'cuya cartografía y tabla de vértices GPS se encuentran pendientes de elaboración y se incorporarán posteriormente al presente contrato mediante adenda suscrita por ambas partes.')
+    ] : [
+        'Forman parte integrante del presente contrato los siguientes documentos:',
+        '1. El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de Managua.',
         '2. Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por EL CONTRATANTE para cada labor asignada.',
         '3. El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de EL CONTRATANTE.',
         '4. Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.',
         '5. Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.'
     ];
     if (hasConsignacion) {
-        docsIntegrales.push('6. El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.');
-    }
-    if (isPoligono) {
-        docsIntegrales.push((hasConsignacion ? '7.' : '6.') + ' El Anexo III de Delimitación Territorial y Geocercas Periciales Satelitales (Google My Maps) que fija de manera inmutable los polígonos y vértices GPS certificados dentro de los cuales aplica la tarifa ordinaria pactada sin cobro de kilometraje.');
+        docsIntegrales.push((docsIntegrales.length + 1) + '. El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.');
     }
     addClause('TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:', docsIntegrales);
 
@@ -6684,7 +6768,19 @@ async function buildDocxFromContractData(data) {
         uniformRestrictDocx = '2. De manera excepcional y sujeta a autorización expresa de Centro de Servicios, se autoriza a EL CONTRATISTA portar vestimenta técnica propia siempre que porte visiblemente el gafete o credencial oficial emitida por SINSA.';
     }
 
-    addClause('CUARTA [OBLIGACIONES DEL CONTRATISTA]:', [
+    const obligacionesList = isForaneo ? [
+        'EL CONTRATISTA se compromete formalmente a:',
+        '1. Portar, durante la prestación de los servicios, el uniforme corporativo de ' + nomCom + ', el cual deberá encontrarse en buen estado, limpio y permitir la identificación visible de la empresa, manteniendo en todo momento una imagen pulcra y profesional.',
+        '2. Portar de manera visible el gafete o credencial oficial emitido por SINSA, que identificará al personal de EL CONTRATISTA ante el cliente final como representante operativo autorizado de SINSA. Sus facultades estarán estrictamente limitadas a la atención y ejecución de la actividad autorizada en el presente contrato y especificada en la OT asignada; en consecuencia, no podrá celebrar contratos, asumir obligaciones, efectuar cobros ni representar legalmente a SINSA para ningún otro acto.',
+        '3. Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.',
+        '4. Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de EL CONTRATANTE y las normas técnicas aplicables en Nicaragua.',
+        '5. Reportar inmediatamente a los coordinadores de EL CONTRATANTE cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.',
+        '6. Planificar y programar la ejecución de las OT que le hayan sido asignadas, coordinando con el cliente final las fechas y horarios de atención. EL CONTRATISTA deberá realizar el primer contacto con el cliente dentro de las cuarenta y ocho (48) horas siguientes a la asignación cuando el servicio se ubique en la ciudad de ' + (data.base_operativa || 'la ciudad base').toUpperCase() + ', y dentro de las setenta y seis (76) horas hábiles siguientes cuando se ubique fuera de dicha ciudad. La asignación o adjudicación de una OT por EL CONTRATANTE no constituirá, por sí misma, la programación de su ejecución ni una instrucción de inicio inmediato. La planificación y programación serán responsabilidad de EL CONTRATISTA, quien deberá comunicarlas y mantenerlas disponibles para revisión del personal de SINSA, así como informar oportunamente cualquier modificación.',
+        '7. Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de EL CONTRATANTE.',
+        '8. Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.',
+        '9. Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para EL CONTRATANTE ni para el cliente.',
+        '10. Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.'
+    ] : [
         'EL CONTRATISTA se compromete formalmente a:',
         uniformDocx,
         uniformRestrictDocx,
@@ -6696,14 +6792,19 @@ async function buildDocxFromContractData(data) {
         '8. Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.',
         '9. Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para EL CONTRATANTE ni para el cliente.',
         '10. Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.'
-    ]);
+    ];
+
+    addClause('CUARTA [OBLIGACIONES DEL CONTRATISTA]:', obligacionesList);
 
     addClause('QUINTA [PLAZO DEL CONTRATO]:',
         'El plazo del presente contrato es de DOCE (12) MESES calendario, contados a partir de la fecha de su suscripción. Este plazo se prorrogará automáticamente por períodos sucesivos de igual duración, salvo que cualquiera de las partes notifique por escrito a la otra su decisión de no renovarlo con al menos treinta (30) días de anticipación a la fecha de vencimiento.'
     );
 
     let paymentClauseDocx = '';
-    if (data.condicion_pago && data.condicion_pago.startsWith('CREDITO')) {
+    if (isForaneo) {
+        const diasCred = (data.condicion_pago && data.condicion_pago.includes('30')) ? 'treinta (30)' : 'quince (15)';
+        paymentClauseDocx = 'El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán bajo la modalidad de crédito comercial de ' + diasCred + ' días calendario contados a partir de la presentación y radicación formal y completa de la factura comercial debidamente autorizada por la DGI. Las evidencias y la firma del cliente tendrán el mismo valor como requisitos de pago; la ausencia de cualquiera de ellas impedirá el inicio del plazo de pago respecto de la OT incompleta. EL CONTRATANTE efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ' + cta + ' del banco ' + banco + ' en moneda córdobas a nombre de ' + titular + '.';
+    } else if (data.condicion_pago && data.condicion_pago.startsWith('CREDITO')) {
         const diasCred = data.condicion_pago.includes('15') ? 'quince (15)' : 'treinta (30)';
         paymentClauseDocx = 'El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán bajo la modalidad de crédito comercial de ' + diasCred + ' días calendario posteriores a la presentación y radicación formal de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. EL CONTRATANTE efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: ' + cta + ' del banco ' + banco + ' en moneda córdobas a nombre de ' + titular + '.';
     } else {
@@ -6711,9 +6812,10 @@ async function buildDocxFromContractData(data) {
     }
     addClause('SEXTA [VALOR DEL CONTRATO Y FORMA DE PAGO]:', paymentClauseDocx);
 
-    addClause('SÉPTIMA [MANTENIMIENTO DE VALOR]:',
-        'Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).'
-    );
+    const valorMantenimientoDocx = isForaneo
+        ? 'Las partes convienen que las tarifas pactadas en moneda nacional toman como base un tipo de cambio de treinta y seis córdobas con seis mil doscientas cuarenta y tres diezmilésimas (C$ 36.6243) por un dólar de los Estados Unidos de América (US$ 1.00), el cual se mantendrá como referencia durante el año calendario correspondiente. Si el Banco Central de Nicaragua establece un tipo de cambio oficial distinto para un año calendario posterior, las tarifas sujetas a mantenimiento de valor se actualizarán a partir del inicio de dicho año en la misma proporción de variación entre el nuevo tipo de cambio oficial y el tipo de cambio base aquí indicado, salvo acuerdo escrito distinto entre las partes.'
+        : 'Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).';
+    addClause('SÉPTIMA [MANTENIMIENTO DE VALOR]:', valorMantenimientoDocx);
 
     addClause('OCTAVA [RELACIÓN COMERCIAL Y RESPONSABILIDAD LABORAL]:',
         'Queda claramente convenido que la relación jurídica que une a las partes es de naturaleza estrictamente civil y mercantil independiente, por lo que no existe ni existirá ningún vínculo de subordinación laboral ni relación obrero-patronal entre EL CONTRATANTE y el personal dependiente o subcontratado por EL CONTRATISTA. En consecuencia, EL CONTRATISTA asume la responsabilidad exclusiva por el pago de salarios, prestaciones sociales, seguro social (INSS), aportes al INATEC y demás obligaciones laborales vigentes en la República de Nicaragua respecto a su personal.'
@@ -6725,9 +6827,10 @@ async function buildDocxFromContractData(data) {
 
     const garInstVal = data.garantia_instalacion || 12;
     const garMantVal = data.garantia_mantenimiento || '1';
-    addClause('DÉCIMA [GARANTÍA DE LOS TRABAJOS Y RESPONSABILIDAD CIVIL]:',
-        'EL CONTRATISTA otorga una garantía de ' + garInstVal + ' MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, EL CONTRATISTA corregirá de inmediato el daño sin costo alguno. Asimismo, para los servicios de mantenimiento preventivo y limpieza técnica de equipos, EL CONTRATISTA otorga una garantía técnica de ' + garMantVal + ' MES(ES) calendario. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.'
-    );
+    const garantiaDocx = isForaneo
+        ? 'EL CONTRATISTA otorga una garantía de doce (12) meses calendario sobre la mano de obra y los servicios técnicos ejecutados, contados a partir de la fecha de ejecución de cada actividad registrada en la OT correspondiente. Si durante este plazo se presentaren fallas atribuibles a una instalación, mantenimiento o servicio técnico deficiente, incluyendo fugas de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, EL CONTRATISTA deberá corregirlas de inmediato y sin costo alguno para EL CONTRATANTE ni para el cliente. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.'
+        : ('EL CONTRATISTA otorga una garantía de ' + garInstVal + ' MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, EL CONTRATISTA corregirá de inmediato el daño sin costo alguno. Asimismo, para los servicios de mantenimiento preventivo y limpieza técnica de equipos, EL CONTRATISTA otorga una garantía técnica de ' + garMantVal + ' MES(ES) calendario. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.');
+    addClause('DÉCIMA [GARANTÍA DE LOS TRABAJOS Y RESPONSABILIDAD CIVIL]:', garantiaDocx);
 
     addClause('DÉCIMA PRIMERA [PENALIZACIONES Y MULTAS]:',
         'El incumplimiento injustificado en los tiempos de entrega, retrasos en la atención de visitas o inasistencia a citas concertadas con los clientes facultará a EL CONTRATANTE a deducir una penalidad equivalente al uno punto veinticinco por ciento (1.25%) diario sobre el valor total de la orden de trabajo correspondiente, hasta por un período máximo de ocho (8) días hábiles, tras lo cual EL CONTRATANTE podrá rescindir unilateralmente el servicio y reasignarlo a otro proveedor, deduciendo los costos sobrevenidos a EL CONTRATISTA.'
@@ -6741,14 +6844,15 @@ async function buildDocxFromContractData(data) {
         'Cualquier modificación a los términos, condiciones, alcances o tarifas de este contrato deberá constar por escrito mediante Adenda debidamente rubricada y suscrita por los representantes autorizados de ambas partes.'
     );
 
-    addClause('DÉCIMA CUARTA [CONFIDENCIALIDAD]:',
-        'EL CONTRATISTA se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.'
-    );
+    const confidencialidadDocx = isForaneo
+        ? 'EL CONTRATISTA se obliga a guardar estricta confidencialidad sobre toda información técnica, comercial, operativa o personal a la que tenga acceso con motivo del presente contrato, incluyendo datos de clientes, Órdenes de Trabajo, tarifas, procedimientos internos, fotografías, firmas, Hojas de Levantamiento, credenciales de acceso y demás evidencias. Dicha información únicamente podrá utilizarse para la planificación y ejecución de los servicios asignados, quedando prohibida su divulgación, reproducción, extracción o utilización para contactar, captar u ofrecer servicios directamente a los clientes de EL CONTRATANTE. EL CONTRATISTA limitará el acceso al personal estrictamente necesario, responderá por las actuaciones de sus empleados y técnicos, adoptará medidas razonables de seguridad y notificará inmediatamente cualquier pérdida, acceso o divulgación no autorizada. Al terminar el contrato deberá devolver o eliminar la información que conserve, salvo obligación legal de mantenerla. Estas obligaciones permanecerán vigentes durante el contrato y por cinco (5) años después de su terminación; su incumplimiento constituirá causa grave para suspender las OT, cancelar accesos y terminar anticipadamente el contrato, sin perjuicio de la reclamación de los daños y perjuicios comprobados.'
+        : 'EL CONTRATISTA se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.';
+    addClause('DÉCIMA CUARTA [CONFIDENCIALIDAD]:', confidencialidadDocx);
 
     const contactOpStr = data.contacto_operativo ? ' / Contacto Operativo: ' + data.contacto_operativo : '';
     addClause('DÉCIMA QUINTA [AVISOS Y NOTIFICACIONES]:', [
         'Todas las comunicaciones, avisos y notificaciones entre las partes se considerarán válidamente efectuadas en las siguientes direcciones:',
-        '• EL CONTRATANTE: Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: JOSE ALFREDO RAUDES ORTIZ / ÁNGEL CAMPOS (Tel: 7886-2226 / 8267-2246 - Correo: jose.raudes@sinsa.com.ni).',
+        '• EL CONTRATANTE: Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: JOSE ALFREDO RAUDES ORTIZ (Tel: 7886-2226 - Correo: jose.raudes@sinsa.com.ni).',
         '• EL CONTRATISTA: ' + nomCom + ', con domicilio en ' + dir + '. Con Atención a: ' + nomRep + contactOpStr + ' (Teléfono: ' + tel + ' - Correo Electrónico: ' + correo + ').',
         'Cualquier cambio de domicilio o datos de contacto deberá notificarse formalmente por escrito con al menos veinticuatro (24) horas de anticipación para que surta plenos efectos legales.'
     ]);
@@ -6765,15 +6869,19 @@ async function buildDocxFromContractData(data) {
         'EL CONTRATISTA suministrará a su propia costa todos los medios de transporte y movilización adecuados, así como las herramientas e instrumentos técnicos necesarios para la debida ejecución de los servicios (escaleras certificadas, bombas de vacío, manómetros digitales o análogos para refrigerantes R410A y R32, abocardadores excéntricos, llaves dinamométricas, amperímetros y multímetros). Cuando los materiales o repuestos de instalación sean provistos por EL CONTRATANTE, EL CONTRATISTA deberá retirarlos formalmente de las bodegas designadas presentando la orden respectiva.'
     );
 
+    addClause('DÉCIMA NOVENA [TERMINACIÓN ANTICIPADA]:',
+        'EL CONTRATANTE podrá terminar anticipadamente el presente contrato, mediante notificación escrita, cuando EL CONTRATISTA incurra en incumplimiento grave o reiterado de sus obligaciones, abandone o suspenda injustificadamente los servicios, ceda trabajos sin autorización, incumpla las normas de seguridad, confidencialidad o atención al cliente, pierda la capacidad técnica o legal necesaria, o entre en estado de insolvencia, disolución o cese de operaciones. Cuando el incumplimiento sea subsanable, EL CONTRATANTE podrá conceder un plazo de cinco (5) días hábiles para su corrección. Asimismo, cualquiera de las partes podrá terminar el contrato sin expresión de causa mediante aviso escrito con treinta (30) días calendario de anticipación. La terminación no liberará a las partes de completar o liquidar las OT previamente ejecutadas, ni extinguirá las obligaciones de garantía, confidencialidad, pago o responsabilidad que deban subsistir por su naturaleza.'
+    );
+
     if (hasConsignacion) {
-        addClause('DÉCIMA NOVENA [CONSIGNACIÓN DE MATERIALES E INVENTARIO INICIAL]:',
+        addClause('VIGÉSIMA [CONSIGNACIÓN DE MATERIALES E INVENTARIO INICIAL]:',
             'Por medio de la presente cláusula, EL CONTRATANTE entrega a EL CONTRATISTA en calidad de consignación mercantil, y éste recibe a su entera satisfacción en depósito responsable, el inventario inicial de materiales, accesorios y repuestos para instalación de aires acondicionados detallado en el ANEXO II del presente contrato. Las partes declaran expresamente que el valor total del inventario consignado asciende a la suma de ' + matTotals.totalLetras + ', compuesto por un Subtotal Neto de C$ ' + matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 }) + ' más el quince por ciento (15%) correspondiente al Impuesto al Valor Agregado (IVA) por la suma de C$ ' + matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 }) + '. EL CONTRATISTA se constituye en custodio legal y depositario mercantil de dichos bienes, asumiendo plena responsabilidad civil, comercial y penal por mermas injustificadas, pérdidas o extravíos, obligándose a utilizarlos exclusivamente en la ejecución de las Órdenes de Trabajo encomendadas por EL CONTRATANTE y a reponerlos o liquidarlos contra cada servicio facturado.'
         );
-        addClause('VIGÉSIMA [ACEPTACIÓN]:',
+        addClause('VIGÉSIMA PRIMERA [ACEPTACIÓN]:',
             'Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ' + dia + ' días del mes de ' + mes + ' del año ' + anio + '.'
         );
     } else {
-        addClause('DÉCIMA NOVENA [ACEPTACIÓN]:',
+        addClause('VIGÉSIMA [ACEPTACIÓN]:',
             'Ambas partes declaran expresamente que conocen, entienden y aceptan todas y cada una de las cláusulas y estipulaciones contenidas en el presente contrato, encontrándolo redactado a entera conformidad y sin vicio alguno que pudiera invalidarlo, en fe de lo cual firmamos en dos (2) tantos de un mismo tenor y fuerza legal, en la ciudad de Managua, a los ' + dia + ' días del mes de ' + mes + ' del año ' + anio + '.'
         );
     }
@@ -8106,8 +8214,13 @@ function downloadWordMLContract(data) {
         </div>
     ` : '';
 
+    const isPoligono = (data.geocerca_modalidad === 'MAPA_POLIGONO' || (isForaneo && (!data.geocerca_modalidad || data.geocerca_modalidad === 'MAPA_POLIGONO')));
+
     let paymentClauseText = '';
-    if (data.condicion_pago && data.condicion_pago.startsWith('CREDITO')) {
+    if (isForaneo) {
+        const diasCred = (data.condicion_pago && data.condicion_pago.includes('30')) ? 'treinta (30)' : 'quince (15)';
+        paymentClauseText = `El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán bajo la modalidad de crédito comercial de ${diasCred} días calendario contados a partir de la presentación y radicación formal y completa de la factura comercial debidamente autorizada por la DGI. Las evidencias y la firma del cliente tendrán el mismo valor como requisitos de pago; la ausencia de cualquiera de ellas impedirá el inicio del plazo de pago respecto de la OT incompleta. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: <strong>${cta}</strong> del banco <strong>${banco}</strong> en moneda córdobas a nombre de <strong>${titular}</strong>.`;
+    } else if (data.condicion_pago && data.condicion_pago.startsWith('CREDITO')) {
         const diasCred = data.condicion_pago.includes('15') ? 'quince (15)' : 'treinta (30)';
         paymentClauseText = `El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. Los pagos se procesarán bajo la modalidad de crédito comercial de ${diasCred} días calendario posteriores a la presentación y radicación formal de la factura comercial debidamente autorizada por la DGI junto con las Órdenes de Trabajo y Actas de Recepción firmadas a entera satisfacción por los clientes. <strong>EL CONTRATANTE</strong> efectuará las retenciones tributarias correspondientes conforme la Ley de Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: <strong>${cta}</strong> del banco <strong>${banco}</strong> en moneda córdobas a nombre de <strong>${titular}</strong>.`;
     } else {
@@ -8116,7 +8229,23 @@ function downloadWordMLContract(data) {
 
     const garInstVal = data.garantia_instalacion || 12;
     const garMantVal = data.garantia_mantenimiento || '1';
-    const warrantyClauseText = `<strong>EL CONTRATISTA</strong> otorga una garantía de ${garInstVal} MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> corregirá de inmediato el daño sin costo alguno. Asimismo, para los servicios de mantenimiento preventivo y limpieza técnica de equipos, <strong>EL CONTRATISTA</strong> otorga una garantía técnica de ${garMantVal} MES(ES) calendario. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.`;
+    const warrantyClauseText = isForaneo ? `
+        <strong>EL CONTRATISTA</strong> otorga una garantía de doce (12) meses calendario sobre la mano de obra y los servicios técnicos ejecutados, contados a partir de la fecha de ejecución de cada actividad registrada en la OT correspondiente. Si durante este plazo se presentaren fallas atribuibles a una instalación, mantenimiento o servicio técnico deficiente, incluyendo fugas de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> deberá corregirlas de inmediato y sin costo alguno para <strong>EL CONTRATANTE</strong> ni para el cliente. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.
+    ` : `
+        <strong>EL CONTRATISTA</strong> otorga una garantía de ${garInstVal} MESES calendario sobre la mano de obra de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, <strong>EL CONTRATISTA</strong> corregirá de inmediato el daño sin costo alguno. Asimismo, para los servicios de mantenimiento preventivo y limpieza técnica de equipos, <strong>EL CONTRATISTA</strong> otorga una garantía técnica de ${garMantVal} MES(ES) calendario. En todos los casos responderá ante cualquier reclamación o demanda por daños a terceros provocados en la ejecución de los servicios.
+    `;
+
+    const valorMantenimientoWordMLText = isForaneo ? `
+        Las partes convienen que las tarifas pactadas en moneda nacional toman como base un tipo de cambio de treinta y seis córdobas con seis mil doscientas cuarenta y tres diezmilésimas (C$ 36.6243) por un dólar de los Estados Unidos de América (US$ 1.00), el cual se mantendrá como referencia durante el año calendario correspondiente. Si el Banco Central de Nicaragua establece un tipo de cambio oficial distinto para un año calendario posterior, las tarifas sujetas a mantenimiento de valor se actualizarán a partir del inicio de dicho año en la misma proporción de variación entre el nuevo tipo de cambio oficial y el tipo de cambio base aquí indicado, salvo acuerdo escrito distinto entre las partes.
+    ` : `
+        Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).
+    `;
+
+    const confidencialidadWordMLText = isForaneo ? `
+        <strong>EL CONTRATISTA</strong> se obliga a guardar estricta confidencialidad sobre toda información técnica, comercial, operativa o personal a la que tenga acceso con motivo del presente contrato, incluyendo datos de clientes, Órdenes de Trabajo, tarifas, procedimientos internos, fotografías, firmas, Hojas de Levantamiento, credenciales de acceso y demás evidencias. Dicha información únicamente podrá utilizarse para la planificación y ejecución de los servicios asignados, quedando prohibida su divulgación, reproducción, extracción o utilización para contactar, captar u ofrecer servicios directamente a los clientes de <strong>EL CONTRATANTE</strong>. <strong>EL CONTRATISTA</strong> limitará el acceso al personal estrictamente necesario, responderá por las actuaciones de sus empleados y técnicos, adoptará medidas razonables de seguridad y notificará inmediatamente cualquier pérdida, acceso o divulgación no autorizada. Al terminar el contrato deberá devolver o eliminar la información que conserve, salvo obligación legal de mantenerla. Estas obligaciones permanecerán vigentes durante el contrato y por cinco (5) años después de su terminación; su incumplimiento constituirá causa grave para suspender las OT, cancelar accesos y terminar anticipadamente el contrato, sin perjuicio de la reclamación de los daños y perjuicios comprobados.
+    ` : `
+        <strong>EL CONTRATISTA</strong> se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.
+    `;
 
     let uniformItem2 = `Se prohíbe de manera expresa a EL CONTRATISTA y a su personal portar uniformes, distintivos, gorras o utilizar vehículos con logotipos o publicidad de su propia marca comercial mientras preste los servicios objeto de este contrato.`;
     if (data.politica_uniformes === 'EXCEPCION_PROPIA_GAFETE' || data.politica_uniformes === 'PROVEEDOR_GAFETE') {
@@ -8127,7 +8256,7 @@ function downloadWordMLContract(data) {
     let anexoIIHtml = '';
     if (hasConsignacion) {
         consignacionClauseHtml = `
-            <div class="clause-title">DÉCIMA NOVENA [CONSIGNACIÓN DE MATERIALES E INVENTARIO INICIAL]:</div>
+            <div class="clause-title">VIGÉSIMA [CONSIGNACIÓN DE MATERIALES E INVENTARIO INICIAL]:</div>
             <p>Por medio de la presente cláusula, <strong>EL CONTRATANTE</strong> entrega a <strong>EL CONTRATISTA</strong> en calidad de consignación mercantil, y éste recibe a su entera satisfacción en depósito responsable, el inventario inicial de materiales, accesorios y repuestos para instalación de aires acondicionados detallado en el <strong>ANEXO II</strong> del presente contrato. Las partes declaran expresamente que el valor total del inventario consignado asciende a la suma de <strong>${matTotals.totalLetras}</strong>, compuesto por un Subtotal Neto de <strong>C$ ${matTotals.subtotal.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</strong> más el quince por ciento (15%) correspondiente al Impuesto al Valor Agregado (IVA) por la suma de <strong>C$ ${matTotals.iva.toLocaleString('es-NI', { minimumFractionDigits: 2 })}</strong>. <strong>EL CONTRATISTA</strong> se constituye en custodio legal y depositario mercantil de dichos bienes, asumiendo plena responsabilidad civil, comercial y penal por mermas injustificadas, pérdidas o extravíos, obligándose a utilizarlos exclusivamente en la ejecución de las Órdenes de Trabajo encomendadas por <strong>EL CONTRATANTE</strong> y a reponerlos o liquidarlos contra cada servicio facturado.</p>
         `;
 
@@ -8200,9 +8329,9 @@ function downloadWordMLContract(data) {
         primeraWordMLText = data.clausulas_custom.PRIMERA;
     } else {
         const customScope = (data.objeto_servicio_custom || (document.getElementById('wiz-objeto-servicio-descripcion')?.value || '')).trim();
-        const baseScope = customScope || 'labores de instalación, desinstalación, mantenimiento preventivo y mantenimiento general de equipos de aires acondicionados';
+        const baseScope = customScope || 'labores de instalación, desinstalación, mantenimiento preventivo, mantenimiento general, diagnóstico técnico y levantamiento previo de equipos de aire acondicionado';
         const territorialML = isForaneo 
-            ? ` en las circunscripciones y municipios autorizados del departamento de <strong>${data.base_operativa || 'la base operativa asignada'}</strong>.` 
+            ? (isPoligono ? ` en las zonas y polígonos delimitados en el Anexo III de Delimitación Territorial (${(data.base_operativa || 'Occidente').toUpperCase()}) que le sean asignadas mediante las respectivas OT. La delimitación territorial y las geocercas aplicables se incorporan formalmente en el Anexo III del presente instrumento.` : ` en las zonas de <strong>${(data.base_operativa || data.domicilio || 'Chinandega').toUpperCase()}</strong> que le sean asignadas mediante las respectivas OT. La delimitación territorial y las geocercas aplicables se incorporarán posteriormente en el Anexo III mediante adenda suscrita por ambas partes.`) 
             : '.';
         primeraWordMLText = `Por medio del presente documento, <strong>EL CONTRATANTE</strong> contrata los servicios profesionales independientes de <strong>EL CONTRATISTA</strong> para que ejecute ${baseScope} que resulten necesarias para la correcta culminación de los trabajos encomendados por los clientes de <strong>EL CONTRATANTE</strong>${territorialML}`;
     }
@@ -8217,14 +8346,71 @@ function downloadWordMLContract(data) {
         segundaWordMLHtml = `
             <p>Los alcances de los servicios a brindar por parte de <strong>EL CONTRATISTA</strong> comprenden:</p>
             <ul>
-                <li><strong>Sección 1 (Visita previa):</strong> Presentarse en el sitio o inmueble indicado por EL CONTRATANTE, inspeccionar las condiciones físicas, eléctricas y mecánicas del área de instalación, y determinar la factibilidad técnica y los insumos complementarios requeridos.</li>
-                <li><strong>Sección 2 (Lista de materiales):</strong> Remitir al personal de Centro de Servicios de EL CONTRATANTE el informe técnico detallado y la lista de materiales adicionales no contemplados en el kit básico que deban ser presupuestados y facturados al cliente final.</li>
+                <li><strong>Sección 1 (Visita previa):</strong> Presentarse en el sitio o inmueble indicado por <strong>EL CONTRATANTE</strong>, inspeccionar las condiciones físicas, eléctricas y mecánicas del área de instalación, y determinar la factibilidad técnica y los insumos complementarios requeridos.</li>
+                <li><strong>Sección 2 (Lista de materiales):</strong> Remitir al personal de Centro de Servicios de <strong>EL CONTRATANTE</strong> el informe técnico detallado y la lista de materiales adicionales no contemplados en el kit básico que deban ser presupuestados y facturados al cliente final.</li>
                 <li><strong>Sección 3 (Ejecución de servicios e instalaciones):</strong> Ejecutar las labores técnicas de instalación, desinstalación y mantenimientos (preventivo y general) de equipos de aire acondicionado, cumpliendo estrictamente los estándares técnicos del fabricante, pruebas de vacío con bomba, sellado hermético de tuberías, fijación segura de condensadoras y evaporadoras, limpieza del área de trabajo y entrega a entera satisfacción del cliente.</li>
             </ul>
         `;
     }
 
-    const acceptanceClauseNum = hasConsignacion ? 'VIGÉSIMA' : 'DÉCIMA NOVENA';
+    const docsIntegralesWordMLHtml = isForaneo ? `
+        <ol>
+            <li>El Anexo I que contiene la Tabla Oficial de Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional ${isPoligono ? 'fuera de la geocerca contractual pactada en el Anexo III' : 'fuera de la geocerca contractual que se delimite en el Anexo III'}.</li>
+            <li>Las Órdenes de Trabajo (OT), las cuales serán creadas y asignadas exclusivamente por el personal de MAESTROS de <strong>EL CONTRATANTE</strong> mediante la plataforma o sistema digital autorizado. Cada OT identificará el servicio adjudicado a <strong>EL CONTRATISTA</strong> y constituirá la instrucción formal para su ejecución. Una vez que <strong>EL CONTRATISTA</strong> se encuentre en el lugar realizando la actividad, deberá iniciar el proceso de ejecución en la plataforma. Culminado el servicio y completadas las evidencias requeridas, deberá registrar la finalización de la actividad; seguidamente, la plataforma habilitará el espacio para que el cliente final firme directamente en el dispositivo móvil, dejando constancia de la recepción del servicio.</li>
+            <li>Las evidencias de ejecución incorporadas a cada OT y la firma del cliente final capturada en el dispositivo móvil al concluir el servicio. Ambas constituirán requisitos concurrentes y tendrán el mismo valor para efectos de validación, liquidación y pago de la OT; por consiguiente, la falta de las evidencias requeridas o de la firma del cliente impedirá que la OT sea procesada para pago. El único documento físico será la Hoja de Levantamiento, cuando corresponda, la cual deberá ser firmada por el cliente; <strong>EL CONTRATISTA</strong> deberá tomar una imagen clara, completa y legible de dicha hoja y cargarla en la OT respectiva como parte de las evidencias obligatorias.</li>
+            <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
+            <li>El Anexo III de Delimitación Territorial y Geocercas Contractuales, ${isPoligono ? 'cuya cartografía y tabla de vértices GPS certificados delimitan la zona geográfica obligatoria' : 'cuya cartografía y tabla de vértices GPS se encuentran pendientes de elaboración y se incorporarán posteriormente al presente contrato mediante adenda suscrita por ambas partes'}.</li>
+            ${hasConsignacion ? '<li>El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.</li>' : ''}
+        </ol>
+    ` : `
+        <ol>
+            <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de Managua.</li>
+            <li>Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por <strong>EL CONTRATANTE</strong> para cada labor asignada.</li>
+            <li>El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de <strong>EL CONTRATANTE</strong>.</li>
+            <li>Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.</li>
+            <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
+            ${hasConsignacion ? '<li>El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.</li>' : ''}
+        </ol>
+    `;
+
+    const obligacionesWordMLHtml = isForaneo ? `
+        <ol>
+            <li>Portar, durante la prestación de los servicios, el uniforme corporativo de <strong>${nomCom}</strong>, el cual deberá encontrarse en buen estado, limpio y permitir la identificación visible de la empresa, manteniendo en todo momento una imagen pulcra y profesional.</li>
+            <li>Portar de manera visible el gafete o credencial oficial emitido por SINSA, que identificará al personal de <strong>EL CONTRATISTA</strong> ante el cliente final como representante operativo autorizado de SINSA. Sus facultades estarán estrictamente limitadas a la atención y ejecución de la actividad autorizada en el presente contrato y especificada en la OT asignada; en consecuencia, no podrá celebrar contratos, asumir obligaciones, efectuar cobros ni representar legalmente a SINSA para ningún otro acto.</li>
+            <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
+            <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de <strong>EL CONTRATANTE</strong> y las normas técnicas aplicables en Nicaragua.</li>
+            <li>Reportar inmediatamente a los coordinadores de <strong>EL CONTRATANTE</strong> cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
+            <li>Planificar y programar la ejecución de las OT que le hayan sido asignadas, coordinando con el cliente final las fechas y horarios de atención. <strong>EL CONTRATISTA</strong> deberá realizar el primer contacto con el cliente dentro de las cuarenta y ocho (48) horas siguientes a la asignación cuando el servicio se ubique en la ciudad de <strong>${(data.base_operativa || 'la ciudad base').toUpperCase()}</strong>, y dentro de las setenta y seis (76) horas hábiles siguientes cuando se ubique fuera de dicha ciudad. La asignación o adjudicación de una OT por <strong>EL CONTRATANTE</strong> no constituirá, por sí misma, la programación de su ejecución ni una instrucción de inicio inmediato. La planificación y programación serán responsabilidad de <strong>EL CONTRATISTA</strong>, quien deberá comunicarlas y mantenerlas disponibles para revisión del personal de SINSA, así como informar oportunamente cualquier modificación.</li>
+            <li>Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de <strong>EL CONTRATANTE</strong>.</li>
+            <li>Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.</li>
+            <li>Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para <strong>EL CONTRATANTE</strong> ni para el cliente.</li>
+            <li>Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.</li>
+        </ol>
+    ` : `
+        <ol>
+            <li>Portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por EL CONTRATANTE (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.</li>
+            <li>${uniformItem2}</li>
+            <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
+            <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de EL CONTRATANTE y las normas técnicas aplicables en Nicaragua.</li>
+            <li>Reportar inmediatamente a los coordinadores de EL CONTRATANTE cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
+            <li>Cumplir estrictamente con la programación de citas y horarios previamente coordinados con el cliente y notificados por EL CONTRATANTE.</li>
+            <li>Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de EL CONTRATANTE.</li>
+            <li>Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.</li>
+            <li>Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para EL CONTRATANTE ni para el cliente.</li>
+            <li>Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.</li>
+        </ol>
+    `;
+
+    const terminacionAnticipadaWordMLHtml = `
+        <div class="clause-title">DÉCIMA NOVENA [TERMINACIÓN ANTICIPADA]:</div>
+        <p><strong>EL CONTRATANTE</strong> podrá terminar anticipadamente el presente contrato, mediante notificación escrita, cuando <strong>EL CONTRATISTA</strong> incurra en incumplimiento grave o reiterado de sus obligaciones, abandone o suspenda injustificadamente los servicios, ceda trabajos sin autorización, incumpla las normas de seguridad, confidencialidad o atención al cliente, pierda la capacidad técnica o legal necesaria, o entre en estado de insolvencia, disolución o cese de operaciones. Cuando el incumplimiento sea subsanable, <strong>EL CONTRATANTE</strong> podrá conceder un plazo de cinco (5) días hábiles para su corrección. Asimismo, cualquiera de las partes podrá terminar el contrato sin expresión de causa mediante aviso escrito con treinta (30) días calendario de anticipación. La terminación no liberará a las partes de completar o liquidar las OT previamente ejecutadas, ni extinguirá las obligaciones de garantía, confidencialidad, pago o responsabilidad que deban subsistir por su naturaleza.</p>
+    `;
+
+    const acceptanceClauseNum = hasConsignacion ? 'VIGÉSIMA PRIMERA' : 'VIGÉSIMA';
+
+    const preambleContractorWordML = isForaneo
+        ? `y por otra parte, <strong>${nomRep}</strong>, mayor de edad, ${estCivil}, ${prof}, con domicilio en ${dom}, con cédula de identidad nicaragüense número: <strong>${cedula}</strong>${ruc}, quien desarrolla actividades comerciales por cuenta propia bajo el nombre comercial <strong>${nomCom}</strong>, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRE ACONDICIONADO</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:`
+        : `y por otra parte, <strong>${nomRep}</strong>, mayor de edad, ${estCivil}, ${prof}, con domicilio en ${dom}, con cédula de identidad nicaragüense número: <strong>${cedula}</strong>${ruc}, quien actúa en nombre y representación del negocio mercantil bajo ${reg} denominado <strong>${nomCom}</strong>, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:`;
 
     const wordContent = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -8258,9 +8444,9 @@ function downloadWordMLContract(data) {
             ${logoHtml}
             ${variantBannerHtml}
 
-            <h1>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS${isForaneo ? ' (VARIANTE FORÁNEA)' : ''}.</h1>
+            <h1>CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRE ACONDICIONADO${isForaneo ? ' (VARIANTE FORÁNEA)' : ''}.</h1>
 
-            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientosCINCO (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; y por otra parte, <strong>${nomRep}</strong>, mayor de edad, ${estCivil}, ${prof}, con domicilio en ${dom}, con cédula de identidad nicaragüense número: <strong>${cedula}</strong>${ruc}, quien actúa en nombre y representación del negocio mercantil bajo ${reg} denominado <strong>${nomCom}</strong>, quien en adelante se denominará simplemente como <strong>"EL CONTRATISTA"</strong>, acordamos celebrar el presente <strong>CONTRATO DE SERVICIOS DE INSTALACION DE AIRES ACONDICIONADOS</strong>, el que se regirá bajo las siguientes cláusulas y estipulaciones:</p>
+            <p>Nosotros, <strong>OSCAR RENÉ VARGAS REYES</strong>, mayor de edad, casado, Master en Administración de Empresas, con domicilio en el municipio de Nindirí, departamento de Masaya, de tránsito por esta ciudad de Managua, con cédula de identidad nicaragüense número cuatrocientos uno guión doscientos cincuenta y un mil doscientos setenta y uno guión cuatro ceros letra "W" (401-251271-0000W), quien comparece en nombre y representación de la sociedad mercantil denominada <strong>SILVA INTERNACIONAL, SOCIEDAD ANÓNIMA</strong>, que se abrevia <strong>"SINSA"</strong>, sociedad anónima constituida y existente de conformidad con las leyes de la República de Nicaragua, mediante Escritura Pública número doce (12), autorizada en la ciudad de Managua a las dos de la tarde del cuatro de Septiembre de mil novecientos noventa, ante los oficios notariales del Doctor Luis Exequiel Alvarado Ramírez, debidamente inscrita bajo el número trece mil quinientos nueve (13,509), páginas doscientos noventa y dos a la trescientos (292/300), Tomo seiscientos setenta y cuatro (674), Libro Segundo de Sociedades, y páginas uno a la tres (1/3), Tomo seiscientos setenta y cinco (675), Libro Segundo de Sociedades, e inscrita con el número veintiséis mil trescientos sesenta y cinco (26,365), página doscientos treinta y cinco (235), Tomo ciento quince (115), Libro de Personas, ambas del Registro Público de la Propiedad Inmueble y Mercantil del departamento de Managua; cuya representación legal ostenta en su carácter de Apoderado General de Administración, lo que acredita mediante Testimonio de Escritura Pública número ciento noventa y dos (192) de Poder General de Administración, autorizada en la ciudad de Managua a las tres de la tarde del doce de Octubre del dos mil dieciséis ante los oficios notariales del Licenciado Juan Víctor Zamora Morales, e inscrita bajo el número único de inscripción mercantil MC guión XF cincuenta y cinco GP (MC-XF55GP), Asiento catorce (14), en el Registro Público Mercantil de Managua; y que para los efectos de este contrato en lo sucesivo se denominará simplemente como <strong>"EL CONTRATANTE"</strong>; ${preambleContractorWordML}</p>
 
             <div class="clause-title">PRIMERA [OBJETO DEL CONTRATO]:</div>
             <p>${primeraWordMLText}</p>
@@ -8270,29 +8456,11 @@ function downloadWordMLContract(data) {
 
             <div class="clause-title">TERCERA [DOCUMENTOS INTEGRALES DEL CONTRATO]:</div>
             <p>Forman parte integrante del presente contrato los siguientes documentos:</p>
-            <ol>
-                <li>El Anexo I que contiene la Tabla Oficial de Códigos RMS, Descripción de Actividades y Tarifas de Servicios vigentes, así como la tarifa de combustible por kilómetro adicional fuera del radio de ${isForaneo ? (data.base_operativa || 'la base operativa') : 'Managua'}.</li>
-                <li>Las Órdenes de Compra (OC) y Órdenes de Servicio (OT) emitidas por EL CONTRATANTE para cada labor asignada.</li>
-                <li>El Procedimiento Operativo y Políticas de Proveedores de Servicios Tercerizados de EL CONTRATANTE.</li>
-                <li>Las Hojas de Visita, Protocolos de Levantamiento y Actas de Recepción a Satisfacción firmadas por el cliente final receptor del servicio.</li>
-                <li>Las Facturas Comerciales o Recibos Oficiales emitidos conforme a la legislación tributaria aplicable.</li>
-                ${hasConsignacion ? '<li>El Anexo II contentivo del Inventario Inicial y Tabla de Materiales e Insumos entregados en Consignación Mercantil Valorizada.</li>' : ''}
-            </ol>
+            ${docsIntegralesWordMLHtml}
 
             <div class="clause-title">CUARTA [OBLIGACIONES DEL CONTRATISTA]:</div>
             <p><strong>EL CONTRATISTA</strong> se compromete formalmente a:</p>
-            <ol>
-                <li>Portar en todo momento el uniforme reglamentario con la identificación o logo proporcionado por EL CONTRATANTE (Centro de Servicios / Maestros), manteniendo una imagen pulcra y profesional.</li>
-                <li>${uniformItem2}</li>
-                <li>Brindar a los clientes un trato sumamente respetuoso, puntual, cordial y transparente en cada visita técnica.</li>
-                <li>Llevar a cabo los trabajos de instalación y mantenimiento de conformidad con los manuales de los fabricantes, las especificaciones de EL CONTRATANTE y las normas técnicas aplicables en Nicaragua.</li>
-                <li>Reportar inmediatamente a los coordinadores de EL CONTRATANTE cualquier incidencia, negativa de acceso del cliente, daño preexistente en el inmueble o imposibilidad técnica sobrevenida.</li>
-                <li>Cumplir estrictamente con la programación de citas y horarios previamente coordinados con el cliente y notificados por EL CONTRATANTE.</li>
-                <li>Abstenerse de ofrecer, pactar o realizar trabajos adicionales directos o cobros particulares en efectivo al cliente final sin la debida canalización a través de EL CONTRATANTE.</li>
-                <li>Asumir de forma exclusiva e inmediata el costo total de reparaciones o reposición de equipos en caso de daños causados por impericia, negligencia, mala instalación o caídas atribuibles a su personal técnico.</li>
-                <li>Responder diligentemente a los reclamos por garantías presentados por los clientes dentro del período de garantía estipulado, sin costo adicional alguno para EL CONTRATANTE ni para el cliente.</li>
-                <li>Cumplir estrictamente con la Ley N.º 618, Ley General de Higiene y Seguridad del Trabajo de Nicaragua, asegurando que todo su personal porte el Equipo de Protección Personal (EPP) indispensable: arnés de seguridad para trabajos en altura mayores a 1.80 metros, casco, calzado dieléctrico, guantes y lentes de protección.</li>
-            </ol>
+            ${obligacionesWordMLHtml}
 
             <div class="clause-title">QUINTA [PLAZO DEL CONTRATO]:</div>
             <p>El plazo del presente contrato es de DOCE (12) MESES calendario, contados a partir de la fecha de su suscripción. Este plazo se prorrogará automáticamente por períodos sucesivos de igual duración, salvo que cualquiera de las partes notifique por escrito a la otra su decisión de no renovarlo con al menos treinta (30) días de anticipación a la fecha de vencimiento.</p>
@@ -8301,7 +8469,7 @@ function downloadWordMLContract(data) {
             <p>${paymentClauseText}</p>
 
             <div class="clause-title">SÉPTIMA [MANTENIMIENTO DE VALOR]:</div>
-            <p>Las partes convienen expresamente que las sumas pactadas en moneda nacional gozan de la cláusula de mantenimiento de valor respecto al tipo de cambio oficial del Córdoba respecto al Dólar de los Estados Unidos de América emitido por el Banco Central de Nicaragua, de conformidad con lo prescrito en el Artículo 38 de la Ley de Régimen Monetario (Ley 732).</p>
+            <p>${valorMantenimientoWordMLText}</p>
 
             <div class="clause-title">OCTAVA [RELACIÓN COMERCIAL Y RESPONSABILIDAD LABORAL]:</div>
             <p>Queda claramente convenido que la relación jurídica que une a las partes es de naturaleza estrictamente civil y mercantil independiente, por lo que no existe ni existirá ningún vínculo de subordinación laboral ni relación obrero-patronal entre <strong>EL CONTRATANTE</strong> y el personal dependiente o subcontratado por <strong>EL CONTRATISTA</strong>. En consecuencia, <strong>EL CONTRATISTA</strong> asume la responsabilidad exclusiva por el pago de salarios, prestaciones sociales, seguro social (INSS), aportes al INATEC y demás obligaciones laborales vigentes en la República de Nicaragua respecto a su personal.</p>
@@ -8322,12 +8490,12 @@ function downloadWordMLContract(data) {
             <p>Cualquier modificación a los términos, condiciones, alcances o tarifas de este contrato deberá constar por escrito mediante Adenda debidamente rubricada y suscrita por los representantes autorizados de ambas partes.</p>
 
             <div class="clause-title">DÉCIMA CUARTA [CONFIDENCIALIDAD]:</div>
-            <p><strong>EL CONTRATISTA</strong> se obliga a guardar estricta confidencialidad respecto a toda la información técnica, comercial, listados de clientes, números de teléfono, direcciones domiciliares y procedimientos internos a los que tenga acceso en ocasión de la ejecución del presente contrato, no pudiendo revelarla ni emplearla para fines ajenos a la prestación del servicio.</p>
+            <p>${confidencialidadWordMLText}</p>
 
             <div class="clause-title">DÉCIMA QUINTA [AVISOS Y NOTIFICACIONES]:</div>
             <p>Todas las comunicaciones, avisos y notificaciones entre las partes se considerarán válidamente efectuadas en las siguientes direcciones:</p>
             <ul>
-                <li><strong>EL CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: <strong>JOSE ALFREDO RAUDES ORTIZ / ÁNGEL CAMPOS</strong> (Tel: 7886-2226 / 8267-2246 - Correo: jose.raudes@sinsa.com.ni).</li>
+                <li><strong>EL CONTRATANTE:</strong> Oficinas de Centro de Servicios SINSA, Centro de Distribución (CEDI), Rotonda El Periodista 100 metros al Este, Managua, Nicaragua. Con Atención a: <strong>JOSE ALFREDO RAUDES ORTIZ</strong> (Tel: 7886-2226 - Correo: jose.raudes@sinsa.com.ni).</li>
                 <li><strong>EL CONTRATISTA:</strong> ${nomCom}, con domicilio en ${dir}. Con Atención a: ${nomRep}${contactOpStr} (Tel: ${tel} - Correo Electrónico: ${correo}).</li>
             </ul>
             <p>Cualquier cambio de domicilio o datos de contacto deberá notificarse formalmente por escrito con al menos veinticuatro (24) horas de anticipación para que surta plenos efectos legales.</p>
@@ -8340,6 +8508,8 @@ function downloadWordMLContract(data) {
 
             <div class="clause-title">DÉCIMA OCTAVA [EQUIPOS, HERRAMIENTAS E INSUMOS]:</div>
             <p><strong>EL CONTRATISTA</strong> suministrará a su propia costa todos los medios de transporte y movilización adecuados, así como las herramientas e instrumentos técnicos necesarios para la debida ejecución de los servicios (escaleras certificadas, bombas de vacío, manómetros digitales o análogos para refrigerantes R410A y R32, abocardadores excéntricos, llaves dinamométricas, amperímetros y multímetros). Cuando los materiales o repuestos de instalación sean provistos por <strong>EL CONTRATANTE</strong>, <strong>EL CONTRATISTA</strong> deberá retirarlos formalmente de las bodegas designadas presentando la orden respectiva.</p>
+
+            ${terminacionAnticipadaWordMLHtml}
 
             ${consignacionClauseHtml}
 

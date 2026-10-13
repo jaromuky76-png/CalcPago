@@ -188,17 +188,29 @@ def generate_contract_document(provider_data, template_path=None):
         preamble_split = "y por otra parte,"
         if preamble_split in p2.text:
             sinsa_part = p2.text.split(preamble_split)[0] + preamble_split + " "
-            contractor_part = (
-                f"{nombre_rep.upper()}, mayor de edad, {estado_civil.lower()}, {profesion.lower()}, "
-                f"con domicilio en {domicilio}, titular de cédula de identidad nicaragüense número: {cedula}"
-            )
-            if ruc:
-                contractor_part += f" y cédula RUC: {ruc}"
-                
-            contractor_part += (
-                f", quien actúa en nombre e interés de negocio bajo {regimen} denominado {nombre_comercial.upper()}, "
-                f"quien en adelante se denominará EL CONTRATISTA, ambas partes de común acuerdo convenimos en celebrar el siguiente"
-            )
+            if is_foraneo:
+                contractor_part = (
+                    f"{nombre_rep.upper()}, mayor de edad, {estado_civil.lower()}, {profesion.lower()}, "
+                    f"con domicilio en {domicilio}, titular de cédula de identidad nicaragüense número: {cedula}"
+                )
+                if ruc:
+                    contractor_part += f" y cédula RUC: {ruc}"
+                contractor_part += (
+                    f", quien desarrolla actividades comerciales por cuenta propia bajo el nombre comercial {nombre_comercial.upper()}, "
+                    f"quien en adelante se denominará EL CONTRATISTA, ambas partes de común acuerdo convenimos en celebrar el presente "
+                    f"CONTRATO DE SERVICIOS DE INSTALACIÓN DE AIRE ACONDICIONADO, el que se regirá bajo las siguientes cláusulas y estipulaciones:"
+                )
+            else:
+                contractor_part = (
+                    f"{nombre_rep.upper()}, mayor de edad, {estado_civil.lower()}, {profesion.lower()}, "
+                    f"con domicilio en {domicilio}, titular de cédula de identidad nicaragüense número: {cedula}"
+                )
+                if ruc:
+                    contractor_part += f" y cédula RUC: {ruc}"
+                contractor_part += (
+                    f", quien actúa en nombre e interés de negocio bajo {regimen} denominado {nombre_comercial.upper()}, "
+                    f"quien en adelante se denominará EL CONTRATISTA, ambas partes de común acuerdo convenimos en celebrar el siguiente"
+                )
             p2.text = sinsa_part + contractor_part
             for r in p2.runs:
                 r.font.name = 'Arial'
@@ -222,8 +234,18 @@ def generate_contract_document(provider_data, template_path=None):
 
     # 2. Cláusula Séptima (Forma de pago)
     for p in doc.paragraphs:
-        if "Estos pagos serán realizados mediante transferencia bancaria" in p.text:
-            if str(condicion_pago).startswith('CREDITO'):
+        if "Estos pagos serán realizados mediante transferencia bancaria" in p.text or "Los pagos se procesarán" in p.text:
+            if is_foraneo:
+                dias_cred = 'treinta (30)' if '30' in str(condicion_pago) else 'quince (15)'
+                p.text = (
+                    f"El valor de los servicios contratados se liquidará conforme a las tarifas unitarias estipuladas en el Anexo I del presente instrumento. "
+                    f"Los pagos se procesarán bajo la modalidad de crédito comercial de {dias_cred} días calendario contados a partir de la presentación y radicación formal y completa "
+                    f"de la factura comercial debidamente autorizada por la DGI. Las evidencias y la firma del cliente tendrán el mismo valor como requisitos de pago; la ausencia de cualquiera "
+                    f"de ellas impedirá el inicio del plazo de pago respecto de la OT incompleta. EL CONTRATANTE efectuará las retenciones tributarias correspondientes conforme la Ley de "
+                    f"Concertación Tributaria (Ley 822) y acreditará los fondos netos mediante transferencia bancaria a la cuenta número: {cuenta_bancaria} del banco {banco.upper()} "
+                    f"en moneda córdobas a nombre de {titular_cuenta.upper()}."
+                )
+            elif str(condicion_pago).startswith('CREDITO'):
                 dias_cred = 'quince (15)' if '15' in str(condicion_pago) else 'treinta (30)'
                 p.text = (
                     f"Estos pagos serán realizados bajo la modalidad de crédito comercial de {dias_cred} días calendario "
@@ -240,25 +262,45 @@ def generate_contract_document(provider_data, template_path=None):
 
     # 2.1 Garantías (DÉCIMA SEGUNDA)
     for idx, p in enumerate(doc.paragraphs):
-        if "DÉCIMA SEGUNDA [GARANTÍA]" in p.text or "DECIMA SEGUNDA [GARANTIA]" in p.text:
+        if "DÉCIMA SEGUNDA [GARANTÍA]" in p.text or "DECIMA SEGUNDA [GARANTIA]" in p.text or "DÉCIMA [GARANTÍA" in p.text:
             if idx + 1 < len(doc.paragraphs):
                 p_gar = doc.paragraphs[idx + 1]
-                p_gar.text = (
-                    f"EL CONTRATISTA otorga una garantía de {garantia_instalacion} MESES calendario sobre la mano de obra "
-                    f"de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. "
-                    f"Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por "
-                    f"mala abocardadura o deficiencias en conexiones eléctricas, EL CONTRATISTA corregirá de inmediato el daño sin costo alguno. "
-                    f"Asimismo, para los servicios de mantenimiento preventivo y limpieza técnica de equipos, EL CONTRATISTA otorga "
-                    f"una garantía técnica de {garantia_mantenimiento} MES(ES) calendario. En todos los casos responderá ante cualquier "
-                    f"reclamación o demanda por daños a terceros provocados en la ejecución de los servicios."
-                )
+                if is_foraneo:
+                    p_gar.text = (
+                        "EL CONTRATISTA otorga una garantía de doce (12) meses calendario sobre la mano de obra y los servicios técnicos ejecutados, "
+                        "contados a partir de la fecha de ejecución de cada actividad registrada en la OT correspondiente. Si durante este plazo se presentaren fallas "
+                        "atribuibles a una instalación, mantenimiento o servicio técnico deficiente, incluyendo fugas de refrigerante por mala abocardadura o deficiencias en conexiones eléctricas, "
+                        "EL CONTRATISTA deberá corregirlas de inmediato y sin costo alguno para EL CONTRATANTE ni para el cliente. En todos los casos responderá ante cualquier reclamación "
+                        "o demanda por daños a terceros provocados en la ejecución de los servicios."
+                    )
+                else:
+                    p_gar.text = (
+                        f"EL CONTRATISTA otorga una garantía de {garantia_instalacion} MESES calendario sobre la mano de obra "
+                        f"de las instalaciones realizadas, contados a partir de la firma del Acta de Entrega y Recepción por el cliente. "
+                        f"Si durante este plazo se presentaren fallas derivadas de una deficiente instalación, fuga de refrigerante por "
+                        f"mala abocardadura o deficiencias en conexiones eléctricas, EL CONTRATISTA corregirá de inmediato el daño sin costo alguno. "
+                        f"Asimismo, para los servicios de mantenimiento preventivo y limpieza técnica de equipos, EL CONTRATISTA otorga "
+                        f"una garantía técnica de {garantia_mantenimiento} MES(ES) calendario. En todos los casos responderá ante cualquier "
+                        f"reclamación o demanda por daños a terceros provocados en la ejecución de los servicios."
+                    )
                 for r in p_gar.runs:
                     r.font.name = 'Arial'
                     r.font.size = Pt(10)
             break
 
     # 2.2 Política de Uniformes
-    if politica_uniformes in ['EXCEPCION_PROPIA_GAFETE', 'PROVEEDOR_GAFETE']:
+    if is_foraneo:
+        for p in doc.paragraphs:
+            if "portar en todo momento el uniforme reglamentario" in p.text or "prohíbe de manera expresa a EL CONTRATISTA" in p.text:
+                p.text = (
+                    f"Portar, durante la prestación de los servicios, el uniforme corporativo de {nombre_comercial.upper()}, el cual deberá encontrarse en buen estado, limpio y permitir la identificación visible de la empresa, manteniendo en todo momento una imagen pulcra y profesional. "
+                    f"Asimismo, portar de manera visible el gafete o credencial oficial emitido por SINSA, que identificará al personal de EL CONTRATISTA ante el cliente final como representante operativo autorizado de SINSA."
+                )
+                for r in p.runs:
+                    r.font.name = 'Arial'
+                    r.font.size = Pt(10)
+                break
+    elif politica_uniformes in ['EXCEPCION_PROPIA_GAFETE', 'PROVEEDOR_GAFETE']:
         for p in doc.paragraphs:
             if "portar en todo momento el uniforme reglamentario" in p.text or "prohíbe de manera expresa a EL CONTRATISTA y a su personal portar uniformes" in p.text:
                 p.text += " De manera excepcional y sujeta a autorización escrita de Centro de Servicios, se autoriza a EL CONTRATISTA portar vestimenta técnica propia siempre que porte visiblemente el gafete o credencial oficial emitida por SINSA."
@@ -267,8 +309,10 @@ def generate_contract_document(provider_data, template_path=None):
                     r.font.size = Pt(10)
                 break
 
-    # 3. Cláusula Décima Séptima (Notificaciones)
+    # 3. Cláusula Notificaciones
     for p in doc.paragraphs:
+        if "JOSE ALFREDO RAUDES ORTIZ" in p.text and "/ ÁNGEL CAMPOS" in p.text:
+            p.text = p.text.replace("/ ÁNGEL CAMPOS", "").replace("7886-2226 / 8267-2246", "7886-2226")
         if "CONTRATISTA: XXXXXXXXXXX" in p.text:
             contact_op_str = f" / Contacto Operativo: {contacto_operativo}" if contacto_operativo else ""
             p.text = (
