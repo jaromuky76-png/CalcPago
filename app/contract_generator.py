@@ -48,10 +48,12 @@ def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
 def add_signature_table_docx(doc, is_annex=False, left_title=None, left_name="Oscar René Vargas Reyes", left_sub=None, right_title=None, right_name=None, right_sub=None):
     if is_annex:
         lt = left_title or "POR SINSA"
+        ln = "Centro de Servicios" if left_name == "Oscar René Vargas Reyes" else left_name
         ls = left_sub or "SILVA INTERNACIONAL S.A."
         rt = right_title or "POR EL CONTRATISTA"
     else:
         lt = left_title or "EL CONTRATANTE"
+        ln = left_name
         ls = left_sub or "SILVA INTERNACIONAL S.A. (SINSA)"
         rt = right_title or "EL CONTRATISTA"
     rn = right_name or "REPRESENTANTE LEGAL"
@@ -70,9 +72,11 @@ def add_signature_table_docx(doc, is_annex=False, left_title=None, left_name="Os
     c_mid = table_sig.rows[0].cells[1]
     c_right = table_sig.rows[0].cells[2]
 
+    sig_space_before = Pt(10) if is_annex else Pt(28)
+
     # Spacing and line on Left
     p_l_space = c_left.paragraphs[0]
-    p_l_space.paragraph_format.space_before = Pt(28)
+    p_l_space.paragraph_format.space_before = sig_space_before
     p_l_space.paragraph_format.space_after = Pt(4)
     r_bar_l = p_l_space.add_run("____________________________________\n")
     r_bar_l.bold = True
@@ -93,7 +97,7 @@ def add_signature_table_docx(doc, is_annex=False, left_title=None, left_name="Os
     p_l_sub1.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_l_sub1.paragraph_format.space_before = Pt(0)
     p_l_sub1.paragraph_format.space_after = Pt(1)
-    r_ls1 = p_l_sub1.add_run(left_name)
+    r_ls1 = p_l_sub1.add_run(ln)
     r_ls1.font.name = 'Arial'
     r_ls1.font.size = Pt(8.5)
 
@@ -108,7 +112,7 @@ def add_signature_table_docx(doc, is_annex=False, left_title=None, left_name="Os
 
     # Spacing and line on Right
     p_r_space = c_right.paragraphs[0]
-    p_r_space.paragraph_format.space_before = Pt(28)
+    p_r_space.paragraph_format.space_before = sig_space_before
     p_r_space.paragraph_format.space_after = Pt(4)
     r_bar_r = p_r_space.add_run("____________________________________\n")
     r_bar_r.bold = True
@@ -645,21 +649,21 @@ def generate_contract_document(provider_data, template_path=None):
         table_mat.alignment = WD_TABLE_ALIGNMENT.CENTER
         table_mat.autofit = False
 
-        col_mat_widths = [Inches(1.0), Inches(2.6), Inches(0.7), Inches(0.8), Inches(1.0), Inches(1.1)]
+        col_mat_widths = [Inches(0.9), Inches(2.7), Inches(0.65), Inches(0.75), Inches(1.0), Inches(1.1)]
 
         # Header Row
         mat_headers = ["CÓDIGO RMS", "DESCRIPCIÓN DEL INSUMO", "UNIDAD", "CANTIDAD", "COSTO UNIT.", "SUBTOTAL"]
         row_mat_hdr = table_mat.add_row()
         for idx, (cell, h_text) in enumerate(zip(row_mat_hdr.cells, mat_headers)):
             set_cell_background(cell, "0F172A")
-            set_cell_margins(cell, top=100, bottom=100, left=100, right=100)
+            set_cell_margins(cell, top=35, bottom=35, left=50, right=50)
             p = cell.paragraphs[0]
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER if idx in [0, 2] else (WD_ALIGN_PARAGRAPH.RIGHT if idx >= 3 else WD_ALIGN_PARAGRAPH.LEFT)
             r = p.add_run(h_text)
             r.bold = True
             r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
             r.font.name = 'Arial'
-            r.font.size = Pt(9)
+            r.font.size = Pt(8)
 
         calc_subtotal = 0.0
         for idx, m in enumerate(materiales):
@@ -691,13 +695,13 @@ def generate_contract_document(provider_data, template_path=None):
             for c_idx, (text_val, align_val, bold_val) in enumerate(vals):
                 cell_curr = row_m.cells[c_idx]
                 set_cell_background(cell_curr, bg_color)
-                set_cell_margins(cell_curr, top=70, bottom=70, left=80, right=80)
+                set_cell_margins(cell_curr, top=25, bottom=25, left=45, right=45)
                 p_c = cell_curr.paragraphs[0]
                 p_c.alignment = align_val
                 r_c = p_c.add_run(text_val)
                 r_c.bold = bold_val
                 r_c.font.name = 'Arial'
-                r_c.font.size = Pt(8.5)
+                r_c.font.size = Pt(7.5)
 
         calc_iva = calc_subtotal * 0.15
         calc_total = calc_subtotal + calc_iva
@@ -708,23 +712,23 @@ def generate_contract_document(provider_data, template_path=None):
         for merge_idx in range(1, 5):
             c_sub0.merge(row_sub.cells[merge_idx])
         set_cell_background(c_sub0, "F8FAFC")
-        set_cell_margins(c_sub0, top=80, bottom=80, left=100, right=100)
+        set_cell_margins(c_sub0, top=30, bottom=30, left=50, right=50)
         p_s0 = c_sub0.paragraphs[0]
         p_s0.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         r_s0 = p_s0.add_run("SUBTOTAL NETO DE MATERIALES:")
         r_s0.bold = True
         r_s0.font.name = 'Arial'
-        r_s0.font.size = Pt(9)
+        r_s0.font.size = Pt(8)
 
         c_sub_val = row_sub.cells[5]
         set_cell_background(c_sub_val, "F8FAFC")
-        set_cell_margins(c_sub_val, top=80, bottom=80, left=100, right=100)
+        set_cell_margins(c_sub_val, top=30, bottom=30, left=50, right=50)
         p_sv = c_sub_val.paragraphs[0]
         p_sv.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         r_sv = p_sv.add_run(f"C$ {calc_subtotal:,.2f}")
         r_sv.bold = True
         r_sv.font.name = 'Arial'
-        r_sv.font.size = Pt(9)
+        r_sv.font.size = Pt(8)
 
         # IVA Row
         row_iva = table_mat.add_row()
@@ -732,23 +736,23 @@ def generate_contract_document(provider_data, template_path=None):
         for merge_idx in range(1, 5):
             c_iva0.merge(row_iva.cells[merge_idx])
         set_cell_background(c_iva0, "F8FAFC")
-        set_cell_margins(c_iva0, top=80, bottom=80, left=100, right=100)
+        set_cell_margins(c_iva0, top=30, bottom=30, left=50, right=50)
         p_i0 = c_iva0.paragraphs[0]
         p_i0.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         r_i0 = p_i0.add_run("IMPUESTO AL VALOR AGREGADO (IVA 15%):")
         r_i0.bold = True
         r_i0.font.name = 'Arial'
-        r_i0.font.size = Pt(9)
+        r_i0.font.size = Pt(8)
 
         c_iva_val = row_iva.cells[5]
         set_cell_background(c_iva_val, "F8FAFC")
-        set_cell_margins(c_iva_val, top=80, bottom=80, left=100, right=100)
+        set_cell_margins(c_iva_val, top=30, bottom=30, left=50, right=50)
         p_iv = c_iva_val.paragraphs[0]
         p_iv.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         r_iv = p_iv.add_run(f"C$ {calc_iva:,.2f}")
         r_iv.bold = True
         r_iv.font.name = 'Arial'
-        r_iv.font.size = Pt(9)
+        r_iv.font.size = Pt(8)
 
         # Total Row
         row_tot = table_mat.add_row()
@@ -756,25 +760,25 @@ def generate_contract_document(provider_data, template_path=None):
         for merge_idx in range(1, 5):
             c_tot0.merge(row_tot.cells[merge_idx])
         set_cell_background(c_tot0, "EFF6FF")
-        set_cell_margins(c_tot0, top=90, bottom=90, left=100, right=100)
+        set_cell_margins(c_tot0, top=35, bottom=35, left=50, right=50)
         p_t0 = c_tot0.paragraphs[0]
         p_t0.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         r_t0 = p_t0.add_run("TOTAL VALORIZADO EN CONSIGNACIÓN:")
         r_t0.bold = True
         r_t0.font.color.rgb = RGBColor(0x1E, 0x40, 0xAF)
         r_t0.font.name = 'Arial'
-        r_t0.font.size = Pt(9.5)
+        r_t0.font.size = Pt(8.5)
 
         c_tot_val = row_tot.cells[5]
         set_cell_background(c_tot_val, "EFF6FF")
-        set_cell_margins(c_tot_val, top=90, bottom=90, left=100, right=100)
+        set_cell_margins(c_tot_val, top=35, bottom=35, left=50, right=50)
         p_tv = c_tot_val.paragraphs[0]
         p_tv.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         r_tv = p_tv.add_run(f"C$ {calc_total:,.2f}")
         r_tv.bold = True
         r_tv.font.color.rgb = RGBColor(0x1E, 0x40, 0xAF)
         r_tv.font.name = 'Arial'
-        r_tv.font.size = Pt(9.5)
+        r_tv.font.size = Pt(8.5)
 
         # Set cell widths
         for r in table_mat.rows:
@@ -955,6 +959,68 @@ def generate_contract_document(provider_data, template_path=None):
             r_as3.font.size = Pt(8.5)
             r_as3.font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
             add_signature_table_docx(doc, is_annex=True, right_name=nombre_rep, right_sub=nombre_comercial)
+
+            # HOJA 2 DE ANEXO III: MAPA CARTOGRÁFICO DE DELIMITACIÓN TERRITORIAL
+            map_img_path = None
+            cur_dir = os.path.dirname(os.path.abspath(__file__))
+            sample_img = os.path.join(cur_dir, "geocerca_chinandega_sample.png")
+            if os.path.exists(sample_img):
+                map_img_path = sample_img
+            
+            custom_map = provider_data.get('geocerca_map_image')
+            if custom_map and isinstance(custom_map, str) and os.path.exists(custom_map):
+                map_img_path = custom_map
+
+            if map_img_path:
+                p_m_title = doc.add_paragraph()
+                p_m_title.paragraph_format.page_break_before = True
+                p_m_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                r_mt = p_m_title.add_run("ANEXO III (CONTINUACIÓN): MAPA CARTOGRÁFICO DE DELIMITACIÓN TERRITORIAL")
+                r_mt.bold = True
+                r_mt.font.name = 'Arial'
+                r_mt.font.size = Pt(11)
+                r_mt.font.color.rgb = RGBColor(0x05, 0x96, 0x69)
+
+                p_m_sub = doc.add_paragraph()
+                p_m_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                r_ms = p_m_sub.add_run(f"POLÍGONO PERICIAL DE COBERTURA GEOGRÁFICA - BASE OPERATIVA: {base_operativa.upper()}")
+                r_ms.font.name = 'Arial'
+                r_ms.font.size = Pt(9.5)
+                r_ms.font.color.rgb = RGBColor(0x47, 0x55, 0x69)
+
+                p_pic = doc.add_paragraph()
+                p_pic.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p_pic.paragraph_format.space_before = Pt(6)
+                p_pic.paragraph_format.space_after = Pt(10)
+                try:
+                    doc.add_picture(map_img_path, width=Inches(6.2))
+                except Exception:
+                    pass
+
+                p_cert = doc.add_paragraph()
+                p_cert.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_cert.paragraph_format.space_before = Pt(8)
+                p_cert.paragraph_format.space_after = Pt(6)
+                r_c1 = p_cert.add_run("CERTIFICACIÓN CARTOGRÁFICA PERICIAL: ")
+                r_c1.bold = True
+                r_c1.font.name = 'Arial'
+                r_c1.font.size = Pt(8.5)
+                r_c2 = p_cert.add_run("La delimitación territorial visualizada en la cartografía satelital superior corresponde con exactitud matemática a las coordenadas del datum geodésico WGS84 consignadas en la tabla pericial de la Hoja 1. Ambas partes ratifican la plena validez de esta cartografía digital para la liquidación de las Órdenes de Trabajo ejecutadas en el marco del contrato.")
+                r_c2.font.name = 'Arial'
+                r_c2.font.size = Pt(8.5)
+                r_c2.font.color.rgb = RGBColor(0x33, 0x41, 0x55)
+
+                p_m_sig_intro = doc.add_paragraph()
+                p_m_sig_intro.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                p_m_sig_intro.paragraph_format.space_before = Pt(8)
+                p_m_sig_intro.paragraph_format.space_after = Pt(2)
+                r_mas = p_m_sig_intro.add_run("Ratificado y aceptado en conformidad cartográfica digital:")
+                r_mas.italic = True
+                r_mas.font.name = 'Arial'
+                r_mas.font.size = Pt(8.5)
+                r_mas.font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
+
+                add_signature_table_docx(doc, is_annex=True, right_name=nombre_rep, right_sub=nombre_comercial)
         else:
             p_note = doc.add_paragraph()
             p_note.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
