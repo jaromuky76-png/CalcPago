@@ -8306,6 +8306,10 @@ async function buildProviderOnboardingKitDocx(data = {}) {
     const textMuted = '475569';
     const borderColor = '94A3B8';
     const lightBorderColor = 'CBD5E1';
+    const grayHeaderBg = '808080';   // Gris oficial encabezados SINSA (10.F.S01.0006)
+    const blueProviderBg = 'DBEAFE'; // Celeste/Azul suave campos a llenar por el proveedor
+    const lightGrayBg = 'F1F5F9';
+    const whiteBg = 'FFFFFF';
 
     const cellBorderSolid = {
         top: { style: BorderStyle.SINGLE, size: 4, color: borderColor },
@@ -8321,18 +8325,14 @@ async function buildProviderOnboardingKitDocx(data = {}) {
         right: { style: BorderStyle.SINGLE, size: 2, color: lightBorderColor }
     };
 
-    const noBorders = {
-        top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-        bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-        left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-        right: { style: BorderStyle.NONE, size: 0, color: 'auto' }
-    };
-
-    const logoBytes = getSinsaLogoUint8Array();
+    const logoBytes = typeof getSinsaLogoUint8Array === 'function' ? getSinsaLogoUint8Array() : null;
 
     const provName = (data.nombre_comercial || data.nombre || '').trim();
     const repName = (data.nombre_representante || '').trim();
-    const regimen = data.regimen || '';
+    const regimen = data.regimen || 'Régimen de Cuota Fija';
+    const isRegGeneral = regimen.includes('General');
+    const isCuotaFija = regimen.includes('Cuota Fija');
+    const isCompraUnica = regimen.includes('Compra Única') || regimen.includes('Natural') || regimen.includes('No Inscrita');
     const cedula = (data.cedula || '').trim();
     const ruc = (data.ruc || '').trim();
     const tel = (data.telefono || '').trim();
@@ -8354,209 +8354,172 @@ async function buildProviderOnboardingKitDocx(data = {}) {
 
     const children = [];
 
+    // Helper para encabezados de sección oficiales SINSA (Gris 808080)
+    function createSectionHeader(titleText) {
+        return new Paragraph({
+            spacing: { before: 50, after: 20 },
+            shading: { fill: grayHeaderBg },
+            children: [
+                new TextRun({ text: `  ${titleText}`, bold: true, font, size: 14, color: 'FFFFFF' })
+            ]
+        });
+    }
+
+    // Helper para celdas con borde y relleno
+    function makeCell(paragraphs, widthPercent, bg = whiteBg, colSpan = 1) {
+        return new TableCell({
+            width: { size: widthPercent, type: WidthType.PERCENTAGE },
+            columnSpan: colSpan,
+            borders: cellBorderSolid,
+            shading: { fill: bg },
+            margins: { top: 20, bottom: 20, left: 35, right: 35 },
+            children: Array.isArray(paragraphs) ? paragraphs : [paragraphs]
+        });
+    }
+
     // =========================================================================
-    // PARTE 1: GUÍA Y CHECKLIST DE DOCUMENTACIÓN (POL.GLE.001 / 10.P.S01.0001)
+    // PARTE 1: GUÍA Y CHECKLIST DE COMPLETAMIENTO PARA EL PROVEEDOR
+    // Normativas: POL.GLE.001 / 10.P.S01.0001 / Requisitos Oficiales SINSA
     // =========================================================================
 
     const headerCells = [];
     if (logoBytes) {
-        headerCells.push(new TableCell({
-            width: { size: 24, type: WidthType.PERCENTAGE },
-            borders: noBorders,
-            verticalAlign: 'center',
-            children: [
-                new Paragraph({
-                    alignment: AlignmentType.LEFT,
-                    children: [
-                        new ImageRun({
-                            data: logoBytes,
-                            transformation: { width: 135, height: 42 }
-                        })
-                    ]
-                })
-            ]
-        }));
+        headerCells.push(makeCell([
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                    new ImageRun({
+                        data: logoBytes,
+                        transformation: { width: 130, height: 40 }
+                    })
+                ]
+            })
+        ], 22, whiteBg));
     } else {
-        headerCells.push(new TableCell({
-            width: { size: 24, type: WidthType.PERCENTAGE },
-            borders: noBorders,
-            verticalAlign: 'center',
-            children: [
-                new Paragraph({
-                    children: [new TextRun({ text: 'SINSA', bold: true, font, size: 26, color: primaryColor })]
-                })
-            ]
-        }));
+        headerCells.push(makeCell([
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                    new TextRun({ text: 'SINSA', bold: true, font, size: 26, color: primaryColor }),
+                    new TextRun({ text: '\nNicaragua', font, size: 11, color: textMuted })
+                ]
+            })
+        ], 22, whiteBg));
     }
 
-    headerCells.push(new TableCell({
-        width: { size: 52, type: WidthType.PERCENTAGE },
-        borders: noBorders,
-        verticalAlign: 'center',
-        children: [
-            new Paragraph({
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 20 },
-                children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A. (SINSA)', bold: true, font, size: 18, color: darkNavy })]
-            }),
-            new Paragraph({
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 20 },
-                children: [new TextRun({ text: 'GERENCIA ADMINISTRATIVA FINANCIERA / GESTIÓN LEGAL', bold: true, font, size: 14, color: textMuted })]
-            }),
-            new Paragraph({
-                alignment: AlignmentType.CENTER,
-                children: [new TextRun({ text: 'POLÍTICA DE ALTA DE PROVEEDORES (POL.GLE.001 / 10.P.S01.0001)', bold: true, font, size: 13, color: primaryColor })]
-            })
-        ]
-    }));
+    headerCells.push(makeCell([
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 10 }, children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A.', bold: true, font, size: 16, color: darkNavy })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 10 }, children: [new TextRun({ text: 'GERENCIA FINANCIERA - CONTABILIDAD / CUENTAS POR PAGAR', bold: true, font, size: 12, color: textMuted })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'LISTA DE CHEQUEO DE RECAUDOS PARA ALTA DE PROVEEDORES', bold: true, font, size: 14, color: primaryColor })] })
+    ], 54, whiteBg));
 
-    headerCells.push(new TableCell({
-        width: { size: 24, type: WidthType.PERCENTAGE },
-        borders: cellBorderSolid,
-        shading: { fill: 'F8FAFC' },
-        margins: { top: 40, bottom: 40, left: 60, right: 60 },
-        children: [
-            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 15 }, children: [new TextRun({ text: 'CONTROL NORMATIVO', bold: true, font, size: 12, color: darkNavy })] }),
-            new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'Código: 10.P.S01.0001', bold: true, font, size: 13, color: primaryColor })] }),
-            new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'Versión: 02 (Vigente)', font, size: 13 })] }),
-            new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: `Emisión: ${diaStr}/${now.getMonth() + 1}/${anioStr}`, font, size: 12, color: textMuted })] })
-        ]
-    }));
+    headerCells.push(makeCell([
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 10 }, children: [new TextRun({ text: 'CONTROL NORMATIVO', bold: true, font, size: 11, color: darkNavy })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'POL.GLE.001', bold: true, font, size: 12, color: primaryColor })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '10.P.S01.0001', font, size: 11, color: textMuted })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Fecha: ${diaStr}/${now.getMonth() + 1}/${anioStr}`, font, size: 11 })] })
+    ], 24, lightGrayBg));
 
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: noBorders,
+        borders: cellBorderSolid,
         rows: [new TableRow({ children: headerCells })]
     }));
 
-    children.push(new Paragraph({ spacing: { before: 80, after: 80 } }));
-
-    // Título Principal de la Guía
+    // Título Principal del Checklist
     children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 40, after: 40 },
-        shading: { fill: '0F172A' },
+        spacing: { before: 40, after: 30 },
+        shading: { fill: darkNavy },
         children: [
-            new TextRun({ text: 'GUÍA Y CHECKLIST DE REQUISITOS PARA ALTA Y VINCULACIÓN DE PROVEEDORES', bold: true, font, size: 18, color: 'FFFFFF' })
+            new TextRun({ text: 'CHECKLIST OFICIAL DE RECAUDOS PARA COMPLETAMIENTO POR EL CONTRATISTA', bold: true, font, size: 15, color: 'FFFFFF' })
         ]
     }));
 
-    // Instrucciones
+    // Instrucciones al Contratista
     children.push(new Paragraph({
         alignment: AlignmentType.JUSTIFY,
-        spacing: { before: 60, after: 60, line: 230 },
+        spacing: { before: 20, after: 40, line: 220 },
         children: [
-            new TextRun({ text: 'Estimado Contratista: ', bold: true, font, size: 15, color: darkNavy }),
+            new TextRun({ text: 'Estimado Proveedor / Contratista: ', bold: true, font, size: 13, color: darkNavy }),
             new TextRun({
-                text: 'Para formalizar su vinculación contractual con SILVA INTERNACIONAL S.A. (SINSA), habilitar la asignación de Órdenes de Trabajo (OTs) y tramitar el pago oportuno de sus facturas conforme a las políticas corporativas POL.GLE.001 y 10.P.S01.0001, sírvase recopilar los recaudos que correspondan a su régimen tributario y completar el Formato Oficial de Solicitud de Alta (10.F.S01.0006) adjunto.',
-                font, size: 15, color: '1E293B'
+                text: 'Para formalizar su vinculación contractual con SILVA INTERNACIONAL S.A. (SINSA), habilitar la asignación de Órdenes de Trabajo (OTs) y tramitar el pago oportuno de sus facturas conforme a las políticas corporativas POL.GLE.001 y 10.P.S01.0001, sírvase recopilar y marcar con una equis [X] en la columna "Adjunto" los recaudos que correspondan a su régimen tributario (Régimen General: 11 requisitos; Cuota Fija: 6 requisitos; Compra Única: 4 requisitos). Complete el número de folio/referencia y fecha de vigencia de cada recaudo. Complete asimismo el Formato de Solicitud de Alta adjunto (10.F.S01.0006) en los campos resaltados en color azul y firme la declaración final.',
+                font, size: 13, color: '1E293B'
             })
         ]
     }));
 
-    // Cuadro de Datos del Contratista Objetivo
+    // Ficha de Identificación del Contratista Objetivo
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: cellBorderSolid,
         rows: [
             new TableRow({
                 children: [
-                    new TableCell({
-                        width: { size: 60, type: WidthType.PERCENTAGE },
-                        shading: { fill: 'F1F5F9' },
-                        margins: { top: 30, bottom: 30, left: 60, right: 60 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'Proveedor / Razón Social: ', bold: true, font, size: 14, color: darkNavy }),
-                                    new TextRun({ text: provName || '________________________________________________', bold: !!provName, font, size: 14, color: provName ? '00A859' : textMuted })
-                                ]
-                            }),
-                            new Paragraph({
-                                spacing: { before: 20 },
-                                children: [
-                                    new TextRun({ text: 'Titular / Representante: ', bold: true, font, size: 14, color: darkNavy }),
-                                    new TextRun({ text: repName || '________________________________________________', font, size: 14 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 40, type: WidthType.PERCENTAGE },
-                        shading: { fill: 'F1F5F9' },
-                        margins: { top: 30, bottom: 30, left: 60, right: 60 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'Régimen: ', bold: true, font, size: 14, color: darkNavy }),
-                                    new TextRun({ text: regimen || '☐ Régimen General  ☐ Cuota Fija  ☐ P. Natural', font, size: 14 })
-                                ]
-                            }),
-                            new Paragraph({
-                                spacing: { before: 20 },
-                                children: [
-                                    new TextRun({ text: 'Fecha Entrega: ', bold: true, font, size: 14, color: darkNavy }),
-                                    new TextRun({ text: fechaCompleta, font, size: 14 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({ children: [new TextRun({ text: 'Proveedor / Razón Social: ', bold: true, font, size: 12, color: darkNavy }), new TextRun({ text: provName || '________________________________________________', bold: !!provName, font, size: 12, color: provName ? primaryColor : textMuted })] }),
+                        new Paragraph({ spacing: { before: 15 }, children: [new TextRun({ text: 'Representante Legal / Titular: ', bold: true, font, size: 12, color: darkNavy }), new TextRun({ text: repName || '________________________________________________', font, size: 12 })] }),
+                        new Paragraph({ spacing: { before: 15 }, children: [new TextRun({ text: 'Cédula / Cédula RUC: ', bold: true, font, size: 12, color: darkNavy }), new TextRun({ text: (ruc || cedula) || '________________________________________________', font, size: 12 })] })
+                    ], 60, lightGrayBg),
+                    makeCell([
+                        new Paragraph({ children: [new TextRun({ text: 'Régimen Tributario del Contratista: ', bold: true, font, size: 12, color: darkNavy })] }),
+                        new Paragraph({ spacing: { before: 10 }, children: [new TextRun({ text: `[ ${isRegGeneral ? 'X' : '  '} ] Régimen General (11 recaudos)`, bold: isRegGeneral, font, size: 11, color: isRegGeneral ? '059669' : textMuted })] }),
+                        new Paragraph({ spacing: { before: 5 }, children: [new TextRun({ text: `[ ${isCuotaFija ? 'X' : '  '} ] Régimen Cuota Fija (6 recaudos)`, bold: isCuotaFija, font, size: 11, color: isCuotaFija ? '059669' : textMuted })] }),
+                        new Paragraph({ spacing: { before: 5 }, children: [new TextRun({ text: `[ ${isCompraUnica ? 'X' : '  '} ] Compra Única / P. Natural (4 recaudos)`, bold: isCompraUnica, font, size: 11, color: isCompraUnica ? '059669' : textMuted })] }),
+                        new Paragraph({ spacing: { before: 10 }, children: [new TextRun({ text: 'Fecha: ', bold: true, font, size: 11 }), new TextRun({ text: fechaCompleta, font, size: 11 })] })
+                    ], 40, lightGrayBg)
                 ]
             })
         ]
     }));
 
-    children.push(new Paragraph({ spacing: { before: 60, after: 40 } }));
+    children.push(new Paragraph({ spacing: { before: 40, after: 20 } }));
 
-    // TABLA DE CHECKLIST DE REQUISITOS
-    const checklistHeader = new TableRow({
+    // TABLA DE CHECKLIST INTERACTIVA / COMPLETABLE
+    const chkTableHeaders = new TableRow({
         tableHeader: true,
         cantSplit: true,
         children: [
-            new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Nº', bold: true, font, size: 13, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 37, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 50, right: 50 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DOCUMENTO / REQUISITO EXIGIDO', bold: true, font, size: 13, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'RÉGIMEN GENERAL', bold: true, font, size: 12, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CUOTA FIJA', bold: true, font, size: 12, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'P. NATURAL (NO DGI)', bold: true, font, size: 11, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ESPECIFICACIÓN / ENTREGA', bold: true, font, size: 12, color: 'FFFFFF' })] })] })
+            makeCell([new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'N°', bold: true, font, size: 11, color: 'FFFFFF' })] })], 4, darkNavy),
+            makeCell([new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DOCUMENTO / REQUISITO EXIGIDO POR SINSA', bold: true, font, size: 11, color: 'FFFFFF' })] })], 33, darkNavy),
+            makeCell([new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'RÉGIMEN EXIGIDO', bold: true, font, size: 11, color: 'FFFFFF' })] })], 16, darkNavy),
+            makeCell([new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '[X] ADJUNTO', bold: true, font, size: 11, color: 'FFFFFF' })] })], 11, darkNavy),
+            makeCell([new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'N° FOLIO / DOCUMENTO', bold: true, font, size: 11, color: 'FFFFFF' })] })], 14, darkNavy),
+            makeCell([new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'FECHA VIGENCIA', bold: true, font, size: 11, color: 'FFFFFF' })] })], 11, darkNavy),
+            makeCell([new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'NOTAS PROVEEDOR', bold: true, font, size: 11, color: 'FFFFFF' })] })], 11, darkNavy)
         ]
     });
 
-    const checklistRowsData = [
-        { num: '1', doc: 'Formato Solicitud de Alta de Proveedores (Código 10.F.S01.0006)', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'OBLIGATORIO', spec: 'Físico original firmado y sellado (adjunto en este kit)' },
-        { num: '2', doc: 'Cédula de Identidad Vigente del Titular o Representante Legal', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'OBLIGATORIO', spec: 'Copia nítida y legible ambas caras (vigencia comprobable)' },
-        { num: '3', doc: 'Cédula RUC Vigente emitida por la DGI', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'No Aplica', spec: 'Constancia oficial actualizada de inscripción tributaria' },
-        { num: '4', doc: 'Matrícula de Alcaldía Municipal del Año en Curso', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'No Aplica', spec: 'Copia de matrícula del municipio donde opera' },
-        { num: '5', doc: 'Factura o Talonario en Blanco autorizado por DGI', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'No Aplica', spec: 'Pie de imprenta válido, numeración y fecha vencimiento' },
-        { num: '6', doc: 'Testimonio de Escritura de Constitución y Estatutos', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Inscrita debidamente en el Registro Mercantil' },
-        { num: '7', doc: 'Poder Notarial del Representante Legal debidamente inscrito', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Poder General o Especial inscrito en Registro Público' },
-        { num: '8', doc: 'Constancia de Inscripción en la DGI', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Constancia oficial de actividad económica acreditada' },
-        { num: '9', doc: 'Constancia de Responsable Recaudador de IVA (o No Retención)', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Constancia emitida por DGI para exención de retención' },
-        { num: '10', doc: 'Solvencia Fiscal Actualizada emitida por la DGI', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'No Aplica', spec: 'Certificación vigente al momento de radicar expediente' },
-        { num: '11', doc: 'Certificado de Beneficiario Final actualizado', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Declaración jurada conforme normativa mercantil vigente' },
-        { num: '12', doc: 'Constancia de Afiliación Patronal / Pagos al INSS', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'Opcional', spec: 'Respaldo de seguro social de técnicos y cuadrilla' },
-        { num: '13', doc: 'Certificación Bancaria Oficial de Cuenta en Córdobas (C$)', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'OBLIGATORIO', spec: 'Constancia membretada del banco (BAC/BANPRO/LAFISE)' },
-        { num: '14', doc: 'Declaratoria de Adhesión al Código de Ética y Conducta SINSA', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'OBLIGATORIO', spec: 'Carta firmada y sellada según política POL.GLE.001' }
+    const checklistItems = [
+        { num: '1', doc: 'Formato Solicitud de Alta de Proveedores (Código 10.F.S01.0006)', regimenReq: 'General / Cuota Fija / Compra Única', check: '[ X ]', folio: '10.F.S01.0006-ORIG', fecha: `${diaStr}/${mesStr.slice(0,3)}/${anioStr}`, notas: 'Firmado y sellado en azul' },
+        { num: '2', doc: 'Copia de Cédula de Identidad del Representante Legal / Titular', regimenReq: 'General / Cuota Fija / Compra Única', check: `[ ${cedula ? 'X' : '  '} ]`, folio: cedula || '________________', fecha: 'Vigente', notas: 'Ambas caras legibles' },
+        { num: '3', doc: 'Copia de Cédula RUC emitida por la DGI', regimenReq: 'General / Cuota Fija / Compra Única', check: `[ ${ruc ? 'X' : '  '} ]`, folio: ruc || '________________', fecha: 'Actualizada', notas: 'Constancia oficial DGI' },
+        { num: '4', doc: 'Copia de Matrícula de Alcaldía Municipal del Año en Curso', regimenReq: 'General / Cuota Fija', check: '[   ]', folio: '________________', fecha: anioStr, notas: 'Municipio de operación' },
+        { num: '5', doc: 'Copia de Factura o Talonario en Blanco autorizado por DGI', regimenReq: 'General / Cuota Fija', check: '[   ]', folio: '________________', fecha: 'Vigente', notas: 'Pie imprenta / vencimiento' },
+        { num: '6', doc: 'Copia de Acta de Constitución de la Empresa (Personería Jurídica)', regimenReq: 'Régimen General', check: '[   ]', folio: '________________', fecha: 'Inscrita', notas: 'Registro Mercantil' },
+        { num: '7', doc: 'Poder General de Administración debidamente inscrito', regimenReq: 'Régimen General', check: '[   ]', folio: '________________', fecha: 'Inscrito', notas: 'Registro Público' },
+        { num: '8', doc: 'Copia de Constancia de Inscripción en la DGI', regimenReq: 'Régimen General', check: '[   ]', folio: '________________', fecha: 'Actualizada', notas: 'Actividad económica' },
+        { num: '9', doc: 'Constancia de No Retención en la fuente emitida por DGI (si aplica)', regimenReq: 'Régimen General (Opcional)', check: '[   ]', folio: '________________', fecha: 'Vigente', notas: 'Exención de retención' },
+        { num: '10', doc: 'Copia de Constancia de Responsable Recaudador de IVA', regimenReq: 'General / Compra Única', check: '[   ]', folio: '________________', fecha: 'Vigente', notas: 'Recaudador IVA DGI' },
+        { num: '11', doc: 'Constancia de Afiliación Patronal / Pagos al INSS', regimenReq: 'General / Cuota Fija', check: '[   ]', folio: '________________', fecha: 'Al día', notas: 'Seguro social cuadrilla' },
+        { num: '12', doc: 'Certificación Bancaria Oficial de Cuenta en Córdobas (C$)', regimenReq: 'General / Cuota Fija / Compra Única', check: `[ ${cuenta ? 'X' : '  '} ]`, folio: cuenta || '________________', fecha: 'Reciente', notas: banco || 'BAC Credomatic' },
+        { num: '13', doc: 'Carta de Adhesión al Código de Ética y Conducta SINSA (POL.GLE.001)', regimenReq: 'General / Cuota Fija / Compra Única', check: '[   ]', folio: 'POL.GLE.001', fecha: `${diaStr}/${mesStr.slice(0,3)}/${anioStr}`, notas: 'Firmada y sellada' }
     ];
 
-    const checklistTableRows = [checklistHeader];
+    const chkRows = [chkTableHeaders];
 
-    checklistRowsData.forEach((row, i) => {
-        const bg = i % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
-        const isObligGen = row.gen === 'OBLIGATORIO';
-        const isObligCuota = row.cuota === 'OBLIGATORIO';
-        const isObligNoDgi = row.noDgi === 'OBLIGATORIO';
-
-        checklistTableRows.push(new TableRow({
+    checklistItems.forEach((item, idx) => {
+        const rowBg = idx % 2 === 0 ? whiteBg : 'F8FAFC';
+        chkRows.push(new TableRow({
             cantSplit: true,
             children: [
-                new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 20, bottom: 20, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: row.num, bold: true, font, size: 13, color: primaryColor })] })] }),
-                new TableCell({ width: { size: 37, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 20, bottom: 20, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: `☐ ${row.doc}`, bold: true, font, size: 13, color: darkNavy })] })] }),
-                new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: isObligGen ? 'ECFDF5' : bg }, margins: { top: 20, bottom: 20, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isObligGen ? '✓ Exigido' : '—', bold: isObligGen, font, size: 12, color: isObligGen ? '059669' : textMuted })] })] }),
-                new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: isObligCuota ? 'ECFDF5' : bg }, margins: { top: 20, bottom: 20, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isObligCuota ? '✓ Exigido' : 'No Aplica', bold: isObligCuota, font, size: 12, color: isObligCuota ? '059669' : textMuted })] })] }),
-                new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: isObligNoDgi ? 'ECFDF5' : bg }, margins: { top: 20, bottom: 20, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isObligNoDgi ? '✓ Exigido' : 'No Aplica', bold: isObligNoDgi, font, size: 12, color: isObligNoDgi ? '059669' : textMuted })] })] }),
-                new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 20, bottom: 20, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: row.spec, font, size: 11, color: textMuted })] })] })
+                new TableCell({ width: { size: 4, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: rowBg }, margins: { top: 15, bottom: 15, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.num, bold: true, font, size: 11, color: primaryColor })] })] }),
+                new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: rowBg }, margins: { top: 15, bottom: 15, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: item.doc, bold: true, font, size: 11, color: darkNavy })] })] }),
+                new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: rowBg }, margins: { top: 15, bottom: 15, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.regimenReq, font, size: 10, color: textMuted })] })] }),
+                new TableCell({ width: { size: 11, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: item.check.includes('X') ? 'DCFCE7' : rowBg }, margins: { top: 15, bottom: 15, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.check, bold: true, font, size: 11, color: item.check.includes('X') ? '15803D' : darkNavy })] })] }),
+                new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: rowBg }, margins: { top: 15, bottom: 15, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.folio, font, size: 10, color: item.folio.includes('_') ? textMuted : darkNavy })] })] }),
+                new TableCell({ width: { size: 11, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: rowBg }, margins: { top: 15, bottom: 15, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.fecha, font, size: 10 })] })] }),
+                new TableCell({ width: { size: 11, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: rowBg }, margins: { top: 15, bottom: 15, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: item.notas, font, size: 10, color: textMuted })] })] })
             ]
         }));
     });
@@ -8564,36 +8527,51 @@ async function buildProviderOnboardingKitDocx(data = {}) {
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: cellBorderSolid,
-        rows: checklistTableRows
+        rows: chkRows
     }));
 
-    // Notas de Entrega y Ventanilla
-    children.push(new Paragraph({ spacing: { before: 50, after: 30 } }));
+    // Declaración y Firma del Proveedor en el Checklist
+    children.push(new Paragraph({ spacing: { before: 30, after: 20 } }));
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: cellBorderSolid,
         rows: [
             new TableRow({
                 children: [
-                    new TableCell({
-                        shading: { fill: 'FEF3C7' },
-                        margins: { top: 25, bottom: 25, left: 50, right: 50 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: '📌 CANAL Y PROCEDIMIENTO DE ENTREGA: ', bold: true, font, size: 13, color: '92400E' }),
-                                    new TextRun({ text: 'Remitir expediente digitalizado en formato PDF legible a la cuenta oficial de Cuentas por Pagar y Operaciones de Servicios. Los originales para confrontación física se reciben en Ventanilla de Proveedores SINSA según política 10.PO.S01.0006. Tiempo de respuesta para alta en sistemas (Oracle Fusion / RMS): 2 días hábiles.', font, size: 12, color: '78350F' })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({
+                            spacing: { after: 10 },
+                            children: [
+                                new TextRun({ text: 'DECLARACIÓN JURADA DE VERACIDAD Y COMPLETAMIENTO DEL PROVEEDOR:', bold: true, font, size: 11, color: darkNavy })
+                            ]
+                        }),
+                        new Paragraph({
+                            alignment: AlignmentType.JUSTIFY,
+                            spacing: { after: 20, line: 200 },
+                            children: [
+                                new TextRun({
+                                    text: 'Yo, ____________________________________________________, en representación legal de ____________________________________________________, declaro bajo juramento que los documentos marcados en este checklist han sido recopilados, revisados y adjuntados a la presente solicitud para su entrega a SILVA INTERNACIONAL S.A. (SINSA). Garantizo la autenticidad, legitimidad y plena vigencia de toda la documentación provista, comprometiéndome a presentar los originales físicos para su confrontación cuando sea requerido.',
+                                    font, size: 10, color: '334155'
+                                })
+                            ]
+                        }),
+                        new Paragraph({
+                            alignment: AlignmentType.SPACE_BETWEEN,
+                            children: [
+                                new TextRun({ text: 'Firma del Proveedor / Representante: _______________________________', font, size: 11, color: darkNavy }),
+                                new TextRun({ text: '    Sello Oficial: [                            ]    ', font, size: 11, color: textMuted }),
+                                new TextRun({ text: 'Fecha: _____/_____/________', font, size: 11, color: darkNavy })
+                            ]
+                        })
+                    ], 100, 'FEF9C3')
                 ]
             })
         ]
     }));
 
     // =========================================================================
-    // PARTE 2: FORMATO OFICIAL SOLICITUD DE ALTA DE PROVEEDORES (10.F.S01.0006)
+    // PARTE 2: FORMATO OFICIAL SOLICITUD DE ALTA DE PROVEEDORES
+    // Código: 10.F.S01.0006 - Versión: 1 (Estructura oficial SINSA I a VI)
     // =========================================================================
 
     // Salto de página para el Formato Oficial
@@ -8602,72 +8580,65 @@ async function buildProviderOnboardingKitDocx(data = {}) {
         children: []
     }));
 
-    // Encabezado Institucional Formato 10.F.S01.0006
-    const formHeaderCells = [];
+    // Encabezado Oficial Formato 10.F.S01.0006
+    const formatoHeaderCells = [];
     if (logoBytes) {
-        formHeaderCells.push(new TableCell({
-            width: { size: 24, type: WidthType.PERCENTAGE },
-            borders: cellBorderSolid,
-            verticalAlign: 'center',
-            margins: { top: 30, bottom: 30, left: 40, right: 40 },
-            children: [
-                new Paragraph({
-                    alignment: AlignmentType.CENTER,
-                    children: [
-                        new ImageRun({
-                            data: logoBytes,
-                            transformation: { width: 130, height: 40 }
-                        })
-                    ]
-                })
-            ]
-        }));
+        formatoHeaderCells.push(makeCell([
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                    new ImageRun({
+                        data: logoBytes,
+                        transformation: { width: 130, height: 40 }
+                    })
+                ]
+            })
+        ], 22, whiteBg));
     } else {
-        formHeaderCells.push(new TableCell({
-            width: { size: 24, type: WidthType.PERCENTAGE },
-            borders: cellBorderSolid,
-            verticalAlign: 'center',
-            children: [
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SINSA', bold: true, font, size: 24, color: primaryColor })] })
-            ]
-        }));
+        formatoHeaderCells.push(makeCell([
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                    new TextRun({ text: 'SINSA', bold: true, font, size: 28, color: primaryColor })
+                ]
+            })
+        ], 22, whiteBg));
     }
 
-    formHeaderCells.push(new TableCell({
-        width: { size: 52, type: WidthType.PERCENTAGE },
+    formatoHeaderCells.push(makeCell([
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 10 }, children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A.', bold: true, font, size: 16, color: darkNavy })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 10 }, children: [new TextRun({ text: 'Gerencia Financiera - Contabilidad', bold: true, font, size: 13, color: textMuted })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Formato de Solicitud de Alta de Proveedores', bold: true, font, size: 15, color: primaryColor })] })
+    ], 54, whiteBg));
+
+    formatoHeaderCells.push(makeCell([
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 8 }, children: [new TextRun({ text: 'Código: 10.F.S01.0006', bold: true, font, size: 12, color: darkNavy })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 8 }, children: [new TextRun({ text: 'Versión: 1', font, size: 12 })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Fecha: ${diaStr}/${mesStr.slice(0,3).toUpperCase()}/${anioStr}`, bold: true, font, size: 11, color: primaryColor })] })
+    ], 24, lightGrayBg));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
         borders: cellBorderSolid,
-        verticalAlign: 'center',
-        margins: { top: 30, bottom: 30, left: 40, right: 40 },
+        rows: [new TableRow({ children: formatoHeaderCells })]
+    }));
+
+    // NOTA OFICIAL SINSA DE LLENADO EN AZUL
+    children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 20, after: 20 },
+        shading: { fill: blueProviderBg },
+        borders: cellBorderSolid,
         children: [
-            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 15 }, children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A.', bold: true, font, size: 18, color: darkNavy })] }),
-            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 15 }, children: [new TextRun({ text: 'SINSA - GERENCIA ADMINISTRATIVA FINANCIERA', bold: true, font, size: 14, color: textMuted })] }),
-            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SOLICITUD ALTA DE PROVEEDORES', bold: true, font, size: 17, color: primaryColor })] })
+            new TextRun({ text: 'Nota Oficial: ', bold: true, font, size: 11, color: '1E3A8A' }),
+            new TextRun({ text: 'Los proveedores llenarán los campos que están en color azul (sombreado celeste), el resto de campos será completado por personal de SINSA.', italic: true, font, size: 11, color: '1E3A8A' })
         ]
     }));
 
-    formHeaderCells.push(new TableCell({
-        width: { size: 24, type: WidthType.PERCENTAGE },
-        borders: cellBorderSolid,
-        margins: { top: 25, bottom: 25, left: 40, right: 40 },
-        children: [
-            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 10 }, children: [new TextRun({ text: 'Código: 10.F.S01.0006', bold: true, font, size: 13, color: darkNavy })] }),
-            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 10 }, children: [new TextRun({ text: 'Versión: 01', font, size: 13 })] }),
-            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Fecha: ${diaStr} / ${mesStr} / ${anioStr}`, bold: true, font, size: 12, color: primaryColor })] })
-        ]
-    }));
-
-    children.push(new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: cellBorderSolid,
-        rows: [new TableRow({ children: formHeaderCells })]
-    }));
-
-    // SECCIÓN I: DATOS GENERALES (FUSION, RMS Y REIM)
-    children.push(new Paragraph({
-        spacing: { before: 50, after: 20 },
-        children: [new TextRun({ text: 'I - DATOS GENERALES (FUSION, RMS Y REIM)', bold: true, font, size: 14, color: 'FFFFFF' })],
-        shading: { fill: '0F172A' }
-    }));
+    // -------------------------------------------------------------------------
+    // I- DATOS GENERALES (FUSION, RMS Y REIM)
+    // -------------------------------------------------------------------------
+    children.push(createSectionHeader('I- DATOS GENERALES (FUSION, RMS Y REIM)'));
 
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
@@ -8676,78 +8647,64 @@ async function buildProviderOnboardingKitDocx(data = {}) {
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 70, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'PROVEEDOR O RAZÓN SOCIAL: ', bold: true, font, size: 13, color: darkNavy }),
-                                    new TextRun({ text: provName || '________________________________________________________', bold: !!provName, font, size: 13, color: provName ? '00A859' : textMuted })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 30, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'DÍA: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: `${diaStr}   `, font, size: 12 }),
-                                    new TextRun({ text: 'MES: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: `${mesStr.slice(0, 3).toUpperCase()}   `, font, size: 12 }),
-                                    new TextRun({ text: 'AÑO: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: anioStr, font, size: 12 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'PROVEEDOR O RAZÓN SOCIAL: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: provName || '________________________________________________', bold: !!provName, font, size: 11, color: provName ? primaryColor : darkNavy })
+                            ]
+                        })
+                    ], 70, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'DÍA: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: `${diaStr}   `, font, size: 11 }),
+                                new TextRun({ text: 'MES: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: `${mesStr.slice(0, 3).toUpperCase()}   `, font, size: 11 }),
+                                new TextRun({ text: 'AÑO: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: anioStr, font, size: 11 })
+                            ]
+                        })
+                    ], 30, blueProviderBg)
                 ]
             }),
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 40, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'TIPO DE GESTIÓN: ', bold: true, font, size: 13, color: darkNavy }),
-                                    new TextRun({ text: '☒ Alta Nueva   ☐ Actualización   ☐ Compra Única', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 60, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'BENEFICIARIO ACREDITADO: ', bold: true, font, size: 13, color: darkNavy }),
-                                    new TextRun({ text: titular || repName || provName || '____________________________________', font, size: 13 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'TIPO DE GESTIÓN: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: '☒ Nuevo proveedor   ☐ Actualización   ☐ Compra Única', font, size: 10 })
+                            ]
+                        })
+                    ], 35, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'TIPO PROVEEDOR: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: '☒ Servicios   ☐ Nacional   ☐ Extranjero', font, size: 10 })
+                            ]
+                        })
+                    ], 25, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'BENEFICIARIO: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: titular || repName || provName || '__________________________________', font, size: 10 })
+                            ]
+                        })
+                    ], 40, blueProviderBg)
                 ]
             })
         ]
     }));
 
-    // SECCIÓN II: DATOS DE CONTACTO Y UBICACIÓN (FUSION Y RMS)
-    children.push(new Paragraph({
-        spacing: { before: 40, after: 20 },
-        children: [new TextRun({ text: 'II - DATOS DE CONTACTO Y UBICACIÓN (FUSION Y RMS)', bold: true, font, size: 14, color: 'FFFFFF' })],
-        shading: { fill: '0F172A' }
-    }));
+    // -------------------------------------------------------------------------
+    // II- DATOS GENERALES (FUSION y RMS)
+    // -------------------------------------------------------------------------
+    children.push(createSectionHeader('II- DATOS GENERALES (FUSION y RMS)'));
 
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
@@ -8756,130 +8713,192 @@ async function buildProviderOnboardingKitDocx(data = {}) {
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 65, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'NOMBRE COMPLETO DEL CONTACTO: ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: repName || '______________________________________________', font, size: 13 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 35, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'TELÉFONO / CELULAR: ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: tel || '_______________________', font, size: 13 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'NOMBRE COMPLETO DEL CONTACTO: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: repName || '________________________________________', font, size: 11 })
+                            ]
+                        })
+                    ], 65, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'MUNICIPIO: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: data.municipio || 'Managua', font, size: 11 })
+                            ]
+                        })
+                    ], 35, blueProviderBg)
                 ]
             }),
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 40, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'E-MAIL: ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: correo || '______________________________', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 30, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'MÉTODO DE PAGO: ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: '☒ Transferencia   ☐ Cheque', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 30, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'CONDICIÓN PAGO: ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: condicionPago === 'SEMANAL' ? '☒ Semanal   ☐ Crédito' : '☐ Semanal   ☒ Crédito', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'TELÉFONO: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: tel || '__________________', font, size: 11 })
+                            ]
+                        })
+                    ], 25, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'COLONIA: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: data.colonia || data.barrio || '__________________', font, size: 11 })
+                            ]
+                        })
+                    ], 25, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'PAÍS: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: 'Nicaragua', font, size: 11 })
+                            ]
+                        })
+                    ], 25, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'ESTADO: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: data.departamento || 'Managua', font, size: 11 })
+                            ]
+                        })
+                    ], 25, blueProviderBg)
                 ]
             }),
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 100, type: WidthType.PERCENTAGE },
-                        columnSpan: 3,
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'DIRECCIÓN FISCAL: ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: dir || '________________________________________________________________________________________', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'E-MAIL: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: correo || '____________________________________', font, size: 10 })
+                            ]
+                        })
+                    ], 40, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'FAX: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: data.fax || '—', font, size: 10 })
+                            ]
+                        })
+                    ], 15, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'CÓDIGO POSTAL: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: data.codigo_postal || '10000', font, size: 10 })
+                            ]
+                        })
+                    ], 20, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'CIUDAD: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: data.ciudad || 'Managua', font, size: 10 })
+                            ]
+                        })
+                    ], 25, blueProviderBg)
                 ]
             }),
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 100, type: WidthType.PERCENTAGE },
-                        columnSpan: 3,
-                        borders: cellBorderSolid,
-                        shading: { fill: 'F8FAFC' },
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'CONTACTO OPERATIVO PARA DESPACHO DE OTs: ', bold: true, font, size: 13, color: primaryColor }),
-                                    new TextRun({ text: contactoOp || 'Nombre y Teléfono de Cuadrilla Técnica: _____________________________________________', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'MÉTODO DE PAGO: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: 'Transferencia Bancaria', font, size: 10 })
+                            ]
+                        })
+                    ], 35, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'CONDICIONES DE PAGO: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: condicionPago === 'SEMANAL' ? 'Semanal (7 días)' : condicionPago, font, size: 10 })
+                            ]
+                        })
+                    ], 35, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'CÓDIGO FUSIÓN: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: '[ Uso Interno SINSA ]', font, size: 9, color: textMuted })
+                            ]
+                        })
+                    ], 30, whiteBg)
+                ]
+            }),
+            // Direcciones 1, 2 y 3
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([
+                        new Paragraph({ children: [new TextRun({ text: 'DIRECCIÓN 1: ', bold: true, font, size: 11 }), new TextRun({ text: dir || '________________________________________________________', font, size: 10 })] })
+                    ], 65, blueProviderBg),
+                    makeCell([
+                        new Paragraph({ children: [new TextRun({ text: 'CONTACTO: ', bold: true, font, size: 11 }), new TextRun({ text: repName || '________________________', font, size: 10 })] })
+                    ], 35, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CIUDAD 1: ', bold: true, font, size: 10 }), new TextRun({ text: data.ciudad || 'Managua', font, size: 10 })] })], 35, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PAIS: ', bold: true, font, size: 10 }), new TextRun({ text: 'Nicaragua', font, size: 10 })] })], 35, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'ESTADO: ', bold: true, font, size: 10 }), new TextRun({ text: data.departamento || 'Managua', font, size: 10 })] })], 30, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([
+                        new Paragraph({ children: [new TextRun({ text: 'DIRECCIÓN 2: ', bold: true, font, size: 11 }), new TextRun({ text: contactoOp ? `Base Operativa: ${contactoOp}` : '________________________________________________________', font, size: 10 })] })
+                    ], 65, blueProviderBg),
+                    makeCell([
+                        new Paragraph({ children: [new TextRun({ text: 'CONTACTO: ', bold: true, font, size: 11 }), new TextRun({ text: data.contacto_secundario || '________________________', font, size: 10 })] })
+                    ], 35, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CIUDAD 2: ', bold: true, font, size: 10 }), new TextRun({ text: data.ciudad || 'Managua', font, size: 10 })] })], 35, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PAIS: ', bold: true, font, size: 10 }), new TextRun({ text: 'Nicaragua', font, size: 10 })] })], 35, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'ESTADO: ', bold: true, font, size: 10 }), new TextRun({ text: data.departamento || 'Managua', font, size: 10 })] })], 30, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([
+                        new Paragraph({ children: [new TextRun({ text: 'DIRECCIÓN 3: ', bold: true, font, size: 11 }), new TextRun({ text: '________________________________________________________', font, size: 10 })] })
+                    ], 65, blueProviderBg),
+                    makeCell([
+                        new Paragraph({ children: [new TextRun({ text: 'CONTACTO: ', bold: true, font, size: 11 }), new TextRun({ text: '________________________', font, size: 10 })] })
+                    ], 35, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CIUDAD 3: ', bold: true, font, size: 10 }), new TextRun({ text: '________________________', font, size: 10 })] })], 35, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PAIS: ', bold: true, font, size: 10 }), new TextRun({ text: 'Nicaragua', font, size: 10 })] })], 35, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'ESTADO: ', bold: true, font, size: 10 }), new TextRun({ text: '________________________', font, size: 10 })] })], 30, blueProviderBg)
                 ]
             })
         ]
     }));
 
-    // SECCIÓN III: DATOS GENERALES (FUSION) Y DATOS BANCARIOS
-    children.push(new Paragraph({
-        spacing: { before: 40, after: 20 },
-        children: [new TextRun({ text: 'III - DATOS FISCALES Y BANCARIOS (FUSION)', bold: true, font, size: 14, color: 'FFFFFF' })],
-        shading: { fill: '0F172A' }
-    }));
-
-    const isCuotaFija = regimen.includes('Cuota Fija');
-    const isRegGeneral = regimen.includes('General');
-    const isNoDgi = regimen.includes('No Inscrita');
+    // -------------------------------------------------------------------------
+    // III- DATOS GENERALES (FUSION)
+    // -------------------------------------------------------------------------
+    children.push(createSectionHeader('III- DATOS GENERALES (FUSION)'));
 
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
@@ -8888,187 +8907,197 @@ async function buildProviderOnboardingKitDocx(data = {}) {
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 40, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'TIPO ORGANIZACIÓN FISCAL: ', bold: true, font, size: 12 }),
-                                    new TextRun({
-                                        text: `${isRegGeneral ? '☒' : '☐'} Rég. General   ${isCuotaFija ? '☒' : '☐'} Cuota Fija   ${isNoDgi ? '☒' : '☐'} P. Natural`,
-                                        font, size: 12
-                                    })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 30, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'TIPO PROVEEDOR: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: 'Servicios de Instalación', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 30, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'RELACIÓN COMERCIAL: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: 'Contratista Maestro', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'TIPO DE ORGANIZACIÓN FISCAL: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: regimen || 'Régimen de Cuota Fija', font, size: 10 })
+                            ]
+                        })
+                    ], 35, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'TIPO DE PROVEEDOR: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: 'Servicios de Instalación', font, size: 10 })
+                            ]
+                        })
+                    ], 35, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'RELACIÓN COMERCIAL: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: 'Contratista de Climatización / A/A', font, size: 10 })
+                            ]
+                        })
+                    ], 30, blueProviderBg)
                 ]
             }),
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 40, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'RUC / CÉDULA: ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: (ruc || cedula) ? `${ruc ? 'RUC: ' + ruc + ' ' : ''}${cedula ? 'Céd: ' + cedula : ''}` : '____________________________________', bold: !!(ruc || cedula), font, size: 13, color: (ruc || cedula) ? '00A859' : textMuted })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 30, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'RESPONSABLE IVA: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: isRegGeneral ? '☒ SÍ   ☐ NO' : '☐ SÍ   ☒ NO', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 30, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'RETENCIÓN IMPUESTOS: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: '☒ Aplica Retención   ☐ No Retención', font, size: 11 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'RUC O N° DE REGISTRO FISCAL: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: (ruc || cedula || '________________________'), bold: !!(ruc || cedula), font, size: 11, color: (ruc || cedula) ? primaryColor : darkNavy })
+                            ]
+                        })
+                    ], 40, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'IVA: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: isRegGeneral ? 'SÍ (Responsable)' : 'NO (Exento / Cuota Fija)', font, size: 10 })
+                            ]
+                        })
+                    ], 30, blueProviderBg),
+                    makeCell([
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: 'RETENCIÓN DE IMPUESTOS: ', bold: true, font, size: 11 }),
+                                new TextRun({ text: 'Aplica Retención de Ley', font, size: 10 })
+                            ]
+                        })
+                    ], 30, blueProviderBg)
                 ]
             }),
-            // BANCO
+            // BANCO DEL PROVEEDOR
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 100, type: WidthType.PERCENTAGE },
-                        columnSpan: 3,
-                        borders: cellBorderSolid,
-                        shading: { fill: 'F1F5F9' },
-                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'DATOS BANCARIOS DEL PROVEEDOR PARA TRANSFERENCIA SINSA:', bold: true, font, size: 13, color: primaryColor })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'DATOS BANCARIOS DEL PROVEEDOR:', bold: true, font, size: 11, color: darkNavy })] })], 100, lightGrayBg, 3)
                 ]
             }),
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 50, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'INSTITUCIÓN BANCARIA: ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: banco || 'BAC Credomatic', bold: true, font, size: 13, color: darkNavy })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 50, type: WidthType.PERCENTAGE },
-                        columnSpan: 2,
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'Nº CUENTA EN CÓRDOBAS (C$): ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: cuenta || '______________________________________', bold: !!cuenta, font, size: 13, color: cuenta ? '00A859' : textMuted })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'N° DE CUENTA: ', bold: true, font, size: 11 }), new TextRun({ text: cuenta || '______________________________', bold: !!cuenta, font, size: 11, color: cuenta ? primaryColor : darkNavy })] })], 50, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'NOMBRE DE LA CUENTA: ', bold: true, font, size: 11 }), new TextRun({ text: titular || provName || '______________________________', font, size: 11 })] })], 50, blueProviderBg, 2)
                 ]
             }),
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 60, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'TITULAR DE LA CUENTA ACREDITADA: ', bold: true, font, size: 13 }),
-                                    new TextRun({ text: titular || '________________________________________________', bold: !!titular, font, size: 13 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 40, type: WidthType.PERCENTAGE },
-                        columnSpan: 2,
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'TIPO DE CUENTA: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: '☒ Corriente / Monetaria   ☐ Ahorros', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'BANCO DEL PROVEEDOR: ', bold: true, font, size: 11 }), new TextRun({ text: banco || 'BAC Credomatic', bold: true, font, size: 11, color: darkNavy })] })], 100, blueProviderBg, 3)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'IBAN: ', bold: true, font, size: 10 }), new TextRun({ text: data.iban || 'N/A', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'ABBA: ', bold: true, font, size: 10 }), new TextRun({ text: data.abba || 'N/A', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CLAVE: ', bold: true, font, size: 10 }), new TextRun({ text: data.clave || 'N/A', font, size: 10 })] })], 34, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'MONEDA: ', bold: true, font, size: 10 }), new TextRun({ text: 'Córdobas (C$)', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'SWIFT: ', bold: true, font, size: 10 }), new TextRun({ text: data.swift || 'N/A', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PAIS: ', bold: true, font, size: 10 }), new TextRun({ text: 'Nicaragua', font, size: 10 })] })], 34, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'SUCURSAL BANCARIA: ', bold: true, font, size: 10 }), new TextRun({ text: data.sucursal || 'Principal Managua', font, size: 10 })] })], 50, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CORRESPONSAL: ', bold: true, font, size: 10 }), new TextRun({ text: data.corresponsal || 'N/A', font, size: 10 })] })], 50, blueProviderBg, 2)
+                ]
+            }),
+            // BANCO BENEFICIARIO
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'DATOS DEL BANCO BENEFICIARIO:', bold: true, font, size: 11, color: darkNavy })] })], 100, lightGrayBg, 3)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'N° DE CUENTA: ', bold: true, font, size: 11 }), new TextRun({ text: cuenta || '______________________________', font, size: 11 })] })], 50, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'NOMBRE DE LA CUENTA: ', bold: true, font, size: 11 }), new TextRun({ text: titular || provName || '______________________________', font, size: 11 })] })], 50, blueProviderBg, 2)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'BANCO BENEFICIARIO: ', bold: true, font, size: 11 }), new TextRun({ text: banco || 'BAC Credomatic', font, size: 11 })] })], 100, blueProviderBg, 3)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'IBAN: ', bold: true, font, size: 10 }), new TextRun({ text: 'N/A', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'ABBA: ', bold: true, font, size: 10 }), new TextRun({ text: 'N/A', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CLAVE: ', bold: true, font, size: 10 }), new TextRun({ text: 'N/A', font, size: 10 })] })], 34, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'MONEDA: ', bold: true, font, size: 10 }), new TextRun({ text: 'Córdobas (C$)', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'SWIFT: ', bold: true, font, size: 10 }), new TextRun({ text: 'N/A', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PAIS: ', bold: true, font, size: 10 }), new TextRun({ text: 'Nicaragua', font, size: 10 })] })], 34, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'SUCURSAL BANCARIA: ', bold: true, font, size: 10 }), new TextRun({ text: data.sucursal || 'Principal', font, size: 10 })] })], 50, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CORRESPONSAL: ', bold: true, font, size: 10 }), new TextRun({ text: 'N/A', font, size: 10 })] })], 50, blueProviderBg, 2)
+                ]
+            }),
+            // BANCO INTERMEDIARIO
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'DATOS DEL BANCO INTERMEDIARIO (Si aplica):', bold: true, font, size: 11, color: darkNavy })] })], 100, lightGrayBg, 3)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'N° DE CUENTA: ', bold: true, font, size: 11 }), new TextRun({ text: '______________________________', font, size: 11 })] })], 50, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'NOMBRE DE LA CUENTA: ', bold: true, font, size: 11 }), new TextRun({ text: '______________________________', font, size: 11 })] })], 50, blueProviderBg, 2)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'BANCO INTERMEDIARIO: ', bold: true, font, size: 11 }), new TextRun({ text: '______________________________', font, size: 11 })] })], 100, blueProviderBg, 3)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'IBAN: ', bold: true, font, size: 10 }), new TextRun({ text: 'N/A', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'ABBA: ', bold: true, font, size: 10 }), new TextRun({ text: 'N/A', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CLAVE: ', bold: true, font, size: 10 }), new TextRun({ text: 'N/A', font, size: 10 })] })], 34, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'MONEDA: ', bold: true, font, size: 10 }), new TextRun({ text: 'Córdobas (C$)', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'SWIFT: ', bold: true, font, size: 10 }), new TextRun({ text: 'N/A', font, size: 10 })] })], 33, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PAIS: ', bold: true, font, size: 10 }), new TextRun({ text: 'Nicaragua', font, size: 10 })] })], 34, blueProviderBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'SUCURSAL BANCARIA: ', bold: true, font, size: 10 }), new TextRun({ text: '—', font, size: 10 })] })], 50, blueProviderBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CORRESPONSAL: ', bold: true, font, size: 10 }), new TextRun({ text: '—', font, size: 10 })] })], 50, blueProviderBg, 2)
                 ]
             })
         ]
     }));
 
-    // SECCIÓN IV: TÉRMINOS OPERATIVOS Y COMERCIALES (RMS)
-    children.push(new Paragraph({
-        spacing: { before: 40, after: 20 },
-        children: [new TextRun({ text: 'IV - TÉRMINOS OPERATIVOS Y COMERCIALES (RMS)', bold: true, font, size: 14, color: 'FFFFFF' })],
-        shading: { fill: '0F172A' }
-    }));
+    // -------------------------------------------------------------------------
+    // IV- TÉRMINOS FISCALES (RMS) - Completado por personal de SINSA
+    // -------------------------------------------------------------------------
+    children.push(createSectionHeader('IV- TÉRMINOS FISCALES (RMS) '));
 
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
@@ -9077,75 +9106,54 @@ async function buildProviderOnboardingKitDocx(data = {}) {
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 25, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'MONEDA DE PAGO: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: 'Córdobas (C$)', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 25, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'FACTURACIÓN: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: 'En Córdobas (C$)', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 50, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'COBERTURA TERRITORIAL: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: tipoCobertura === 'FORANEA' ? '☒ Foránea (Departamental)   ☐ Managua Urbana' : '☒ Managua Urbana (Radio 14 Km)   ☐ Foránea', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CONDICIONES DE FLETE: ', bold: true, font, size: 10 }), new TextRun({ text: 'Flete Pagado', font, size: 10 })] })], 33, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'COMPONENTE: ', bold: true, font, size: 10 }), new TextRun({ text: 'Servicios', font, size: 10 })] })], 33, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'MÉTODO DE ENVÍO: ', bold: true, font, size: 10 }), new TextRun({ text: 'Terrestre / Camión', font, size: 10 })] })], 34, whiteBg)
                 ]
             }),
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 100, type: WidthType.PERCENTAGE },
-                        columnSpan: 3,
-                        borders: cellBorderSolid,
-                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'ACTIVIDADES CONTRATADAS: ', bold: true, font, size: 12 }),
-                                    new TextRun({ text: '☒ Instalación Básica A/A (12k-24k BTU)   ☒ Mantenimiento Preventivo / General   ☒ Desinstalación   ☐ Obras Accesorias', font, size: 12 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'POLITICA DE ENTREGA: ', bold: true, font, size: 10 }), new TextRun({ text: 'Siguiente día de entrega Programado', font, size: 10 })] })], 50, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PUERTO DE EMBARQUE: ', bold: true, font, size: 10 }), new TextRun({ text: 'Managua, Nicaragua', font, size: 10 })] })], 50, whiteBg, 2)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'MONEDA: ', bold: true, font, size: 10 }), new TextRun({ text: 'C$ (Córdobas)', font, size: 10 })] })], 25, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'DEVOLUCIONES PERMITIDAS: ', bold: true, font, size: 10 }), new TextRun({ text: 'SÍ', font, size: 10 })] })], 25, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'AUTORIZACIÓN NECESARIA: ', bold: true, font, size: 10 }), new TextRun({ text: 'SÍ', font, size: 10 })] })], 25, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PREMARCA: ', bold: true, font, size: 10 }), new TextRun({ text: 'SI', font, size: 10 })] })], 25, whiteBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'Confirmación necesaria de servicios realizados: ', bold: true, font, size: 9 }), new TextRun({ text: 'SÍ', font, size: 9 })] })], 30, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PLAZO: ', bold: true, font, size: 9 }), new TextRun({ text: '7 Días', font, size: 9 })] })], 15, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'EDT: ', bold: true, font, size: 9 }), new TextRun({ text: 'Inmediato', font, size: 9 })] })], 15, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'TIPO DIRECCIÓN: ', bold: true, font, size: 9 }), new TextRun({ text: 'Operativa', font, size: 9 })] })], 20, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'DIR. PRINCIPAL: ', bold: true, font, size: 9 }), new TextRun({ text: 'SÍ', font, size: 9 })] })], 20, whiteBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PUERTO DE DESCARGA: ', bold: true, font, size: 9 }), new TextRun({ text: 'Managua', font, size: 9 })] })], 20, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'FACTURA EN: ', bold: true, font, size: 9 }), new TextRun({ text: 'Córdobas (C$)', font, size: 9 })] })], 20, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'FACTURAS PREPAGADAS: ', bold: true, font, size: 9 }), new TextRun({ text: 'NO', font, size: 9 })] })], 20, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PERMITIR COBRAR FLETE: ', bold: true, font, size: 9 }), new TextRun({ text: 'NO', font, size: 9 })] })], 20, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CANT. ORDEN COMPRA: ', bold: true, font, size: 9 }), new TextRun({ text: 'Unidad', font, size: 9 })] })], 20, whiteBg)
                 ]
             })
         ]
     }));
 
-    // SECCIÓN V: DECLARATORIA DE ÉTICA, CUMPLIMIENTO Y SEGURIDAD OCUPACIONAL (POL.GLE.001)
-    children.push(new Paragraph({
-        spacing: { before: 40, after: 20 },
-        children: [new TextRun({ text: 'V - DECLARATORIA DE ÉTICA, CUMPLIMIENTO Y SEGURIDAD OCUPACIONAL (POL.GLE.001)', bold: true, font, size: 14, color: 'FFFFFF' })],
-        shading: { fill: '0F172A' }
-    }));
+    // -------------------------------------------------------------------------
+    // V- TÉRMINOS FISCALES (REIM) - Completado por personal de SINSA
+    // -------------------------------------------------------------------------
+    children.push(createSectionHeader('V- TÉRMINOS FISCALES (REIM) '));
 
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
@@ -9154,33 +9162,47 @@ async function buildProviderOnboardingKitDocx(data = {}) {
             new TableRow({
                 cantSplit: true,
                 children: [
-                    new TableCell({
-                        borders: cellBorderSolid,
-                        margins: { top: 25, bottom: 25, left: 50, right: 50 },
-                        children: [
-                            new Paragraph({
-                                alignment: AlignmentType.JUSTIFY,
-                                spacing: { line: 220 },
-                                children: [
-                                    new TextRun({
-                                        text: 'El suscrito, en su condición de Proveedor o Representante Legal debidamente facultado, declara bajo juramento que toda la información consignada en esta solicitud y los documentos de respaldo adjuntos son fidedignos, legítimos y vigentes. Asimismo, declara conocer y aceptar plenamente las políticas corporativas de SILVA INTERNACIONAL S.A. (SINSA), incluyendo la Política de Contratación de Proveedores (POL.GLE.001), la adhesión formal al Código de Ética y Conducta, y el cumplimiento ineludible de la Ley 618 (Ley General de Higiene y Seguridad del Trabajo), asumiendo la exclusiva responsabilidad laboral, civil y técnica del personal asignado para la ejecución de los servicios.',
-                                        font, size: 12, color: '334155'
-                                    })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'GRUPO DE PROVEEDORES: ', bold: true, font, size: 10 }), new TextRun({ text: 'Servicios de Instalación y Climatización Residencial y Comercial', font, size: 10 })] })], 100, whiteBg, 3)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'ENVIAR NOTA DE DÉBITO: ', bold: true, font, size: 10 }), new TextRun({ text: 'SÍ', font, size: 10 })] })], 50, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'ESTRATEGIA DE CONFRONTACIÓN: ', bold: true, font, size: 10 }), new TextRun({ text: '3 Vías (OC - Recepción - Factura)', font, size: 10 })] })], 50, whiteBg, 2)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'REVISOR DE CUENTAS A PAGAR: ', bold: true, font, size: 10 }), new TextRun({ text: 'Analista Cuentas por Pagar', font, size: 10 })] })], 33, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'DÍAS DISCREPANCIA ANTES ENRUTAMIENTO: ', bold: true, font, size: 10 }), new TextRun({ text: '3 días', font, size: 10 })] })], 33, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'Utiliza siempre condiciones factura: ', bold: true, font, size: 10 }), new TextRun({ text: 'SÍ', font, size: 10 })] })], 34, whiteBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'Factura para pago manual por proveedor: ', bold: true, font, size: 10 }), new TextRun({ text: 'NO', font, size: 10 })] })], 33, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'Cantidad total de confrontación: ', bold: true, font, size: 10 }), new TextRun({ text: 'SÍ', font, size: 10 })] })], 33, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'Confrontación principal en línea: ', bold: true, font, size: 10 }), new TextRun({ text: 'SÍ', font, size: 10 })] })], 34, whiteBg)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'Permite fecha devolución productos: ', bold: true, font, size: 10 }), new TextRun({ text: 'SÍ', font, size: 10 })] })], 33, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'Retiene facturas hasta recibir NC: ', bold: true, font, size: 10 }), new TextRun({ text: 'SÍ', font, size: 10 })] })], 33, whiteBg),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'Cant. total cabecera necesaria: ', bold: true, font, size: 10 }), new TextRun({ text: 'SÍ', font, size: 10 })] })], 34, whiteBg)
                 ]
             })
         ]
     }));
 
-    // SECCIÓN VI: CUADRO DE RÚBRICAS Y FIRMAS
-    children.push(new Paragraph({
-        spacing: { before: 40, after: 20 },
-        children: [new TextRun({ text: 'VI - CUADRO DE RÚBRICAS Y AUTORIZACIONES OFICIALES', bold: true, font, size: 14, color: 'FFFFFF' })],
-        shading: { fill: '0F172A' }
-    }));
+    // -------------------------------------------------------------------------
+    // VI- RÚBRICAS
+    // -------------------------------------------------------------------------
+    children.push(createSectionHeader('VI- RÚBRICAS '));
 
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
@@ -9192,38 +9214,50 @@ async function buildProviderOnboardingKitDocx(data = {}) {
                     new TableCell({
                         width: { size: 33, type: WidthType.PERCENTAGE },
                         borders: cellBorderSolid,
+                        shading: { fill: whiteBg },
                         margins: { top: 60, bottom: 25, left: 30, right: 30 },
                         children: [
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '_______________________________', font, size: 13, color: textMuted })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 20 }, children: [new TextRun({ text: 'USUARIO / GESTOR SOLICITANTE', bold: true, font, size: 13, color: darkNavy })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Operaciones de Servicios / Instalaciones', font, size: 11, color: textMuted })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SINSA Nicaragua', font, size: 11, color: textMuted })] })
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '_______________________________', font, size: 12, color: textMuted })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 15 }, children: [new TextRun({ text: 'USUARIO O GESTOR', bold: true, font, size: 12, color: darkNavy })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Operaciones de Servicios', font, size: 10, color: textMuted })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SINSA Nicaragua', font, size: 10, color: textMuted })] })
                         ]
                     }),
                     new TableCell({
                         width: { size: 34, type: WidthType.PERCENTAGE },
                         borders: cellBorderSolid,
+                        shading: { fill: whiteBg },
                         margins: { top: 60, bottom: 25, left: 30, right: 30 },
                         children: [
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '_______________________________', font, size: 13, color: textMuted })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 20 }, children: [new TextRun({ text: 'AUTORIZADO POR', bold: true, font, size: 13, color: darkNavy })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Gerencia Administrativa Financiera', font, size: 11, color: textMuted })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Cuentas por Pagar / Tesorería', font, size: 11, color: textMuted })] })
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '_______________________________', font, size: 12, color: textMuted })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 15 }, children: [new TextRun({ text: 'AUTORIZADO POR', bold: true, font, size: 12, color: darkNavy })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Gerencia Financiera - Contabilidad', font, size: 10, color: textMuted })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Cuentas por Pagar', font, size: 10, color: textMuted })] })
                         ]
                     }),
                     new TableCell({
                         width: { size: 33, type: WidthType.PERCENTAGE },
                         borders: cellBorderSolid,
+                        shading: { fill: blueProviderBg },
                         margins: { top: 60, bottom: 25, left: 30, right: 30 },
                         children: [
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '_______________________________', font, size: 13, color: textMuted })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 20 }, children: [new TextRun({ text: 'PROVEEDOR / CONTRATISTA', bold: true, font, size: 13, color: primaryColor })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: repName || provName || 'Firma y Sello Oficial', bold: !!(repName || provName), font, size: 12, color: darkNavy })] }),
-                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Aceptación de Términos y Veracidad', font, size: 11, color: textMuted })] })
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '_______________________________', font, size: 12, color: darkNavy })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 15 }, children: [new TextRun({ text: 'PROVEEDOR', bold: true, font, size: 12, color: primaryColor })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: repName || provName || 'Firma y Sello Oficial', bold: !!(repName || provName), font, size: 11, color: darkNavy })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Aceptación y Veracidad', font, size: 10, color: textMuted })] })
                         ]
                     })
                 ]
             })
+        ]
+    }));
+
+    // Pie final del documento oficial
+    children.push(new Paragraph({
+        alignment: AlignmentType.LEFT,
+        spacing: { before: 30 },
+        children: [
+            new TextRun({ text: 'Nota: Los proveedores, llenarán los campos que están en color azul, el resto de campos será completado por personal de SINSA.', italic: true, font, size: 10, color: textMuted })
         ]
     }));
 
@@ -9248,7 +9282,7 @@ async function buildProviderOnboardingKitDocx(data = {}) {
                         new Paragraph({
                             alignment: AlignmentType.RIGHT,
                             children: [
-                                new TextRun({ text: 'SINSA | Kit de Alta de Proveedores - POL.GLE.001 / 10.P.S01.0001 / 10.F.S01.0006', font, size: 13, color: textMuted })
+                                new TextRun({ text: 'SINSA | Kit de Alta de Proveedores - POL.GLE.001 / 10.P.S01.0001 / Formato 10.F.S01.0006', font, size: 11, color: textMuted })
                             ]
                         })
                     ]
@@ -9260,11 +9294,11 @@ async function buildProviderOnboardingKitDocx(data = {}) {
                         new Paragraph({
                             alignment: AlignmentType.SPACE_BETWEEN,
                             children: [
-                                new TextRun({ text: 'SILVA INTERNACIONAL S.A. - Documento Oficial Confidencial para Alta de Contratistas', font, size: 13, color: textMuted }),
-                                new TextRun({ text: 'Página ', font, size: 13, color: textMuted }),
-                                new TextRun({ children: [PageNumber.CURRENT], font, size: 13, color: textMuted }),
-                                new TextRun({ text: ' de ', font, size: 13, color: textMuted }),
-                                new TextRun({ children: [PageNumber.TOTAL_PAGES], font, size: 13, color: textMuted })
+                                new TextRun({ text: 'SILVA INTERNACIONAL S.A. - Documento Oficial de Alta de Contratistas', font, size: 11, color: textMuted }),
+                                new TextRun({ text: 'Página ', font, size: 11, color: textMuted }),
+                                new TextRun({ children: [PageNumber.CURRENT], font, size: 11, color: textMuted }),
+                                new TextRun({ text: ' de ', font, size: 11, color: textMuted }),
+                                new TextRun({ children: [PageNumber.TOTAL_PAGES], font, size: 11, color: textMuted })
                             ]
                         })
                     ]
@@ -9291,7 +9325,7 @@ async function downloadProviderOnboardingKitDocx(isCurrentData = true) {
         if (blob && blob.size > 1000) {
             const fileName = `KIT_ALTA_PROVEEDOR_SINSA_10.F.S01.0006_${safeName}.docx`;
             saveBlobAsFile(blob, fileName);
-            alert(`📥 Kit de Alta de Proveedor descargado exitosamente:\n\n📄 Archivo: ${fileName}\n\nIncluye:\n1. Checklist oficial de requisitos según régimen (POL.GLE.001 / 10.P.S01.0001)\n2. Formato de Solicitud de Alta de Proveedores (10.F.S01.0006) listo para entregar al contratista.`);
+            alert(`📥 Kit de Alta de Proveedor descargado exitosamente:\n\n📄 Archivo: ${fileName}\n\nIncluye:\n1. Checklist oficial de requisitos según régimen (POL.GLE.001 / 10.P.S01.0001) para completamiento por el contratista.\n2. Formato Oficial de Solicitud de Alta de Proveedores (10.F.S01.0006) respetando estrictamente las secciones de SINSA (I a VI) con campos azul para el contratista.`);
         } else {
             throw new Error("El archivo generado está vacío.");
         }
@@ -9313,6 +9347,9 @@ function downloadProviderOnboardingKitExcel(isCurrentData = true) {
         const provName = (data.nombre_comercial || data.nombre || '').trim();
         const repName = (data.nombre_representante || '').trim();
         const regimen = data.regimen || 'Régimen de Cuota Fija';
+        const isRegGeneral = regimen.includes('General');
+        const isCuotaFija = regimen.includes('Cuota Fija');
+        const isCompraUnica = regimen.includes('Compra Única') || regimen.includes('Natural') || regimen.includes('No Inscrita');
         const cedula = (data.cedula || '').trim();
         const ruc = (data.ruc || '').trim();
         const tel = (data.telefono || '').trim();
@@ -9332,110 +9369,150 @@ function downloadProviderOnboardingKitExcel(isCurrentData = true) {
         const anioStr = String(data.anio || now.getFullYear());
         const fechaCompleta = `${diaStr} de ${mesStr} de ${anioStr}`;
 
-        // 1. PESTAÑA CHECKLIST DE REQUISITOS
+        // =====================================================================
+        // 1. PESTAÑA: CHECKLIST_COMPLETAMIENTO (Para completamiento por el proveedor)
+        // =====================================================================
         const checklistData = [
             ["SILVA INTERNACIONAL S.A. (SINSA)"],
-            ["GERENCIA ADMINISTRATIVA FINANCIERA / GESTIÓN LEGAL"],
-            ["CHECKLIST DE REQUISITOS PARA ALTA DE PROVEEDORES (POL.GLE.001 / 10.P.S01.0001)"],
+            ["GERENCIA FINANCIERA - CONTABILIDAD / CUENTAS POR PAGAR"],
+            ["LISTA DE CHEQUEO DE RECAUDOS PARA ALTA DE PROVEEDORES (POL.GLE.001 / 10.P.S01.0001)"],
+            ["Control de Completamiento y Entrega por el Contratista"],
             [],
             ["DATOS DEL CONTRATISTA:"],
-            ["Proveedor / Razón Social:", provName || "______________________________", "Fecha de Emisión:", fechaCompleta],
-            ["Titular / Representante:", repName || "______________________________", "Régimen Fiscal:", regimen],
-            ["Teléfono / Contacto:", tel || "______________________________", "Correo Electrónico:", correo || "______________________________"],
+            ["Proveedor / Razón Social:", provName || "______________________________", "", "Fecha de Emisión:", fechaCompleta],
+            ["Titular / Representante Legal:", repName || "______________________________", "", "Régimen Fiscal:", regimen],
+            ["Cédula de Identidad / RUC:", (ruc || cedula) || "______________________________", "", "Condición de Pago:", condicionPago],
+            ["Teléfono de Contacto:", tel || "______________________________", "", "Correo Electrónico:", correo || "______________________________"],
             [],
-            ["Nº", "DOCUMENTO / REQUISITO EXIGIDO", "RÉGIMEN GENERAL", "CUOTA FIJA", "PERSONA NATURAL (NO DGI)", "ESPECIFICACIÓN / FORMA DE ENTREGA", "CHECK ENTREGA"],
-            ["1", "Formato Solicitud de Alta de Proveedores (Código 10.F.S01.0006)", "OBLIGATORIO", "OBLIGATORIO", "OBLIGATORIO", "Físico original firmado y sellado (pestaña Formato_10.F.S01.0006)", ""],
-            ["2", "Cédula de Identidad Vigente del Titular o Representante Legal", "OBLIGATORIO", "OBLIGATORIO", "OBLIGATORIO", "Copia nítida y legible ambas caras (vigencia comprobable)", ""],
-            ["3", "Cédula RUC Vigente emitida por la DGI", "OBLIGATORIO", "OBLIGATORIO", "No Aplica", "Constancia oficial actualizada de inscripción tributaria", ""],
-            ["4", "Matrícula de Alcaldía Municipal del Año en Curso", "OBLIGATORIO", "OBLIGATORIO", "No Aplica", "Copia de matrícula del municipio donde opera el contratista", ""],
-            ["5", "Factura o Talonario en Blanco autorizado por DGI", "OBLIGATORIO", "OBLIGATORIO", "No Aplica", "Pie de imprenta válido, numeración y fecha de vencimiento (10.PO.S01.0006)", ""],
-            ["6", "Testimonio de Escritura de Constitución y Estatutos", "OBLIGATORIO", "No Aplica", "No Aplica", "Inscrita debidamente en el Registro Mercantil", ""],
-            ["7", "Poder Notarial del Representante Legal debidamente inscrito", "OBLIGATORIO", "No Aplica", "No Aplica", "Poder General o Especial inscrito en Registro Público", ""],
-            ["8", "Constancia de Inscripción en la DGI", "OBLIGATORIO", "No Aplica", "No Aplica", "Constancia oficial de actividad económica acreditada", ""],
-            ["9", "Constancia de Responsable Recaudador de IVA (o No Retención)", "OBLIGATORIO", "No Aplica", "No Aplica", "Constancia emitida por DGI para exención de retención en la fuente", ""],
-            ["10", "Solvencia Fiscal Actualizada emitida por la DGI", "OBLIGATORIO", "OBLIGATORIO", "No Aplica", "Certificación vigente al momento de radicar el expediente", ""],
-            ["11", "Certificado de Beneficiario Final actualizado", "OBLIGATORIO", "No Aplica", "No Aplica", "Declaración jurada conforme a la normativa mercantil vigente", ""],
-            ["12", "Constancia de Afiliación Patronal / Pagos al INSS", "OBLIGATORIO", "OBLIGATORIO", "Opcional", "Respaldo de seguro social de técnicos y cuadrilla (Cláusula Quinta)", ""],
-            ["13", "Certificación Bancaria Oficial de Cuenta en Córdobas (C$)", "OBLIGATORIO", "OBLIGATORIO", "OBLIGATORIO", "Constancia membretada del banco (BAC/BANPRO/LAFISE)", ""],
-            ["14", "Declaratoria de Adhesión al Código de Ética y Conducta SINSA", "OBLIGATORIO", "OBLIGATORIO", "OBLIGATORIO", "Carta firmada y sellada según política POL.GLE.001", ""],
+            ["N°", "DOCUMENTO / REQUISITO EXIGIDO POR SINSA", "RÉGIMEN EXIGIDO", "[X] ADJUNTO", "N° DE FOLIO / REFERENCIA", "FECHA EMISIÓN / VIGENCIA", "NOTAS / OBSERVACIONES DEL PROVEEDOR"],
+            ["1", "Formato Solicitud de Alta de Proveedores (Código 10.F.S01.0006)", "General / Cuota Fija / Compra Única", isCurrentData ? "[ X ]" : "[   ]", isCurrentData ? "10.F.S01.0006-ORIG" : "", isCurrentData ? `${diaStr}/${mesStr.slice(0,3)}/${anioStr}` : "", "Firmado y sellado en celdas azules"],
+            ["2", "Copia de Cédula de Identidad del Representante Legal / Titular", "General / Cuota Fija / Compra Única", isCurrentData && cedula ? "[ X ]" : "[   ]", isCurrentData ? cedula : "", isCurrentData ? "Vigente" : "", "Copia nítida ambas caras"],
+            ["3", "Copia de Cédula RUC emitida por la DGI", "General / Cuota Fija / Compra Única", isCurrentData && ruc ? "[ X ]" : "[   ]", isCurrentData ? ruc : "", isCurrentData ? "Actualizada" : "", "Constancia oficial actualizada DGI"],
+            ["4", "Copia de Matrícula de Alcaldía Municipal del Año en Curso", "General / Cuota Fija", "[   ]", "", isCurrentData ? anioStr : "", "Municipio de operaciones"],
+            ["5", "Copia de Factura o Talonario en Blanco autorizado por DGI", "General / Cuota Fija", "[   ]", "", isCurrentData ? "Vigente" : "", "Pie imprenta / numeración / vencimiento"],
+            ["6", "Copia de Acta de Constitución de la Empresa (Personería Jurídica)", "Régimen General", "[   ]", "", "", "Inscrita Registro Mercantil"],
+            ["7", "Poder General de Administración debidamente inscrito", "Régimen General", "[   ]", "", "", "Inscrito Registro Público"],
+            ["8", "Copia de Constancia de Inscripción en la DGI", "Régimen General", "[   ]", "", isCurrentData ? "Actualizada" : "", "Actividad económica acreditada"],
+            ["9", "Constancia de No Retención en la fuente emitida por DGI (si aplica)", "Régimen General (Opcional)", "[   ]", "", "", "Exención retención en la fuente"],
+            ["10", "Copia de Constancia de Responsable Recaudador de IVA", "General / Compra Única", "[   ]", "", isCurrentData ? "Vigente" : "", "Emisión DGI recaudador IVA"],
+            ["11", "Constancia de Afiliación Patronal / Pagos al INSS", "General / Cuota Fija", "[   ]", "", isCurrentData ? "Al día" : "", "Respaldo seguro social técnicos"],
+            ["12", "Certificación Bancaria Oficial de Cuenta en Córdobas (C$)", "General / Cuota Fija / Compra Única", isCurrentData && cuenta ? "[ X ]" : "[   ]", isCurrentData ? cuenta : "", isCurrentData ? "Reciente" : "", banco || "BAC Credomatic"],
+            ["13", "Carta de Adhesión al Código de Ética y Conducta SINSA (POL.GLE.001)", "General / Cuota Fija / Compra Única", "[   ]", "POL.GLE.001", isCurrentData ? `${diaStr}/${mesStr.slice(0,3)}/${anioStr}` : "", "Firmada y sellada por proveedor"],
             [],
-            ["INSTRUCCIONES DE ENTREGA:"],
-            ["1. Digital: Remitir expediente digitalizado en formato PDF legible a Cuentas por Pagar y Operaciones de Servicios."],
-            ["2. Físico: Los documentos originales se confrontan en Ventanilla de Proveedores SINSA según política 10.PO.S01.0006."],
-            ["3. Tiempo de resolución para alta en sistemas (Oracle Fusion / RMS / REIM): 2 días hábiles tras recibir el expediente completo."]
+            ["DECLARACIÓN JURADA DE VERACIDAD Y COMPLETAMIENTO DEL PROVEEDOR:"],
+            ["El suscrito declara bajo juramento que los documentos marcados en este checklist han sido verificados y adjuntados."],
+            ["Confirmo que toda la información es auténtica, legítima y vigente para la entrega oficial a SILVA INTERNACIONAL S.A."],
+            [],
+            ["Firma del Proveedor / Representante:", repName || provName || "______________________________", "Sello Oficial:", "[ Espacio para Sello ]", "Fecha:", fechaCompleta]
         ];
 
         const wsChecklist = XLSX.utils.aoa_to_sheet(checklistData);
         wsChecklist['!cols'] = [
             { wch: 5 },  // Nº
             { wch: 48 }, // Documento
-            { wch: 18 }, // General
-            { wch: 18 }, // Cuota Fija
-            { wch: 22 }, // No DGI
-            { wch: 45 }, // Especificación
-            { wch: 15 }  // Check
+            { wch: 22 }, // Régimen
+            { wch: 14 }, // Check
+            { wch: 22 }, // Folio
+            { wch: 18 }, // Vigencia
+            { wch: 35 }  // Notas
         ];
 
-        // 2. PESTAÑA FORMATO OFICIAL 10.F.S01.0006
+        // =====================================================================
+        // 2. PESTAÑA: FORMATO OFICIAL 10.F.S01.0006 (Estructura exacta oficial SINSA)
+        // =====================================================================
+        const fProv = isCurrentData ? (provName || "") : "";
+        const fRep = isCurrentData ? (repName || "") : "";
+        const fRuc = isCurrentData ? (ruc || cedula || "") : "";
+        const fTel = isCurrentData ? (tel || "") : "";
+        const fCorreo = isCurrentData ? (correo || "") : "";
+        const fDir = isCurrentData ? (dir || "") : "";
+        const fBanco = isCurrentData ? (banco || "BAC Credomatic") : "";
+        const fCuenta = isCurrentData ? (cuenta || "") : "";
+        const fTitular = isCurrentData ? (titular || repName || provName || "") : "";
+        const fCond = isCurrentData ? (condicionPago === "SEMANAL" ? "7 días" : condicionPago) : "";
+        const fRegimen = isCurrentData ? (regimen || "Régimen de Cuota Fija") : "";
+        const fDia = isCurrentData ? diaStr : "";
+        const fMes = isCurrentData ? mesStr.slice(0, 3).toUpperCase() : "";
+        const fAnio = isCurrentData ? anioStr : "";
+
         const formatoData = [
-            ["SILVA INTERNACIONAL S.A. - SINSA"],
-            ["GERENCIA ADMINISTRATIVA FINANCIERA - SOLICITUD ALTA DE PROVEEDORES"],
-            ["Código: 10.F.S01.0006 | Versión: 01 | Fecha: " + fechaCompleta],
+            ["", "", "SILVA INTERNACIONAL S.A.", "", "", "", "", "", "", "Código:"],
+            ["", "", "SINSA", "", "", "", "", "", "", "10.F.S01.0006"],
+            ["", "", "Gerencia Financiera - Contabilidad", "", "", "", "", "", "", "Versión:"],
+            ["", "", "Formato de Solictud de Alta de Proveedores ", "", "", "", "", "", "", "1"],
             [],
-            ["I - DATOS GENERALES (FUSION, RMS Y REIM)"],
-            ["PROVEEDOR O RAZÓN SOCIAL:", provName || ""],
-            ["TIPO DE GESTIÓN:", "ALTA DE NUEVO PROVEEDOR"],
-            ["BENEFICIARIO ACREDITADO:", titular || repName || provName || ""],
-            [],
-            ["II - DATOS DE CONTACTO Y UBICACIÓN (FUSION Y RMS)"],
-            ["NOMBRE COMPLETO DEL CONTACTO:", repName || ""],
-            ["TELÉFONO / CELULAR:", tel || ""],
-            ["CORREO ELECTRÓNICO:", correo || ""],
-            ["MÉTODO DE PAGO:", "TRANSFERENCIA BANCARIA"],
-            ["CONDICIÓN DE PAGO:", condicionPago],
-            ["DIRECCIÓN FISCAL:", dir || ""],
-            ["CONTACTO OPERATIVO PARA OTs:", contactoOp || ""],
-            [],
-            ["III - DATOS FISCALES Y BANCARIOS (FUSION)"],
-            ["TIPO DE ORGANIZACIÓN FISCAL:", regimen],
-            ["TIPO DE PROVEEDOR:", "SERVICIOS DE INSTALACIÓN Y MANTENIMIENTO DE A/A"],
-            ["RELACIÓN COMERCIAL:", "CONTRATISTA MAESTRO"],
-            ["RUC O CÉDULA:", ruc || cedula || ""],
-            ["RESPONSABLE DE IVA:", regimen.includes('General') ? "SÍ" : "NO"],
-            ["RETENCIÓN DE IMPUESTOS:", "APLICA RETENCIÓN EN LA FUENTE SEGÚN LEY"],
-            [],
-            ["DATOS BANCARIOS DEL PROVEEDOR PARA TRANSFERENCIA SINSA:"],
-            ["INSTITUCIÓN BANCARIA:", banco],
-            ["NÚMERO DE CUENTA EN CÓRDOBAS (C$):", cuenta || ""],
-            ["TITULAR DE LA CUENTA:", titular || ""],
-            ["TIPO DE CUENTA:", "CORRIENTE / MONETARIA"],
-            [],
-            ["IV - TÉRMINOS OPERATIVOS Y COMERCIALES (RMS)"],
-            ["MONEDA DE PAGO:", "C$ (CÓRDOBAS)"],
-            ["FACTURACIÓN:", "EN CÓRDOBAS (C$)"],
-            ["COBERTURA TERRITORIAL:", tipoCobertura === 'FORANEA' ? "FORÁNEA (DEPARTAMENTAL)" : "MANAGUA URBANA (RADIO 14 KM)"],
-            ["ACTIVIDADES CONTRATADAS:", "INSTALACIÓN BÁSICA DE A/A, MANTENIMIENTO PREVENTIVO/GENERAL, DESINSTALACIÓN"],
-            [],
-            ["V - DECLARATORIA DE ÉTICA, CUMPLIMIENTO Y SEGURIDAD OCUPACIONAL (POL.GLE.001)"],
-            ["El suscrito declara bajo juramento que toda la información consignada y los recaudos adjuntos son verídicos, legítimos y vigentes."],
-            ["Asimismo, declara conocer y aceptar formalmente las políticas de SILVA INTERNACIONAL S.A. (SINSA), el Código de Ética (POL.GLE.001)"],
-            ["y el cumplimiento ineludible de la Ley 618 de Higiene y Seguridad del Trabajo."],
-            [],
-            ["VI - CUADRO DE RÚBRICAS Y AUTORIZACIONES OFICIALES"],
-            ["GESTOR SOLICITANTE SINSA:", "AUTORIZADO POR FINANZAS:", "PROVEEDOR / REPRESENTANTE LEGAL:"],
-            ["Firma: ________________________", "Firma: ________________________", "Firma: ________________________"],
-            ["Operaciones de Servicios", "Cuentas por Pagar / Tesorería", repName || provName || "Firma y Sello Oficial"]
+            ["I- DATOS GENERALES (FUSION, RMS Y REIM)"],
+            ["PROVEEDOR O RAZÓN SOCIAL:", "", fProv, "", "", "", "", "", "", "DÍA", "MES", "AÑO"],
+            ["TIPO DE GESTIÓN:", isCurrentData ? "Nuevo proveedor" : "", "TIPO PROVEEDOR:", isCurrentData ? "Servicios" : "", "BENEFICIARIO:", fTitular, "", "", "", fDia, fMes, fAnio],
+            ["II- DATOS GENERALES (FUSION y RMS)"],
+            ["NOMBRE COMPLETO DEL CONTACTO:", "", fRep, "", "", "", "", "MUNICIPIO:", "", isCurrentData ? (data.municipio || "Managua") : ""],
+            ["TELÉFONO:", fTel, "COLONIA:", isCurrentData ? (data.colonia || data.barrio || "") : "", "", "", "PAÍS:", isCurrentData ? "Nicaragua" : "", "", "ESTADO:", "", isCurrentData ? (data.departamento || "Managua") : ""],
+            ["E-MAIL:", fCorreo, "", "FAX:", isCurrentData ? (data.fax || "") : "", "CÓDIGO POSTAL:", isCurrentData ? (data.codigo_postal || "10000") : "", "CIUDAD:", "", isCurrentData ? (data.ciudad || "Managua") : ""],
+            ["MÉTODO DE PAGO:", isCurrentData ? "Transferencia Bancaria" : "", "CONDICIONES DE PAGO:", "", fCond, "CÓDIGO FUSIÓN:"],
+            ["DIRECCIÓN 1:", fDir, "", "", "", "", "CONTACTO:", fRep],
+            ["CIUDAD 1:", isCurrentData ? (data.ciudad || "Managua") : "", "", "PAIS:", isCurrentData ? "Nicaragua" : "", "", "ESTADO:", isCurrentData ? (data.departamento || "Managua") : ""],
+            ["DIRECCIÓN 2:", isCurrentData && contactoOp ? ("Base Operativa: " + contactoOp) : "", "", "", "", "", "CONTACTO:", isCurrentData ? (data.contacto_secundario || "") : ""],
+            ["CIUDAD 2:", isCurrentData ? (data.ciudad || "Managua") : "", "", "PAIS:", isCurrentData ? "Nicaragua" : "", "", "ESTADO:", isCurrentData ? (data.departamento || "Managua") : ""],
+            ["DIRECCIÓN 3:", "", "", "", "", "", "CONTACTO:", ""],
+            ["CIUDAD 3:", "", "", "PAIS:", isCurrentData ? "Nicaragua" : "", "", "ESTADO:", ""],
+            ["III- DATOS GENERALES (FUSION)"],
+            ["TIPO DE ORGANIZACIÓN FISCAL:", "", fRegimen, "", "TIPO DE PROVEEDOR:", "", isCurrentData ? "Servicios" : "", "", "RELACIÓN COMERCIAL:", "", "", isCurrentData ? "Contratista A/A" : ""],
+            ["RUC O N° DE REGISTRO FISCAL:", "", fRuc, "", "IVA:", isCurrentData ? (isRegGeneral ? "SÍ" : "NO") : "", "RETENCIÓN DE IMPUESTOS:", "", "", "", isCurrentData ? "Aplica Retención" : ""],
+            ["N° DE CUENTA:", fCuenta, "", "", "NOMBRE DE LA CUENTA:", "", fTitular],
+            ["BANCO DEL PROVEEDOR:", "", fBanco],
+            ["IBAN:", isCurrentData ? (data.iban || "") : "", "", "ABBA:", isCurrentData ? (data.abba || "") : "", "", "CLAVE:", "", isCurrentData ? (data.clave || "") : ""],
+            ["MONEDA:", isCurrentData ? "Córdobas (C$)" : "", "SWIFT:", isCurrentData ? (data.swift || "") : "", "", "", "PAIS", "", isCurrentData ? "Nicaragua" : ""],
+            ["SUCURSAL BANCARIA:", "", isCurrentData ? (data.sucursal || "Principal Managua") : "", "", "", "", "CORRESPONSAL:", "", "", isCurrentData ? (data.corresponsal || "") : ""],
+            ["N° DE CUENTA:", fCuenta, "", "", "NOMBRE DE LA CUENTA:", "", fTitular],
+            ["BANCO BENEFICIARIO:", "", fBanco],
+            ["IBAN:", "", "", "ABBA:", "", "", "CLAVE:", "", ""],
+            ["MONEDA:", isCurrentData ? "Córdobas (C$)" : "", "SWIFT:", "", "", "", "PAIS", "", isCurrentData ? "Nicaragua" : ""],
+            ["SUCURSAL BANCARIA:", "", isCurrentData ? "Principal" : "", "", "", "", "CORRESPONSAL:", "", "", ""],
+            ["N° DE CUENTA:", "", "", "", "NOMBRE DE LA CUENTA:", "", ""],
+            ["BANCO INTERMEDIARIO:", "", ""],
+            ["IBAN:", "", "", "ABBA:", "", "", "CLAVE:", "", ""],
+            ["MONEDA:", "", "SWIFT:", "", "", "", "PAIS", "", ""],
+            ["SUCURSAL BANCARIA:", "", "", "", "", "", "CORRESPONSAL:", "", "", ""],
+            ["IV- TÉRMINOS FISCALES (RMS)"],
+            ["CONDICIONES DE FLETE:", "", "Flete Pagado", "COMPONENTE:", "", "Servicios", "", "MÉTODO DE ENVÍO:", "", "Terrestre"],
+            ["POLITICA DE ENTREGA:", "", "Siguiente día de entrega Programado", "", "PUERTO DE EMBARQUE:", "", "Managua"],
+            ["MONEDA:", "C$", "DEVOLUCIONES PERMITIDAS", "SÍ", "AUTORIZACIÓN NECESARIA", "SÍ", "PREMARCA:", "", "SI"],
+            ["Confirmación necesaria de servicios realizados", "SÍ", "PLAZO", "7 días", "EDT", "Inmediato", "TIPO DE DIRECCIÓN:", "", "Operativa", "DIRECCIÓN PRINCIPAL:", "", "SÍ"],
+            ["PUERTO DE DESCARGA:", "", "Managua", "FACTURA EN:", "C$", "FACTURAS PREPAGADAS DE PROVEEDOR:", "NO", "PERMITIR AL PROVEEDOR COBRAR EL FLETE:", "", "NO", "CANT. EN ÓRDEN DE COMPRA:", "Unidad"],
+            ["V- TÉRMINOS FISCALES (REIM)"],
+            ["GRUPO DE PROVEEDORES", "", "Servicios de Climatización e Instalaciones"],
+            ["ENVIAR NOTA DE DÉBITO", "SÍ", "", "ESTRATEGIA DE CONFRONTACIÓN:", "", "", "3 Vías (OC - Recepción - Factura)"],
+            ["REVISOR DE CUENTAS A PAGAR:", "Analista Cuentas por Pagar", "", "DÍAS DISCREPANCIA ANTES DE ENRUTAMIENTO:", "", "", "3", "Utiliza siempre condiciones de factura", "", "SÍ"],
+            ["Factura para pago manual por proveedor", "NO", "", "Cantidad total de confrontación", "", "", "SÍ", "Confrontación principal en línea", "", "SÍ"],
+            ["Permite fecha de devolución de productos", "SÍ", "", "Retiene facturas hasta recibir la nota de crédito", "", "", "SÍ", "Cantidad total de cabecera es necesaria", "", "SÍ"],
+            ["VI- RÚBRICAS"],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["___________________________", "", "", "___________________________", "", "", "", "___________________________"],
+            ["USUARIO O GESTOR", "", "", "AUTORIZADO POR", "", "", "", "PROVEEDOR"],
+            ["Nota: Los proveedores, llenarán los campos que están en color azul, el resto de campos será completado por personal de SINSA"]
         ];
 
         const wsFormato = XLSX.utils.aoa_to_sheet(formatoData);
         wsFormato['!cols'] = [
-            { wch: 35 },
-            { wch: 45 },
-            { wch: 35 }
+            { wch: 25 },
+            { wch: 22 },
+            { wch: 30 },
+            { wch: 18 },
+            { wch: 18 },
+            { wch: 15 },
+            { wch: 18 },
+            { wch: 25 },
+            { wch: 15 },
+            { wch: 15 },
+            { wch: 15 },
+            { wch: 15 }
         ];
 
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, wsChecklist, "Checklist_Requisitos");
+        XLSX.utils.book_append_sheet(wb, wsChecklist, "Checklist_Completamiento");
         XLSX.utils.book_append_sheet(wb, wsFormato, "Formato_10.F.S01.0006");
 
         const safeName = (provName || 'PROSPECTO').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -9446,6 +9523,7 @@ function downloadProviderOnboardingKitExcel(isCurrentData = true) {
         alert("⚠️ Error al generar el archivo Excel: " + (err.message || err));
     }
 }
+
 
 // Descargador unificado de contrato
 async function downloadContractDocxFile(data) {
