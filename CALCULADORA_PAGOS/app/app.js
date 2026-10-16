@@ -4305,6 +4305,13 @@ function setupWizardAutosaveListeners() {
     document.getElementById('btn-wiz-draft-3')?.addEventListener('click', () => saveCurrentWizardAsDraft(false));
     document.getElementById('btn-wiz-draft-4')?.addEventListener('click', () => saveCurrentWizardAsDraft(false));
 
+    // Botones del Kit de Alta para el Proveedor (Checklist + Formato 10.F.S01.0006)
+    document.getElementById('btn-download-kit-top')?.addEventListener('click', () => downloadProviderOnboardingKitDocx(true));
+    document.getElementById('btn-download-kit-docx')?.addEventListener('click', () => downloadProviderOnboardingKitDocx(true));
+    document.getElementById('btn-download-kit-excel')?.addEventListener('click', () => downloadProviderOnboardingKitExcel(true));
+    document.getElementById('btn-download-kit-blank')?.addEventListener('click', () => downloadProviderOnboardingKitDocx(false));
+    document.getElementById('btn-download-kit-step2')?.addEventListener('click', () => downloadProviderOnboardingKitDocx(true));
+
     // Botones del Banner de Borrador Activo
     document.getElementById('btn-draft-resume')?.addEventListener('click', () => {
         const draftJson = localStorage.getItem(STORAGE_KEY_WIZARD_DRAFT);
@@ -8278,6 +8285,1166 @@ function saveBlobAsFile(blob, fileName) {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
     }, 500);
+}
+
+// ==========================================================================
+// GENERADOR OFICIAL DE KIT DE ALTA Y CHECKLIST PARA EL PROVEEDOR (.DOCX)
+// Normativas SINSA: POL.GLE.001 / 10.P.S01.0001 / Formato 10.F.S01.0006
+// ==========================================================================
+
+async function buildProviderOnboardingKitDocx(data = {}) {
+    if (!window.docx) throw new Error("Librería docx.js no cargada.");
+
+    const {
+        Document, Paragraph, TextRun, Table, TableRow, TableCell,
+        AlignmentType, WidthType, BorderStyle, ShadingType, Header, Footer, PageNumber, ImageRun
+    } = window.docx;
+
+    const font = 'Arial';
+    const primaryColor = '00A859'; // Verde SINSA
+    const darkNavy = '0F172A';
+    const textMuted = '475569';
+    const borderColor = '94A3B8';
+    const lightBorderColor = 'CBD5E1';
+
+    const cellBorderSolid = {
+        top: { style: BorderStyle.SINGLE, size: 4, color: borderColor },
+        bottom: { style: BorderStyle.SINGLE, size: 4, color: borderColor },
+        left: { style: BorderStyle.SINGLE, size: 4, color: borderColor },
+        right: { style: BorderStyle.SINGLE, size: 4, color: borderColor }
+    };
+
+    const cellBorderLight = {
+        top: { style: BorderStyle.SINGLE, size: 2, color: lightBorderColor },
+        bottom: { style: BorderStyle.SINGLE, size: 2, color: lightBorderColor },
+        left: { style: BorderStyle.SINGLE, size: 2, color: lightBorderColor },
+        right: { style: BorderStyle.SINGLE, size: 2, color: lightBorderColor }
+    };
+
+    const noBorders = {
+        top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        right: { style: BorderStyle.NONE, size: 0, color: 'auto' }
+    };
+
+    const logoBytes = getSinsaLogoUint8Array();
+
+    const provName = (data.nombre_comercial || data.nombre || '').trim();
+    const repName = (data.nombre_representante || '').trim();
+    const regimen = data.regimen || '';
+    const cedula = (data.cedula || '').trim();
+    const ruc = (data.ruc || '').trim();
+    const tel = (data.telefono || '').trim();
+    const correo = (data.correo || '').trim();
+    const dir = (data.direccion || '').trim();
+    const contactoOp = (data.contacto_operativo || '').trim();
+    const banco = (data.banco || 'BAC Credomatic').trim();
+    const cuenta = (data.cuenta_bancaria || '').trim();
+    const titular = (data.titular_cuenta || repName || provName || '').trim();
+    const condicionPago = data.condicion_pago || 'SEMANAL';
+    const tipoCobertura = data.tipo_cobertura || 'MANAGUA';
+
+    const now = new Date();
+    const diaStr = String(data.dia || now.getDate()).padStart(2, '0');
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const mesStr = data.mes || meses[now.getMonth()];
+    const anioStr = String(data.anio || now.getFullYear());
+    const fechaCompleta = `${diaStr} de ${mesStr} de ${anioStr}`;
+
+    const children = [];
+
+    // =========================================================================
+    // PARTE 1: GUÍA Y CHECKLIST DE DOCUMENTACIÓN (POL.GLE.001 / 10.P.S01.0001)
+    // =========================================================================
+
+    const headerCells = [];
+    if (logoBytes) {
+        headerCells.push(new TableCell({
+            width: { size: 24, type: WidthType.PERCENTAGE },
+            borders: noBorders,
+            verticalAlign: 'center',
+            children: [
+                new Paragraph({
+                    alignment: AlignmentType.LEFT,
+                    children: [
+                        new ImageRun({
+                            data: logoBytes,
+                            transformation: { width: 135, height: 42 }
+                        })
+                    ]
+                })
+            ]
+        }));
+    } else {
+        headerCells.push(new TableCell({
+            width: { size: 24, type: WidthType.PERCENTAGE },
+            borders: noBorders,
+            verticalAlign: 'center',
+            children: [
+                new Paragraph({
+                    children: [new TextRun({ text: 'SINSA', bold: true, font, size: 26, color: primaryColor })]
+                })
+            ]
+        }));
+    }
+
+    headerCells.push(new TableCell({
+        width: { size: 52, type: WidthType.PERCENTAGE },
+        borders: noBorders,
+        verticalAlign: 'center',
+        children: [
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 20 },
+                children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A. (SINSA)', bold: true, font, size: 18, color: darkNavy })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 20 },
+                children: [new TextRun({ text: 'GERENCIA ADMINISTRATIVA FINANCIERA / GESTIÓN LEGAL', bold: true, font, size: 14, color: textMuted })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [new TextRun({ text: 'POLÍTICA DE ALTA DE PROVEEDORES (POL.GLE.001 / 10.P.S01.0001)', bold: true, font, size: 13, color: primaryColor })]
+            })
+        ]
+    }));
+
+    headerCells.push(new TableCell({
+        width: { size: 24, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        shading: { fill: 'F8FAFC' },
+        margins: { top: 40, bottom: 40, left: 60, right: 60 },
+        children: [
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 15 }, children: [new TextRun({ text: 'CONTROL NORMATIVO', bold: true, font, size: 12, color: darkNavy })] }),
+            new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'Código: 10.P.S01.0001', bold: true, font, size: 13, color: primaryColor })] }),
+            new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'Versión: 02 (Vigente)', font, size: 13 })] }),
+            new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: `Emisión: ${diaStr}/${now.getMonth() + 1}/${anioStr}`, font, size: 12, color: textMuted })] })
+        ]
+    }));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: noBorders,
+        rows: [new TableRow({ children: headerCells })]
+    }));
+
+    children.push(new Paragraph({ spacing: { before: 80, after: 80 } }));
+
+    // Título Principal de la Guía
+    children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 40, after: 40 },
+        shading: { fill: '0F172A' },
+        children: [
+            new TextRun({ text: 'GUÍA Y CHECKLIST DE REQUISITOS PARA ALTA Y VINCULACIÓN DE PROVEEDORES', bold: true, font, size: 18, color: 'FFFFFF' })
+        ]
+    }));
+
+    // Instrucciones
+    children.push(new Paragraph({
+        alignment: AlignmentType.JUSTIFY,
+        spacing: { before: 60, after: 60, line: 230 },
+        children: [
+            new TextRun({ text: 'Estimado Contratista: ', bold: true, font, size: 15, color: darkNavy }),
+            new TextRun({
+                text: 'Para formalizar su vinculación contractual con SILVA INTERNACIONAL S.A. (SINSA), habilitar la asignación de Órdenes de Trabajo (OTs) y tramitar el pago oportuno de sus facturas conforme a las políticas corporativas POL.GLE.001 y 10.P.S01.0001, sírvase recopilar los recaudos que correspondan a su régimen tributario y completar el Formato Oficial de Solicitud de Alta (10.F.S01.0006) adjunto.',
+                font, size: 15, color: '1E293B'
+            })
+        ]
+    }));
+
+    // Cuadro de Datos del Contratista Objetivo
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: [
+            new TableRow({
+                children: [
+                    new TableCell({
+                        width: { size: 60, type: WidthType.PERCENTAGE },
+                        shading: { fill: 'F1F5F9' },
+                        margins: { top: 30, bottom: 30, left: 60, right: 60 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'Proveedor / Razón Social: ', bold: true, font, size: 14, color: darkNavy }),
+                                    new TextRun({ text: provName || '________________________________________________', bold: !!provName, font, size: 14, color: provName ? '00A859' : textMuted })
+                                ]
+                            }),
+                            new Paragraph({
+                                spacing: { before: 20 },
+                                children: [
+                                    new TextRun({ text: 'Titular / Representante: ', bold: true, font, size: 14, color: darkNavy }),
+                                    new TextRun({ text: repName || '________________________________________________', font, size: 14 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 40, type: WidthType.PERCENTAGE },
+                        shading: { fill: 'F1F5F9' },
+                        margins: { top: 30, bottom: 30, left: 60, right: 60 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'Régimen: ', bold: true, font, size: 14, color: darkNavy }),
+                                    new TextRun({ text: regimen || '☐ Régimen General  ☐ Cuota Fija  ☐ P. Natural', font, size: 14 })
+                                ]
+                            }),
+                            new Paragraph({
+                                spacing: { before: 20 },
+                                children: [
+                                    new TextRun({ text: 'Fecha Entrega: ', bold: true, font, size: 14, color: darkNavy }),
+                                    new TextRun({ text: fechaCompleta, font, size: 14 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    }));
+
+    children.push(new Paragraph({ spacing: { before: 60, after: 40 } }));
+
+    // TABLA DE CHECKLIST DE REQUISITOS
+    const checklistHeader = new TableRow({
+        tableHeader: true,
+        cantSplit: true,
+        children: [
+            new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Nº', bold: true, font, size: 13, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 37, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 50, right: 50 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DOCUMENTO / REQUISITO EXIGIDO', bold: true, font, size: 13, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'RÉGIMEN GENERAL', bold: true, font, size: 12, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CUOTA FIJA', bold: true, font, size: 12, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'P. NATURAL (NO DGI)', bold: true, font, size: 11, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '0F172A' }, margins: { top: 30, bottom: 30, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ESPECIFICACIÓN / ENTREGA', bold: true, font, size: 12, color: 'FFFFFF' })] })] })
+        ]
+    });
+
+    const checklistRowsData = [
+        { num: '1', doc: 'Formato Solicitud de Alta de Proveedores (Código 10.F.S01.0006)', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'OBLIGATORIO', spec: 'Físico original firmado y sellado (adjunto en este kit)' },
+        { num: '2', doc: 'Cédula de Identidad Vigente del Titular o Representante Legal', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'OBLIGATORIO', spec: 'Copia nítida y legible ambas caras (vigencia comprobable)' },
+        { num: '3', doc: 'Cédula RUC Vigente emitida por la DGI', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'No Aplica', spec: 'Constancia oficial actualizada de inscripción tributaria' },
+        { num: '4', doc: 'Matrícula de Alcaldía Municipal del Año en Curso', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'No Aplica', spec: 'Copia de matrícula del municipio donde opera' },
+        { num: '5', doc: 'Factura o Talonario en Blanco autorizado por DGI', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'No Aplica', spec: 'Pie de imprenta válido, numeración y fecha vencimiento' },
+        { num: '6', doc: 'Testimonio de Escritura de Constitución y Estatutos', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Inscrita debidamente en el Registro Mercantil' },
+        { num: '7', doc: 'Poder Notarial del Representante Legal debidamente inscrito', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Poder General o Especial inscrito en Registro Público' },
+        { num: '8', doc: 'Constancia de Inscripción en la DGI', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Constancia oficial de actividad económica acreditada' },
+        { num: '9', doc: 'Constancia de Responsable Recaudador de IVA (o No Retención)', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Constancia emitida por DGI para exención de retención' },
+        { num: '10', doc: 'Solvencia Fiscal Actualizada emitida por la DGI', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'No Aplica', spec: 'Certificación vigente al momento de radicar expediente' },
+        { num: '11', doc: 'Certificado de Beneficiario Final actualizado', gen: 'OBLIGATORIO', cuota: 'No Aplica', noDgi: 'No Aplica', spec: 'Declaración jurada conforme normativa mercantil vigente' },
+        { num: '12', doc: 'Constancia de Afiliación Patronal / Pagos al INSS', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'Opcional', spec: 'Respaldo de seguro social de técnicos y cuadrilla' },
+        { num: '13', doc: 'Certificación Bancaria Oficial de Cuenta en Córdobas (C$)', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'OBLIGATORIO', spec: 'Constancia membretada del banco (BAC/BANPRO/LAFISE)' },
+        { num: '14', doc: 'Declaratoria de Adhesión al Código de Ética y Conducta SINSA', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', noDgi: 'OBLIGATORIO', spec: 'Carta firmada y sellada según política POL.GLE.001' }
+    ];
+
+    const checklistTableRows = [checklistHeader];
+
+    checklistRowsData.forEach((row, i) => {
+        const bg = i % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
+        const isObligGen = row.gen === 'OBLIGATORIO';
+        const isObligCuota = row.cuota === 'OBLIGATORIO';
+        const isObligNoDgi = row.noDgi === 'OBLIGATORIO';
+
+        checklistTableRows.push(new TableRow({
+            cantSplit: true,
+            children: [
+                new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 20, bottom: 20, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: row.num, bold: true, font, size: 13, color: primaryColor })] })] }),
+                new TableCell({ width: { size: 37, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 20, bottom: 20, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: `☐ ${row.doc}`, bold: true, font, size: 13, color: darkNavy })] })] }),
+                new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: isObligGen ? 'ECFDF5' : bg }, margins: { top: 20, bottom: 20, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isObligGen ? '✓ Exigido' : '—', bold: isObligGen, font, size: 12, color: isObligGen ? '059669' : textMuted })] })] }),
+                new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: isObligCuota ? 'ECFDF5' : bg }, margins: { top: 20, bottom: 20, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isObligCuota ? '✓ Exigido' : 'No Aplica', bold: isObligCuota, font, size: 12, color: isObligCuota ? '059669' : textMuted })] })] }),
+                new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: isObligNoDgi ? 'ECFDF5' : bg }, margins: { top: 20, bottom: 20, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isObligNoDgi ? '✓ Exigido' : 'No Aplica', bold: isObligNoDgi, font, size: 12, color: isObligNoDgi ? '059669' : textMuted })] })] }),
+                new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 20, bottom: 20, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: row.spec, font, size: 11, color: textMuted })] })] })
+            ]
+        }));
+    });
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: checklistTableRows
+    }));
+
+    // Notas de Entrega y Ventanilla
+    children.push(new Paragraph({ spacing: { before: 50, after: 30 } }));
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: [
+            new TableRow({
+                children: [
+                    new TableCell({
+                        shading: { fill: 'FEF3C7' },
+                        margins: { top: 25, bottom: 25, left: 50, right: 50 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: '📌 CANAL Y PROCEDIMIENTO DE ENTREGA: ', bold: true, font, size: 13, color: '92400E' }),
+                                    new TextRun({ text: 'Remitir expediente digitalizado en formato PDF legible a la cuenta oficial de Cuentas por Pagar y Operaciones de Servicios. Los originales para confrontación física se reciben en Ventanilla de Proveedores SINSA según política 10.PO.S01.0006. Tiempo de respuesta para alta en sistemas (Oracle Fusion / RMS): 2 días hábiles.', font, size: 12, color: '78350F' })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    }));
+
+    // =========================================================================
+    // PARTE 2: FORMATO OFICIAL SOLICITUD DE ALTA DE PROVEEDORES (10.F.S01.0006)
+    // =========================================================================
+
+    // Salto de página para el Formato Oficial
+    children.push(new Paragraph({
+        pageBreakBefore: true,
+        children: []
+    }));
+
+    // Encabezado Institucional Formato 10.F.S01.0006
+    const formHeaderCells = [];
+    if (logoBytes) {
+        formHeaderCells.push(new TableCell({
+            width: { size: 24, type: WidthType.PERCENTAGE },
+            borders: cellBorderSolid,
+            verticalAlign: 'center',
+            margins: { top: 30, bottom: 30, left: 40, right: 40 },
+            children: [
+                new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [
+                        new ImageRun({
+                            data: logoBytes,
+                            transformation: { width: 130, height: 40 }
+                        })
+                    ]
+                })
+            ]
+        }));
+    } else {
+        formHeaderCells.push(new TableCell({
+            width: { size: 24, type: WidthType.PERCENTAGE },
+            borders: cellBorderSolid,
+            verticalAlign: 'center',
+            children: [
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SINSA', bold: true, font, size: 24, color: primaryColor })] })
+            ]
+        }));
+    }
+
+    formHeaderCells.push(new TableCell({
+        width: { size: 52, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        verticalAlign: 'center',
+        margins: { top: 30, bottom: 30, left: 40, right: 40 },
+        children: [
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 15 }, children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A.', bold: true, font, size: 18, color: darkNavy })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 15 }, children: [new TextRun({ text: 'SINSA - GERENCIA ADMINISTRATIVA FINANCIERA', bold: true, font, size: 14, color: textMuted })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SOLICITUD ALTA DE PROVEEDORES', bold: true, font, size: 17, color: primaryColor })] })
+        ]
+    }));
+
+    formHeaderCells.push(new TableCell({
+        width: { size: 24, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        margins: { top: 25, bottom: 25, left: 40, right: 40 },
+        children: [
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 10 }, children: [new TextRun({ text: 'Código: 10.F.S01.0006', bold: true, font, size: 13, color: darkNavy })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 10 }, children: [new TextRun({ text: 'Versión: 01', font, size: 13 })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Fecha: ${diaStr} / ${mesStr} / ${anioStr}`, bold: true, font, size: 12, color: primaryColor })] })
+        ]
+    }));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: [new TableRow({ children: formHeaderCells })]
+    }));
+
+    // SECCIÓN I: DATOS GENERALES (FUSION, RMS Y REIM)
+    children.push(new Paragraph({
+        spacing: { before: 50, after: 20 },
+        children: [new TextRun({ text: 'I - DATOS GENERALES (FUSION, RMS Y REIM)', bold: true, font, size: 14, color: 'FFFFFF' })],
+        shading: { fill: '0F172A' }
+    }));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: [
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 70, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'PROVEEDOR O RAZÓN SOCIAL: ', bold: true, font, size: 13, color: darkNavy }),
+                                    new TextRun({ text: provName || '________________________________________________________', bold: !!provName, font, size: 13, color: provName ? '00A859' : textMuted })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'DÍA: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: `${diaStr}   `, font, size: 12 }),
+                                    new TextRun({ text: 'MES: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: `${mesStr.slice(0, 3).toUpperCase()}   `, font, size: 12 }),
+                                    new TextRun({ text: 'AÑO: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: anioStr, font, size: 12 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 40, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'TIPO DE GESTIÓN: ', bold: true, font, size: 13, color: darkNavy }),
+                                    new TextRun({ text: '☒ Alta Nueva   ☐ Actualización   ☐ Compra Única', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 60, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'BENEFICIARIO ACREDITADO: ', bold: true, font, size: 13, color: darkNavy }),
+                                    new TextRun({ text: titular || repName || provName || '____________________________________', font, size: 13 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    }));
+
+    // SECCIÓN II: DATOS DE CONTACTO Y UBICACIÓN (FUSION Y RMS)
+    children.push(new Paragraph({
+        spacing: { before: 40, after: 20 },
+        children: [new TextRun({ text: 'II - DATOS DE CONTACTO Y UBICACIÓN (FUSION Y RMS)', bold: true, font, size: 14, color: 'FFFFFF' })],
+        shading: { fill: '0F172A' }
+    }));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: [
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 65, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'NOMBRE COMPLETO DEL CONTACTO: ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: repName || '______________________________________________', font, size: 13 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 35, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'TELÉFONO / CELULAR: ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: tel || '_______________________', font, size: 13 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 40, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'E-MAIL: ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: correo || '______________________________', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'MÉTODO DE PAGO: ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: '☒ Transferencia   ☐ Cheque', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'CONDICIÓN PAGO: ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: condicionPago === 'SEMANAL' ? '☒ Semanal   ☐ Crédito' : '☐ Semanal   ☒ Crédito', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        columnSpan: 3,
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'DIRECCIÓN FISCAL: ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: dir || '________________________________________________________________________________________', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        columnSpan: 3,
+                        borders: cellBorderSolid,
+                        shading: { fill: 'F8FAFC' },
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'CONTACTO OPERATIVO PARA DESPACHO DE OTs: ', bold: true, font, size: 13, color: primaryColor }),
+                                    new TextRun({ text: contactoOp || 'Nombre y Teléfono de Cuadrilla Técnica: _____________________________________________', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    }));
+
+    // SECCIÓN III: DATOS GENERALES (FUSION) Y DATOS BANCARIOS
+    children.push(new Paragraph({
+        spacing: { before: 40, after: 20 },
+        children: [new TextRun({ text: 'III - DATOS FISCALES Y BANCARIOS (FUSION)', bold: true, font, size: 14, color: 'FFFFFF' })],
+        shading: { fill: '0F172A' }
+    }));
+
+    const isCuotaFija = regimen.includes('Cuota Fija');
+    const isRegGeneral = regimen.includes('General');
+    const isNoDgi = regimen.includes('No Inscrita');
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: [
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 40, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'TIPO ORGANIZACIÓN FISCAL: ', bold: true, font, size: 12 }),
+                                    new TextRun({
+                                        text: `${isRegGeneral ? '☒' : '☐'} Rég. General   ${isCuotaFija ? '☒' : '☐'} Cuota Fija   ${isNoDgi ? '☒' : '☐'} P. Natural`,
+                                        font, size: 12
+                                    })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'TIPO PROVEEDOR: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: 'Servicios de Instalación', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'RELACIÓN COMERCIAL: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: 'Contratista Maestro', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 40, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'RUC / CÉDULA: ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: (ruc || cedula) ? `${ruc ? 'RUC: ' + ruc + ' ' : ''}${cedula ? 'Céd: ' + cedula : ''}` : '____________________________________', bold: !!(ruc || cedula), font, size: 13, color: (ruc || cedula) ? '00A859' : textMuted })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'RESPONSABLE IVA: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: isRegGeneral ? '☒ SÍ   ☐ NO' : '☐ SÍ   ☒ NO', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'RETENCIÓN IMPUESTOS: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: '☒ Aplica Retención   ☐ No Retención', font, size: 11 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            // BANCO
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        columnSpan: 3,
+                        borders: cellBorderSolid,
+                        shading: { fill: 'F1F5F9' },
+                        margins: { top: 25, bottom: 25, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'DATOS BANCARIOS DEL PROVEEDOR PARA TRANSFERENCIA SINSA:', bold: true, font, size: 13, color: primaryColor })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'INSTITUCIÓN BANCARIA: ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: banco || 'BAC Credomatic', bold: true, font, size: 13, color: darkNavy })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        columnSpan: 2,
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'Nº CUENTA EN CÓRDOBAS (C$): ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: cuenta || '______________________________________', bold: !!cuenta, font, size: 13, color: cuenta ? '00A859' : textMuted })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 60, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'TITULAR DE LA CUENTA ACREDITADA: ', bold: true, font, size: 13 }),
+                                    new TextRun({ text: titular || '________________________________________________', bold: !!titular, font, size: 13 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 40, type: WidthType.PERCENTAGE },
+                        columnSpan: 2,
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'TIPO DE CUENTA: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: '☒ Corriente / Monetaria   ☐ Ahorros', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    }));
+
+    // SECCIÓN IV: TÉRMINOS OPERATIVOS Y COMERCIALES (RMS)
+    children.push(new Paragraph({
+        spacing: { before: 40, after: 20 },
+        children: [new TextRun({ text: 'IV - TÉRMINOS OPERATIVOS Y COMERCIALES (RMS)', bold: true, font, size: 14, color: 'FFFFFF' })],
+        shading: { fill: '0F172A' }
+    }));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: [
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 25, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'MONEDA DE PAGO: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: 'Córdobas (C$)', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 25, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'FACTURACIÓN: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: 'En Córdobas (C$)', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'COBERTURA TERRITORIAL: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: tipoCobertura === 'FORANEA' ? '☒ Foránea (Departamental)   ☐ Managua Urbana' : '☒ Managua Urbana (Radio 14 Km)   ☐ Foránea', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        columnSpan: 3,
+                        borders: cellBorderSolid,
+                        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'ACTIVIDADES CONTRATADAS: ', bold: true, font, size: 12 }),
+                                    new TextRun({ text: '☒ Instalación Básica A/A (12k-24k BTU)   ☒ Mantenimiento Preventivo / General   ☒ Desinstalación   ☐ Obras Accesorias', font, size: 12 })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    }));
+
+    // SECCIÓN V: DECLARATORIA DE ÉTICA, CUMPLIMIENTO Y SEGURIDAD OCUPACIONAL (POL.GLE.001)
+    children.push(new Paragraph({
+        spacing: { before: 40, after: 20 },
+        children: [new TextRun({ text: 'V - DECLARATORIA DE ÉTICA, CUMPLIMIENTO Y SEGURIDAD OCUPACIONAL (POL.GLE.001)', bold: true, font, size: 14, color: 'FFFFFF' })],
+        shading: { fill: '0F172A' }
+    }));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: [
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        borders: cellBorderSolid,
+                        margins: { top: 25, bottom: 25, left: 50, right: 50 },
+                        children: [
+                            new Paragraph({
+                                alignment: AlignmentType.JUSTIFY,
+                                spacing: { line: 220 },
+                                children: [
+                                    new TextRun({
+                                        text: 'El suscrito, en su condición de Proveedor o Representante Legal debidamente facultado, declara bajo juramento que toda la información consignada en esta solicitud y los documentos de respaldo adjuntos son fidedignos, legítimos y vigentes. Asimismo, declara conocer y aceptar plenamente las políticas corporativas de SILVA INTERNACIONAL S.A. (SINSA), incluyendo la Política de Contratación de Proveedores (POL.GLE.001), la adhesión formal al Código de Ética y Conducta, y el cumplimiento ineludible de la Ley 618 (Ley General de Higiene y Seguridad del Trabajo), asumiendo la exclusiva responsabilidad laboral, civil y técnica del personal asignado para la ejecución de los servicios.',
+                                        font, size: 12, color: '334155'
+                                    })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    }));
+
+    // SECCIÓN VI: CUADRO DE RÚBRICAS Y FIRMAS
+    children.push(new Paragraph({
+        spacing: { before: 40, after: 20 },
+        children: [new TextRun({ text: 'VI - CUADRO DE RÚBRICAS Y AUTORIZACIONES OFICIALES', bold: true, font, size: 14, color: 'FFFFFF' })],
+        shading: { fill: '0F172A' }
+    }));
+
+    children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: cellBorderSolid,
+        rows: [
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 33, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 60, bottom: 25, left: 30, right: 30 },
+                        children: [
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '_______________________________', font, size: 13, color: textMuted })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 20 }, children: [new TextRun({ text: 'USUARIO / GESTOR SOLICITANTE', bold: true, font, size: 13, color: darkNavy })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Operaciones de Servicios / Instalaciones', font, size: 11, color: textMuted })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SINSA Nicaragua', font, size: 11, color: textMuted })] })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 34, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 60, bottom: 25, left: 30, right: 30 },
+                        children: [
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '_______________________________', font, size: 13, color: textMuted })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 20 }, children: [new TextRun({ text: 'AUTORIZADO POR', bold: true, font, size: 13, color: darkNavy })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Gerencia Administrativa Financiera', font, size: 11, color: textMuted })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Cuentas por Pagar / Tesorería', font, size: 11, color: textMuted })] })
+                        ]
+                    }),
+                    new TableCell({
+                        width: { size: 33, type: WidthType.PERCENTAGE },
+                        borders: cellBorderSolid,
+                        margins: { top: 60, bottom: 25, left: 30, right: 30 },
+                        children: [
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '_______________________________', font, size: 13, color: textMuted })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 20 }, children: [new TextRun({ text: 'PROVEEDOR / CONTRATISTA', bold: true, font, size: 13, color: primaryColor })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: repName || provName || 'Firma y Sello Oficial', bold: !!(repName || provName), font, size: 12, color: darkNavy })] }),
+                            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Aceptación de Términos y Veracidad', font, size: 11, color: textMuted })] })
+                        ]
+                    })
+                ]
+            })
+        ]
+    }));
+
+    return new Document({
+        styles: {
+            default: {
+                document: {
+                    run: { font, size: 20, color: '1E293B' }
+                }
+            }
+        },
+        sections: [{
+            properties: {
+                page: {
+                    size: { width: 12240, height: 15840 },
+                    margin: { top: 720, right: 720, bottom: 720, left: 720, header: 360, footer: 360 }
+                }
+            },
+            headers: {
+                default: new Header({
+                    children: [
+                        new Paragraph({
+                            alignment: AlignmentType.RIGHT,
+                            children: [
+                                new TextRun({ text: 'SINSA | Kit de Alta de Proveedores - POL.GLE.001 / 10.P.S01.0001 / 10.F.S01.0006', font, size: 13, color: textMuted })
+                            ]
+                        })
+                    ]
+                })
+            },
+            footers: {
+                default: new Footer({
+                    children: [
+                        new Paragraph({
+                            alignment: AlignmentType.SPACE_BETWEEN,
+                            children: [
+                                new TextRun({ text: 'SILVA INTERNACIONAL S.A. - Documento Oficial Confidencial para Alta de Contratistas', font, size: 13, color: textMuted }),
+                                new TextRun({ text: 'Página ', font, size: 13, color: textMuted }),
+                                new TextRun({ children: [PageNumber.CURRENT], font, size: 13, color: textMuted }),
+                                new TextRun({ text: ' de ', font, size: 13, color: textMuted }),
+                                new TextRun({ children: [PageNumber.TOTAL_PAGES], font, size: 13, color: textMuted })
+                            ]
+                        })
+                    ]
+                })
+            },
+            children
+        }]
+    });
+}
+
+// Descargar Kit Oficial de Alta en Formato Word (.docx)
+async function downloadProviderOnboardingKitDocx(isCurrentData = true) {
+    try {
+        if (!window.docx) {
+            throw new Error("Librería docx.js no disponible.");
+        }
+        const data = isCurrentData ? (typeof getWizardData === 'function' ? getWizardData() : {}) : {};
+        const provName = (data.nombre_comercial || data.nombre || '').trim();
+        const safeName = provName ? provName.replace(/[^a-zA-Z0-9_-]/g, '_') : 'EN_BLANCO';
+
+        const doc = await buildProviderOnboardingKitDocx(data);
+        const blob = await window.docx.Packer.toBlob(doc);
+
+        if (blob && blob.size > 1000) {
+            const fileName = `KIT_ALTA_PROVEEDOR_SINSA_10.F.S01.0006_${safeName}.docx`;
+            saveBlobAsFile(blob, fileName);
+            alert(`📥 Kit de Alta de Proveedor descargado exitosamente:\n\n📄 Archivo: ${fileName}\n\nIncluye:\n1. Checklist oficial de requisitos según régimen (POL.GLE.001 / 10.P.S01.0001)\n2. Formato de Solicitud de Alta de Proveedores (10.F.S01.0006) listo para entregar al contratista.`);
+        } else {
+            throw new Error("El archivo generado está vacío.");
+        }
+    } catch (err) {
+        console.error("Error al descargar Kit de Alta:", err);
+        alert("⚠️ Error al generar el Kit de Alta de Proveedor: " + (err.message || err));
+    }
+}
+
+// Descargar Kit Oficial en Formato Excel (.xlsx)
+function downloadProviderOnboardingKitExcel(isCurrentData = true) {
+    if (typeof XLSX === 'undefined') {
+        alert("⚠️ Librería de exportación Excel no disponible en este momento.");
+        return;
+    }
+
+    try {
+        const data = isCurrentData ? (typeof getWizardData === 'function' ? getWizardData() : {}) : {};
+        const provName = (data.nombre_comercial || data.nombre || '').trim();
+        const repName = (data.nombre_representante || '').trim();
+        const regimen = data.regimen || 'Régimen de Cuota Fija';
+        const cedula = (data.cedula || '').trim();
+        const ruc = (data.ruc || '').trim();
+        const tel = (data.telefono || '').trim();
+        const correo = (data.correo || '').trim();
+        const dir = (data.direccion || '').trim();
+        const contactoOp = (data.contacto_operativo || '').trim();
+        const banco = (data.banco || 'BAC Credomatic').trim();
+        const cuenta = (data.cuenta_bancaria || '').trim();
+        const titular = (data.titular_cuenta || repName || provName || '').trim();
+        const condicionPago = data.condicion_pago || 'SEMANAL';
+        const tipoCobertura = data.tipo_cobertura || 'MANAGUA';
+
+        const now = new Date();
+        const diaStr = String(data.dia || now.getDate()).padStart(2, '0');
+        const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const mesStr = data.mes || meses[now.getMonth()];
+        const anioStr = String(data.anio || now.getFullYear());
+        const fechaCompleta = `${diaStr} de ${mesStr} de ${anioStr}`;
+
+        // 1. PESTAÑA CHECKLIST DE REQUISITOS
+        const checklistData = [
+            ["SILVA INTERNACIONAL S.A. (SINSA)"],
+            ["GERENCIA ADMINISTRATIVA FINANCIERA / GESTIÓN LEGAL"],
+            ["CHECKLIST DE REQUISITOS PARA ALTA DE PROVEEDORES (POL.GLE.001 / 10.P.S01.0001)"],
+            [],
+            ["DATOS DEL CONTRATISTA:"],
+            ["Proveedor / Razón Social:", provName || "______________________________", "Fecha de Emisión:", fechaCompleta],
+            ["Titular / Representante:", repName || "______________________________", "Régimen Fiscal:", regimen],
+            ["Teléfono / Contacto:", tel || "______________________________", "Correo Electrónico:", correo || "______________________________"],
+            [],
+            ["Nº", "DOCUMENTO / REQUISITO EXIGIDO", "RÉGIMEN GENERAL", "CUOTA FIJA", "PERSONA NATURAL (NO DGI)", "ESPECIFICACIÓN / FORMA DE ENTREGA", "CHECK ENTREGA"],
+            ["1", "Formato Solicitud de Alta de Proveedores (Código 10.F.S01.0006)", "OBLIGATORIO", "OBLIGATORIO", "OBLIGATORIO", "Físico original firmado y sellado (pestaña Formato_10.F.S01.0006)", ""],
+            ["2", "Cédula de Identidad Vigente del Titular o Representante Legal", "OBLIGATORIO", "OBLIGATORIO", "OBLIGATORIO", "Copia nítida y legible ambas caras (vigencia comprobable)", ""],
+            ["3", "Cédula RUC Vigente emitida por la DGI", "OBLIGATORIO", "OBLIGATORIO", "No Aplica", "Constancia oficial actualizada de inscripción tributaria", ""],
+            ["4", "Matrícula de Alcaldía Municipal del Año en Curso", "OBLIGATORIO", "OBLIGATORIO", "No Aplica", "Copia de matrícula del municipio donde opera el contratista", ""],
+            ["5", "Factura o Talonario en Blanco autorizado por DGI", "OBLIGATORIO", "OBLIGATORIO", "No Aplica", "Pie de imprenta válido, numeración y fecha de vencimiento (10.PO.S01.0006)", ""],
+            ["6", "Testimonio de Escritura de Constitución y Estatutos", "OBLIGATORIO", "No Aplica", "No Aplica", "Inscrita debidamente en el Registro Mercantil", ""],
+            ["7", "Poder Notarial del Representante Legal debidamente inscrito", "OBLIGATORIO", "No Aplica", "No Aplica", "Poder General o Especial inscrito en Registro Público", ""],
+            ["8", "Constancia de Inscripción en la DGI", "OBLIGATORIO", "No Aplica", "No Aplica", "Constancia oficial de actividad económica acreditada", ""],
+            ["9", "Constancia de Responsable Recaudador de IVA (o No Retención)", "OBLIGATORIO", "No Aplica", "No Aplica", "Constancia emitida por DGI para exención de retención en la fuente", ""],
+            ["10", "Solvencia Fiscal Actualizada emitida por la DGI", "OBLIGATORIO", "OBLIGATORIO", "No Aplica", "Certificación vigente al momento de radicar el expediente", ""],
+            ["11", "Certificado de Beneficiario Final actualizado", "OBLIGATORIO", "No Aplica", "No Aplica", "Declaración jurada conforme a la normativa mercantil vigente", ""],
+            ["12", "Constancia de Afiliación Patronal / Pagos al INSS", "OBLIGATORIO", "OBLIGATORIO", "Opcional", "Respaldo de seguro social de técnicos y cuadrilla (Cláusula Quinta)", ""],
+            ["13", "Certificación Bancaria Oficial de Cuenta en Córdobas (C$)", "OBLIGATORIO", "OBLIGATORIO", "OBLIGATORIO", "Constancia membretada del banco (BAC/BANPRO/LAFISE)", ""],
+            ["14", "Declaratoria de Adhesión al Código de Ética y Conducta SINSA", "OBLIGATORIO", "OBLIGATORIO", "OBLIGATORIO", "Carta firmada y sellada según política POL.GLE.001", ""],
+            [],
+            ["INSTRUCCIONES DE ENTREGA:"],
+            ["1. Digital: Remitir expediente digitalizado en formato PDF legible a Cuentas por Pagar y Operaciones de Servicios."],
+            ["2. Físico: Los documentos originales se confrontan en Ventanilla de Proveedores SINSA según política 10.PO.S01.0006."],
+            ["3. Tiempo de resolución para alta en sistemas (Oracle Fusion / RMS / REIM): 2 días hábiles tras recibir el expediente completo."]
+        ];
+
+        const wsChecklist = XLSX.utils.aoa_to_sheet(checklistData);
+        wsChecklist['!cols'] = [
+            { wch: 5 },  // Nº
+            { wch: 48 }, // Documento
+            { wch: 18 }, // General
+            { wch: 18 }, // Cuota Fija
+            { wch: 22 }, // No DGI
+            { wch: 45 }, // Especificación
+            { wch: 15 }  // Check
+        ];
+
+        // 2. PESTAÑA FORMATO OFICIAL 10.F.S01.0006
+        const formatoData = [
+            ["SILVA INTERNACIONAL S.A. - SINSA"],
+            ["GERENCIA ADMINISTRATIVA FINANCIERA - SOLICITUD ALTA DE PROVEEDORES"],
+            ["Código: 10.F.S01.0006 | Versión: 01 | Fecha: " + fechaCompleta],
+            [],
+            ["I - DATOS GENERALES (FUSION, RMS Y REIM)"],
+            ["PROVEEDOR O RAZÓN SOCIAL:", provName || ""],
+            ["TIPO DE GESTIÓN:", "ALTA DE NUEVO PROVEEDOR"],
+            ["BENEFICIARIO ACREDITADO:", titular || repName || provName || ""],
+            [],
+            ["II - DATOS DE CONTACTO Y UBICACIÓN (FUSION Y RMS)"],
+            ["NOMBRE COMPLETO DEL CONTACTO:", repName || ""],
+            ["TELÉFONO / CELULAR:", tel || ""],
+            ["CORREO ELECTRÓNICO:", correo || ""],
+            ["MÉTODO DE PAGO:", "TRANSFERENCIA BANCARIA"],
+            ["CONDICIÓN DE PAGO:", condicionPago],
+            ["DIRECCIÓN FISCAL:", dir || ""],
+            ["CONTACTO OPERATIVO PARA OTs:", contactoOp || ""],
+            [],
+            ["III - DATOS FISCALES Y BANCARIOS (FUSION)"],
+            ["TIPO DE ORGANIZACIÓN FISCAL:", regimen],
+            ["TIPO DE PROVEEDOR:", "SERVICIOS DE INSTALACIÓN Y MANTENIMIENTO DE A/A"],
+            ["RELACIÓN COMERCIAL:", "CONTRATISTA MAESTRO"],
+            ["RUC O CÉDULA:", ruc || cedula || ""],
+            ["RESPONSABLE DE IVA:", regimen.includes('General') ? "SÍ" : "NO"],
+            ["RETENCIÓN DE IMPUESTOS:", "APLICA RETENCIÓN EN LA FUENTE SEGÚN LEY"],
+            [],
+            ["DATOS BANCARIOS DEL PROVEEDOR PARA TRANSFERENCIA SINSA:"],
+            ["INSTITUCIÓN BANCARIA:", banco],
+            ["NÚMERO DE CUENTA EN CÓRDOBAS (C$):", cuenta || ""],
+            ["TITULAR DE LA CUENTA:", titular || ""],
+            ["TIPO DE CUENTA:", "CORRIENTE / MONETARIA"],
+            [],
+            ["IV - TÉRMINOS OPERATIVOS Y COMERCIALES (RMS)"],
+            ["MONEDA DE PAGO:", "C$ (CÓRDOBAS)"],
+            ["FACTURACIÓN:", "EN CÓRDOBAS (C$)"],
+            ["COBERTURA TERRITORIAL:", tipoCobertura === 'FORANEA' ? "FORÁNEA (DEPARTAMENTAL)" : "MANAGUA URBANA (RADIO 14 KM)"],
+            ["ACTIVIDADES CONTRATADAS:", "INSTALACIÓN BÁSICA DE A/A, MANTENIMIENTO PREVENTIVO/GENERAL, DESINSTALACIÓN"],
+            [],
+            ["V - DECLARATORIA DE ÉTICA, CUMPLIMIENTO Y SEGURIDAD OCUPACIONAL (POL.GLE.001)"],
+            ["El suscrito declara bajo juramento que toda la información consignada y los recaudos adjuntos son verídicos, legítimos y vigentes."],
+            ["Asimismo, declara conocer y aceptar formalmente las políticas de SILVA INTERNACIONAL S.A. (SINSA), el Código de Ética (POL.GLE.001)"],
+            ["y el cumplimiento ineludible de la Ley 618 de Higiene y Seguridad del Trabajo."],
+            [],
+            ["VI - CUADRO DE RÚBRICAS Y AUTORIZACIONES OFICIALES"],
+            ["GESTOR SOLICITANTE SINSA:", "AUTORIZADO POR FINANZAS:", "PROVEEDOR / REPRESENTANTE LEGAL:"],
+            ["Firma: ________________________", "Firma: ________________________", "Firma: ________________________"],
+            ["Operaciones de Servicios", "Cuentas por Pagar / Tesorería", repName || provName || "Firma y Sello Oficial"]
+        ];
+
+        const wsFormato = XLSX.utils.aoa_to_sheet(formatoData);
+        wsFormato['!cols'] = [
+            { wch: 35 },
+            { wch: 45 },
+            { wch: 35 }
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, wsChecklist, "Checklist_Requisitos");
+        XLSX.utils.book_append_sheet(wb, wsFormato, "Formato_10.F.S01.0006");
+
+        const safeName = (provName || 'PROSPECTO').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const fileName = `KIT_ALTA_PROVEEDOR_SINSA_10.F.S01.0006_${safeName}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    } catch (err) {
+        console.error("Error al descargar Excel Kit de Alta:", err);
+        alert("⚠️ Error al generar el archivo Excel: " + (err.message || err));
+    }
 }
 
 // Descargador unificado de contrato

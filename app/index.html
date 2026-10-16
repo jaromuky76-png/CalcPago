@@ -273,6 +273,7 @@
                                 <span class="autosave-dot"></span>
                                 <span id="wizard-autosave-text">Autoguardado activo</span>
                             </div>
+                            <button id="btn-download-kit-top" class="btn btn-outline" style="border-color: #00A859; color: #00A859; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem;" title="Descargar Checklist de Requisitos y Formato Oficial de Alta 10.F.S01.0006 para entrega al proveedor">📦 Kit de Alta Proveedor</button>
                             <button id="btn-save-wizard-draft-top" class="btn btn-save-draft" title="Guardar como borrador en el directorio para continuar luego">💾 Guardar Borrador</button>
                             <button id="btn-reset-wizard" class="btn btn-outline" title="Reiniciar formulario">🔄 Limpiar Datos</button>
                         </div>
@@ -335,6 +336,33 @@
                             <div class="step-card-header">
                                 <h3>📋 1. Régimen Fiscal y Datos de Identificación</h3>
                                 <p class="step-card-desc">Selecciona la figura tributaria del contratista y completa sus datos legales y de contacto.</p>
+                            </div>
+
+                            <!-- BANNER DE ENTREGA DE REQUISITOS Y CHECKLIST AL PROVEEDOR -->
+                            <div class="onboarding-kit-box" style="background: linear-gradient(135deg, #F0FDF4 0%, #EFF6FF 100%); border: 1px solid #BBF7D0; border-left: 5px solid #00A859; border-radius: 10px; padding: 1.1rem 1.4rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                                <div style="display: flex; align-items: flex-start; gap: 0.85rem; max-width: 680px;">
+                                    <span style="font-size: 2rem; line-height: 1;">📋</span>
+                                    <div>
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                            <strong style="color: #065F46; font-size: 1rem;">Kit de Alta y Recopilación de Requisitos para el Proveedor</strong>
+                                            <span class="badge-tag" style="background: #00A859; color: white; font-size: 0.72rem; padding: 2px 7px; margin: 0;">10.F.S01.0006 / POL.GLE.001</span>
+                                        </div>
+                                        <p style="margin: 0.35rem 0 0 0; font-size: 0.83rem; color: #334155; line-height: 1.45;">
+                                            Descargue el <strong>Checklist Oficial de Requisitos Documentales</strong> y el <strong>Formato de Solicitud de Alta de Proveedores (10.F.S01.0006)</strong> para entregar al contratista. El proveedor podrá iniciar la recopilación de su expediente según su régimen fiscal (General, Cuota Fija o Persona Natural).
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" id="btn-download-kit-docx" class="btn btn-primary" style="background: #00A859; border-color: #00A859; font-weight: 600; font-size: 0.83rem; padding: 0.55rem 1rem; display: inline-flex; align-items: center; gap: 0.4rem;" title="Descargar Kit Oficial en Word (.docx) con membrete y tablas oficiales">
+                                        <span>📥</span> Descargar Kit (.docx)
+                                    </button>
+                                    <button type="button" id="btn-download-kit-excel" class="btn btn-outline" style="border-color: #059669; color: #059669; font-weight: 600; font-size: 0.83rem; padding: 0.55rem 0.9rem; display: inline-flex; align-items: center; gap: 0.4rem;" title="Descargar Formato y Checklist en Excel (.xlsx) para llenado digital">
+                                        <span>📊</span> Formato Excel (.xlsx)
+                                    </button>
+                                    <button type="button" id="btn-download-kit-blank" class="btn btn-outline" style="border-color: #64748B; color: #475569; font-size: 0.83rem; padding: 0.55rem 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;" title="Descargar plantilla 100% en blanco para nuevo prospecto">
+                                        <span>📄</span> En Blanco
+                                    </button>
+                                </div>
                             </div>
                             
                             <div class="form-grid">
@@ -600,7 +628,10 @@
                                         <h3>📁 2. Expediente Documental Digital</h3>
                                         <p class="step-card-desc">Adjunta los recaudos requeridos según la política oficial <strong>POL.GLE.001</strong> y <strong>10.P.S01.0001</strong>. Puedes marcar como <em>"No necesario"</em> cualquier documento que no aplique para completar el expediente sin pendientes.</p>
                                     </div>
-                                    <div style="display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
+                                    <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                                        <button type="button" id="btn-download-kit-step2" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.85rem; border-color: #00A859; color: #00A859; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;" title="Descargar Checklist oficial de requisitos y formato 10.F.S01.0006 para entrega al proveedor">
+                                            <span>📥</span> Descargar Kit Proveedor (.docx)
+                                        </button>
                                         <button id="btn-exempt-remaining-docs" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; border-color: rgba(100, 116, 139, 0.4); color: #475569;" title="Marcar todos los recaudos pendientes como no requeridos / no necesarios">
                                             ⚡ Exonerar Pendientes
                                         </button>
@@ -1552,6 +1583,6 @@
     </button>
 
     <script src="sinsa_logo_data.js"></script>
-    <script src="app.js?v=20261013_persistence_v2"></script>
+    <script src="app.js?v=20261016_kit_alta_v1"></script>
 </body>
 </html>
