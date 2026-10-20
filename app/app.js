@@ -4066,33 +4066,40 @@ async function downloadActaFiniquitoDocx(prov) {
 
 const DOCS_BY_REGIMEN = {
     "Régimen de Cuota Fija": [
-        { id: "formato_alta", name: "Formato de Solicitud de Alta", desc: "Firmado y sellado por el contratista (Procedimiento 10.P.S01.0001)" },
-        { id: "cedula", name: "Cédula de Identidad Vigente", desc: "Copia legible de cédula nicaragüense vigente del titular" },
-        { id: "ruc", name: "Cédula RUC Vigente", desc: "Constancia de RUC emitida por DGI en régimen de cuota fija" },
-        { id: "matricula", name: "Matrícula de Alcaldía Vigente", desc: "Matrícula municipal del año en curso del municipio correspondiente" },
-        { id: "factura", name: "Factura o Talonario en Blanco", desc: "Pie de imprenta autorizado por DGI con numeración y vigencia" },
-        { id: "solvencia", name: "Solvencia Fiscal Actualizada", desc: "Certificación de solvencia tributaria vigente emitida por DGI" },
-        { id: "etica", name: "Declaratoria de Ética y Conducta", desc: "Carta de aceptación firmada del Código de Ética de SINSA" },
-        { id: "inss", name: "Constancia de Afiliación al INSS", desc: "Respaldo de seguro social del contratista o de sus trabajadores" }
+        { id: "formato_alta", name: "1. Formato de Alta de Proveedor (10.F.S01.0006)", desc: "Requisito Base #1 Cuota Fija (10.F.S01.0006 / POL.GLE.001): Firmado y sellado por el proveedor" },
+        { id: "cedula", name: "2. Copia de Cédula del Proveedor / Rep. Legal", desc: "Requisito Base #2 Cuota Fija (10.F.S01.0006 / POL.GLE.001): Copia legible de cédula vigente" },
+        { id: "ruc", name: "3. Copia de Cédula RUC Vigente", desc: "Requisito Base #3 Cuota Fija (10.F.S01.0006 / POL.GLE.001): Constancia RUC vigente emitida por DGI" },
+        { id: "matricula", name: "4. Copia de Matrícula de la Alcaldía Vigente", desc: "Requisito Base #4 Cuota Fija (10.F.S01.0006 / POL.GLE.001): Matrícula municipal del año en curso" },
+        { id: "factura", name: "5. Copia de Factura en Blanco", desc: "Requisito Base #5 Cuota Fija (10.F.S01.0006 / POL.GLE.001): Factura con pie de imprenta DGI vigente" },
+        { id: "solvencia", name: "6. Solvencia Fiscal Actualizada (Contrato Legal)", desc: "Requisito POL.GLE.001 (30-03-2026) para formalizar contrato legal (Exonerable en alta simple)" },
+        { id: "etica", name: "7. Declaratoria de Ética SINSA (Contrato Legal)", desc: "Requisito POL.GLE.001 Art. 36 (30-03-2026): Carta firmada de adhesión al Código de Ética" },
+        { id: "inss", name: "8. Constancia de Afiliación al INSS (Solo Si Aplica)", desc: "No obligatorio para Cuota Fija independiente según POL.GLE.001 (Solo si tiene planilla)" }
     ],
     "Régimen General": [
-        { id: "formato_alta", name: "Formato de Solicitud de Alta", desc: "Firmado y sellado por el Representante Legal" },
-        { id: "cedula", name: "Cédula del Representante Legal", desc: "Cédula vigente del apoderado o representante legal" },
-        { id: "ruc", name: "Cédula RUC Vigente", desc: "Cédula RUC vigente en Régimen General" },
-        { id: "matricula", name: "Matrícula de Alcaldía Vigente", desc: "Matrícula municipal vigente de la empresa" },
-        { id: "factura", name: "Factura de Venta en Blanco", desc: "Cumplimiento con requisitos de ventanilla (10.PO.S01.0006)" },
-        { id: "constitucion", name: "Acta de Constitución y Estatutos", desc: "Testimonio de Escritura Pública inscrita en Registro Mercantil" },
-        { id: "poder", name: "Poder Notarial del Representante", desc: "Poder General o Especial inscrito en el Registro Público" },
-        { id: "constancia_dgi", name: "Constancia de Inscripción DGI", desc: "Inscripción en la Dirección General de Ingresos" },
-        { id: "iva", name: "Constancia de Recaudador de IVA", desc: "Acreditación como responsable recaudador de IVA" },
-        { id: "solvencia", name: "Solvencia Fiscal Actualizada", desc: "Solvencia fiscal vigente emitida por la DGI" },
-        { id: "beneficiario", name: "Certificado de Beneficiario Final", desc: "Declaración y certificación de beneficiario final actualizada" },
-        { id: "etica", name: "Declaratoria de Ética SINSA", desc: "Carta de adhesión y cumplimiento de código de conducta" },
-        { id: "inss", name: "Constancia de Afiliación al INSS", desc: "Certificado patronal del INSS al día con sus contribuciones" }
+        { id: "formato_alta", name: "1. Formato de Alta de Proveedor (10.F.S01.0006)", desc: "Requisito Base #1 (10.F.S01.0006 / POL.GLE.001): Firmado y sellado por el Representante Legal" },
+        { id: "cedula", name: "2. Copia de Cédula del Representante Legal", desc: "Requisito Base #2 (10.F.S01.0006 / POL.GLE.001): Cédula vigente del apoderado o representante legal" },
+        { id: "ruc", name: "3. Copia de Cédula RUC Vigente", desc: "Requisito Base #3 (10.F.S01.0006 / POL.GLE.001): Cédula RUC vigente en Régimen General" },
+        { id: "matricula", name: "4. Copia de Matrícula de la Alcaldía Vigente", desc: "Requisito Base #4 (10.F.S01.0006 / POL.GLE.001): Matrícula municipal vigente de la empresa" },
+        { id: "factura", name: "5. Copia de Factura en Blanco", desc: "Requisito Base #5 (10.F.S01.0006 / 10.PO.S01.0006): Factura en blanco con pie de imprenta DGI vigente" },
+        { id: "constitucion", name: "6. Copia de Acta de Constitución (Personería Jurídica)", desc: "Requisito #6 Régimen General (10.F.S01.0006 / POL.GLE.001): Escritura inscrita en Registro Mercantil" },
+        { id: "poder", name: "7. Poder General de Administración", desc: "Requisito #7 Régimen General (10.F.S01.0006 / POL.GLE.001): Poder Notarial inscrito en Registro Público" },
+        { id: "constancia_dgi", name: "8. Copia de Constancia de Inscripción DGI", desc: "Requisito #8 Régimen General (10.F.S01.0006 / POL.GLE.001): Constancia de inscripción activa en DGI" },
+        { id: "no_retencion", name: "9. Constancia de No Retención (Si Aplica)", desc: "Requisito #9 Régimen General (10.F.S01.0006): Emitida por la DGI únicamente si aplica" },
+        { id: "iva", name: "10. Copia de Constancia de Recaudador del IVA", desc: "Requisito #10 Régimen General (10.F.S01.0006 / POL.GLE.001): Acreditación como recaudador de IVA" },
+        { id: "solvencia", name: "11. Solvencia Fiscal Actualizada (POL.GLE.001)", desc: "Exigido por Política Legal POL.GLE.001 (30-03-2026) para formalizar contratación" },
+        { id: "beneficiario", name: "12. Certificado de Beneficiario Final (Sociedades)", desc: "Exigido por POL.GLE.001 (30-03-2026) únicamente para Sociedades Mercantiles" },
+        { id: "etica", name: "13. Declaratoria de Ética SINSA (POL.GLE.001)", desc: "Exigido por POL.GLE.001 Art. 36 (30-03-2026): Carta de adhesión al Código de Ética" },
+        { id: "inss", name: "14. Constancia de Afiliación al INSS (Si Aplica)", desc: "Requerido según 10.P.S01.0001 y Art. 18 POL.GLE.001 cuando emplea personal en planilla" }
+    ],
+    "Régimen Compra Única": [
+        { id: "formato_alta", name: "1. Formato de Alta de Proveedor (10.F.S01.0006)", desc: "Requisito #1 Compra Única (10.F.S01.0006 / 10.P.S01.0001): Firmado y sellado" },
+        { id: "cedula", name: "2. Copia de Cédula del Representante Legal / Titular", desc: "Requisito #2 Compra Única (10.F.S01.0006 / 10.P.S01.0001): Copia legible vigente" },
+        { id: "ruc", name: "3. Copia de Cédula RUC", desc: "Requisito #3 Compra Única (10.F.S01.0006 / 10.P.S01.0001): Copia de constancia RUC vigente" },
+        { id: "iva", name: "4. Constancia de Recaudador de IVA (Si Aplica)", desc: "Requisito #4 Compra Única (10.F.S01.0006 / 10.P.S01.0001): Constancia oficial DGI" }
     ],
     "Persona Natural No Inscrita en DGI": [
-        { id: "formato_alta", name: "Formato de Solicitud de Alta", desc: "Firmado y con huella dactilar del prestador del servicio" },
-        { id: "cedula", name: "Cédula de Identidad Vigente", desc: "Copia legible de cédula de identidad nacional" }
+        { id: "formato_alta", name: "1. Formato de Alta de Proveedor (10.F.S01.0006)", desc: "Requisito #1 No Inscrito DGI (POL.GLE.001 Anexo 6.1.1): Firmado por el proveedor" },
+        { id: "cedula", name: "2. Cédula de Identidad Vigente", desc: "Requisito #2 No Inscrito DGI (POL.GLE.001 Anexo 6.1.1): Copia legible de cédula nacional (Sujeto a retención IR)" }
     ]
 };
 
@@ -8850,7 +8857,7 @@ function saveBlobAsFile(blob, fileName) {
 // Normativas SINSA: POL.GLE.001 / 10.P.S01.0001 / Formato 10.F.S01.0006
 // ==========================================================================
 
-async function buildProviderOnboardingKitDocx(data = {}) {
+async function buildProviderOnboardingKitDocx(data = {}, forceBlank = false) {
     if (!window.docx) throw new Error("Librería docx.js no cargada.");
 
     const {
@@ -8865,7 +8872,8 @@ async function buildProviderOnboardingKitDocx(data = {}) {
     const borderColor = '94A3B8';
     const lightBorderColor = 'CBD5E1';
     const grayHeaderBg = '808080';   // Gris oficial encabezados SINSA (10.F.S01.0006)
-    const blueProviderBg = 'DBEAFE'; // Celeste/Azul suave campos a llenar por el proveedor
+    const blueProviderBg = 'DBEAFE'; // Celeste/Azul suave oficial campos a llenar por el proveedor
+    const softBlueChecklistBg = 'EFF6FF';
     const lightGrayBg = 'F1F5F9';
     const whiteBg = 'FFFFFF';
 
@@ -8885,35 +8893,44 @@ async function buildProviderOnboardingKitDocx(data = {}) {
 
     const logoBytes = typeof getSinsaLogoUint8Array === 'function' ? getSinsaLogoUint8Array() : null;
 
-    const provName = (data.nombre_comercial || data.nombre || '').trim();
-    const repName = (data.nombre_representante || '').trim();
-    const regimen = data.regimen || '';
+    // Si forceBlank es true o si no se ha ingresado aún el nombre del proveedor en el formulario,
+    // el documento se genera 100% EN BLANCO para que el proveedor llene y seleccione todo por su cuenta.
+    const rawProvName = (data.nombre_comercial || data.nombre || '').trim();
+    const rawRepName = (data.nombre_representante || '').trim();
+    const isBlank = forceBlank || (!rawProvName && !rawRepName);
+
+    const provName = isBlank ? '' : rawProvName;
+    const repName = isBlank ? '' : rawRepName;
+    // Solo pre-marcar régimen si el usuario lo solicitó explícitamente con datos de un proveedor específico y flag precheckRegimen
+    const regimen = (!isBlank && data.precheckRegimen) ? (data.regimen || '') : '';
     const isRegGeneral = regimen.includes('General');
     const isCuotaFija = regimen.includes('Cuota Fija');
-    const isCompraUnica = regimen.includes('Compra Única') || regimen.includes('Natural') || regimen.includes('No Inscrita');
-    const cedula = (data.cedula || '').trim();
-    const ruc = (data.ruc || '').trim();
-    const tel = (data.telefono || '').trim();
-    const correo = (data.correo || '').trim();
-    const dir = (data.direccion || '').trim();
-    const contactoOp = (data.contacto_operativo || '').trim();
-    const banco = (data.banco || '').trim();
-    const cuenta = (data.cuenta_bancaria || '').trim();
-    const titular = (data.titular_cuenta || repName || provName || '').trim();
-    const condicionPago = data.condicion_pago || '';
+    const isCompraUnica = regimen.includes('Compra Única');
+    const isNoInscrito = regimen.includes('Natural') || regimen.includes('No Inscrita');
+
+    const cedula = isBlank ? '' : (data.cedula || '').trim();
+    const ruc = isBlank ? '' : (data.ruc || '').trim();
+    const tel = isBlank ? '' : (data.telefono || '').trim();
+    const correo = isBlank ? '' : (data.correo || '').trim();
+    const dir = isBlank ? '' : (data.direccion || '').trim();
+    const contactoOp = isBlank ? '' : (data.contacto_operativo || '').trim();
+    const banco = isBlank ? '' : (data.banco || '').trim();
+    const cuenta = isBlank ? '' : (data.cuenta_bancaria || '').trim();
+    const titular = isBlank ? '' : (data.titular_cuenta || repName || provName || '').trim();
+    const condicionPago = isBlank ? '' : (data.condicion_pago || '');
 
     const now = new Date();
     const diaStr = String(data.dia || now.getDate()).padStart(2, '0');
     const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     const mesStr = data.mes || meses[now.getMonth()];
     const anioStr = String(data.anio || now.getFullYear());
-    const fechaCompleta = `${diaStr} de ${mesStr} de ${anioStr}`;
+    const fechaCompleta = isBlank ? '' : `${diaStr} de ${mesStr} de ${anioStr}`;
 
     const children = [];
 
     function createSectionHeader(titleText) {
         return new Paragraph({
-            spacing: { before: 55, after: 20 },
+            spacing: { before: 45, after: 15 },
             shading: { fill: grayHeaderBg },
             children: [
                 new TextRun({ text: `  ${titleText}`, bold: true, font, size: 15, color: 'FFFFFF' })
@@ -8927,7 +8944,7 @@ async function buildProviderOnboardingKitDocx(data = {}) {
             columnSpan: colSpan,
             borders: cellBorderSolid,
             shading: { fill: bg },
-            margins: customMargins || { top: 42, bottom: 42, left: 55, right: 55 },
+            margins: customMargins || { top: 38, bottom: 38, left: 55, right: 55 },
             verticalAlign: 'center',
             children: Array.isArray(paragraphs) ? paragraphs : [paragraphs]
         });
@@ -8935,8 +8952,9 @@ async function buildProviderOnboardingKitDocx(data = {}) {
 
     // =========================================================================
     // HOJA 1:
-    // 1. TABLA GUÍA DE DOCUMENTOS SEGÚN TIPO DE RÉGIMEN (ARRIBA)
-    // 2. CHECKLIST SIMPLE PARA EL PROVEEDOR (DEBAJO EN LA MISMA HOJA)
+    // - CUADRO DE DATOS DEL PROVEEDOR (100% EDITABLE DIGITAL O MANUAL SIN LÍNEAS ROTAS)
+    // - 1. TABLA OFICIAL DE REQUISITOS SEGÚN TIPO DE RÉGIMEN (10.F.S01.0006 + POL.GLE.001)
+    // - 2. CHECKLIST DE CONTROL PARA EL PROVEEDOR (DIGITAL O MANUAL)
     // =========================================================================
 
     const headerCells = [];
@@ -8947,7 +8965,7 @@ async function buildProviderOnboardingKitDocx(data = {}) {
                 children: [
                     new ImageRun({
                         data: logoBytes,
-                        transformation: { width: 135, height: 42 }
+                        transformation: { width: 125, height: 38 }
                     })
                 ]
             })
@@ -8956,7 +8974,7 @@ async function buildProviderOnboardingKitDocx(data = {}) {
         headerCells.push(makeCell([
             new Paragraph({
                 alignment: AlignmentType.CENTER,
-                children: [new TextRun({ text: 'SINSA', bold: true, font, size: 28, color: primaryColor })]
+                children: [new TextRun({ text: 'SINSA', bold: true, font, size: 26, color: primaryColor })]
             })
         ], 22, whiteBg));
     }
@@ -8964,25 +8982,25 @@ async function buildProviderOnboardingKitDocx(data = {}) {
     headerCells.push(makeCell([
         new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { after: 15 },
-            children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A. (SINSA)', bold: true, font, size: 19, color: darkNavy })]
+            spacing: { after: 10 },
+            children: [new TextRun({ text: 'SILVA INTERNACIONAL S.A. (SINSA)', bold: true, font, size: 18, color: darkNavy })]
         }),
         new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { after: 15 },
-            children: [new TextRun({ text: 'GERENCIA ADMINISTRATIVA FINANCIERA / GESTIÓN LEGAL', bold: true, font, size: 13, color: textMuted })]
+            spacing: { after: 10 },
+            children: [new TextRun({ text: 'GERENCIA ADMINISTRATIVA FINANCIERA / GESTIÓN LEGAL', bold: true, font, size: 12, color: textMuted })]
         }),
         new Paragraph({
             alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: 'POLÍTICA DE ALTA DE PROVEEDORES (POL.GLE.001 / 10.P.S01.0001)', bold: true, font, size: 14, color: primaryColor })]
+            children: [new TextRun({ text: 'KIT DE ALTA DE PROVEEDORES (POL.GLE.001 / 10.P.S01.0001 / 10.F.S01.0006)', bold: true, font, size: 13, color: primaryColor })]
         })
     ], 54, whiteBg));
 
     headerCells.push(makeCell([
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 12 }, children: [new TextRun({ text: 'CONTROL NORMATIVO', bold: true, font, size: 12, color: darkNavy })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Código: 10.P.S01.0001', bold: true, font, size: 12, color: primaryColor })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Formato: 10.F.S01.0006', font, size: 12 })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Emisión: ${diaStr}/${now.getMonth() + 1}/${anioStr}`, font, size: 11, color: textMuted })] })
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 8 }, children: [new TextRun({ text: 'NORMATIVA OFICIAL', bold: true, font, size: 11, color: darkNavy })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Política: POL.GLE.001 (2026)', bold: true, font, size: 11, color: primaryColor })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Procedimiento: 10.P.S01.0001', font, size: 11 })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Formato: 10.F.S01.0006 v1', bold: true, font, size: 11, color: textMuted })] })
     ], 24, lightGrayBg));
 
     children.push(new Table({
@@ -8991,118 +9009,151 @@ async function buildProviderOnboardingKitDocx(data = {}) {
         rows: [new TableRow({ children: headerCells })]
     }));
 
-    // Título Sección 1
+    // Instrucción breve de llenado digital o manual
     children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 70, after: 35 },
-        shading: { fill: darkNavy },
+        spacing: { before: 30, after: 25 },
+        shading: { fill: blueProviderBg },
+        borders: cellBorderSolid,
         children: [
-            new TextRun({ text: '1. GUÍA DE REQUISITOS SEGÚN TIPO DE RÉGIMEN', bold: true, font, size: 17, color: 'FFFFFF' })
+            new TextRun({ text: 'INSTRUCCIÓN PARA EL PROVEEDOR (LLENADO DIGITAL O MANUAL): ', bold: true, font, size: 12, color: '1E3A8A' }),
+            new TextRun({ text: 'Complete las celdas en color azul celeste escribiendo en computadora o a mano, seleccione su régimen con una ', font, size: 12, color: '1E3A8A' }),
+            new TextRun({ text: 'X', bold: true, font, size: 12, color: '1E3A8A' }),
+            new TextRun({ text: ' dentro de los corchetes [ X ] y verifique sus documentos en el Checklist.', font, size: 12, color: '1E3A8A' })
         ]
     }));
 
-    // Cuadro de Datos del Contratista (Espacioso y limpio)
+    // Cuadro de Datos del Proveedor con celdas editables limpias (Sin rayas que se desconfiguran al escribir en Word)
+    const pMargin = { top: 42, bottom: 42, left: 55, right: 55 };
     children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: cellBorderSolid,
         rows: [
             new TableRow({
+                cantSplit: true,
                 children: [
-                    new TableCell({
-                        width: { size: 58, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        shading: { fill: 'F8FAFC' },
-                        margins: { top: 75, bottom: 75, left: 80, right: 80 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'Proveedor / Razón Social: ', bold: true, font, size: 15, color: darkNavy }),
-                                    new TextRun({ text: provName || '____________________________________________', bold: !!provName, font, size: 15, color: provName ? primaryColor : textMuted })
-                                ]
-                            }),
-                            new Paragraph({
-                                spacing: { before: 55 },
-                                children: [
-                                    new TextRun({ text: 'Titular / Representante: ', bold: true, font, size: 15, color: darkNavy }),
-                                    new TextRun({ text: repName || '____________________________________________', font, size: 15 })
-                                ]
-                            })
-                        ]
-                    }),
-                    new TableCell({
-                        width: { size: 42, type: WidthType.PERCENTAGE },
-                        borders: cellBorderSolid,
-                        shading: { fill: 'F8FAFC' },
-                        margins: { top: 75, bottom: 75, left: 80, right: 80 },
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({ text: 'Régimen: ', bold: true, font, size: 15, color: darkNavy }),
-                                    new TextRun({ text: `${isRegGeneral ? '☒' : '☐'} General   ${isCuotaFija ? '☒' : '☐'} Cuota Fija   ${isCompraUnica ? '☒' : '☐'} Compra Única`, font, size: 14 })
-                                ]
-                            }),
-                            new Paragraph({
-                                spacing: { before: 55 },
-                                children: [
-                                    new TextRun({ text: 'Fecha Entrega: ', bold: true, font, size: 15, color: darkNavy }),
-                                    new TextRun({ text: fechaCompleta, font, size: 14 })
-                                ]
-                            })
-                        ]
-                    })
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'PROVEEDOR / RAZÓN SOCIAL:', bold: true, font, size: 12, color: darkNavy })] })], 23, lightGrayBg, 1, pMargin),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: provName, bold: true, font, size: 13, color: darkNavy })] })], 41, blueProviderBg, 1, pMargin),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'FECHA DE LLENADO:', bold: true, font, size: 12, color: darkNavy })] })], 16, lightGrayBg, 1, pMargin),
+                    makeCell([new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: fechaCompleta, font, size: 12, color: isBlank ? textMuted : darkNavy })] })], 20, blueProviderBg, 1, pMargin)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'TITULAR / REP. LEGAL:', bold: true, font, size: 12, color: darkNavy })] })], 23, lightGrayBg, 1, pMargin),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: repName, font, size: 13, color: darkNavy })] })], 41, blueProviderBg, 1, pMargin),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CÉDULA / N° RUC:', bold: true, font, size: 12, color: darkNavy })] })], 16, lightGrayBg, 1, pMargin),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: ruc || cedula, font, size: 12, color: darkNavy })] })], 20, blueProviderBg, 1, pMargin)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'TELÉFONO / CELULAR:', bold: true, font, size: 12, color: darkNavy })] })], 23, lightGrayBg, 1, pMargin),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: tel, font, size: 12, color: darkNavy })] })], 41, blueProviderBg, 1, pMargin),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: 'CORREO E-MAIL:', bold: true, font, size: 12, color: darkNavy })] })], 16, lightGrayBg, 1, pMargin),
+                    makeCell([new Paragraph({ children: [new TextRun({ text: correo, font, size: 12, color: darkNavy })] })], 20, blueProviderBg, 1, pMargin)
+                ]
+            }),
+            new TableRow({
+                cantSplit: true,
+                children: [
+                    makeCell([
+                        new Paragraph({ children: [new TextRun({ text: 'SELECCIONE SU RÉGIMEN:', bold: true, font, size: 12, color: darkNavy })] }),
+                        new Paragraph({ children: [new TextRun({ text: '(Marque con X en [  ])', italic: true, font, size: 10, color: textMuted })] })
+                    ], 23, lightGrayBg, 1, pMargin),
+                    makeCell([
+                        new Paragraph({
+                            alignment: AlignmentType.LEFT,
+                            children: [
+                                new TextRun({ text: `[ ${isRegGeneral ? 'X' : '   '} ] `, bold: true, font, size: 13, color: '1E3A8A' }),
+                                new TextRun({ text: 'Régimen General     ', bold: true, font, size: 12, color: darkNavy }),
+                                new TextRun({ text: `[ ${isCuotaFija ? 'X' : '   '} ] `, bold: true, font, size: 13, color: '1E3A8A' }),
+                                new TextRun({ text: 'Régimen Cuota Fija     ', bold: true, font, size: 12, color: darkNavy }),
+                                new TextRun({ text: `[ ${isCompraUnica ? 'X' : '   '} ] `, bold: true, font, size: 13, color: '1E3A8A' }),
+                                new TextRun({ text: 'Compra Única     ', bold: true, font, size: 12, color: darkNavy }),
+                                new TextRun({ text: `[ ${isNoInscrito ? 'X' : '   '} ] `, bold: true, font, size: 13, color: '1E3A8A' }),
+                                new TextRun({ text: 'No Inscrito DGI', bold: true, font, size: 12, color: darkNavy })
+                            ]
+                        })
+                    ], 77, blueProviderBg, 3, pMargin)
                 ]
             })
         ]
     }));
 
-    children.push(new Paragraph({ spacing: { before: 55, after: 25 } }));
+    // =========================================================================
+    // TABLA 1 (ARRIBA): MATRIZ OFICIAL DE REQUISITOS POR TIPO DE RÉGIMEN
+    // Conciliada con Formato 10.F.S01.0006, Procedimiento 10.P.S01.0001 y Política POL.GLE.001 (30-03-2026)
+    // =========================================================================
+    children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 40, after: 15 },
+        shading: { fill: darkNavy },
+        children: [
+            new TextRun({ text: '1. GUÍA OFICIAL DE REQUISITOS SEGÚN TIPO DE RÉGIMEN (10.F.S01.0006 / POL.GLE.001)', bold: true, font, size: 14, color: 'FFFFFF' })
+        ]
+    }));
 
-    // =========================================================================
-    // TABLA 1 (ARRIBA): MATRIZ DE REQUISITOS POR TIPO DE RÉGIMEN
-    // =========================================================================
     const regimeTableHeader = new TableRow({
         tableHeader: true,
         cantSplit: true,
         children: [
-            new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 55, bottom: 55, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Nº', bold: true, font, size: 14, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 39, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 55, bottom: 55, left: 60, right: 60 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DOCUMENTO / REQUISITO EXIGIDO', bold: true, font, size: 14, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 55, bottom: 55, left: 25, right: 25 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'RÉGIMEN GENERAL', bold: true, font, size: 13, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 55, bottom: 55, left: 25, right: 25 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CUOTA FIJA', bold: true, font, size: 13, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 55, bottom: 55, left: 25, right: 25 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'COMPRA ÚNICA', bold: true, font, size: 13, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 17, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 55, bottom: 55, left: 40, right: 40 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ESPECIFICACIÓN', bold: true, font, size: 13, color: 'FFFFFF' })] })] })
+            new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 32, bottom: 32, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Nº', bold: true, font, size: 12, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 41, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 32, bottom: 32, left: 45, right: 45 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DOCUMENTO / REQUISITO OFICIAL SINSA', bold: true, font, size: 12, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 32, bottom: 32, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'RÉGIMEN GENERAL', bold: true, font, size: 11, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 32, bottom: 32, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CUOTA FIJA', bold: true, font, size: 11, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 32, bottom: 32, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'COMPRA ÚNICA', bold: true, font, size: 11, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 15, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: darkNavy }, margins: { top: 32, bottom: 32, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'BASE NORMATIVA', bold: true, font, size: 11, color: 'FFFFFF' })] })] })
         ]
     });
 
+    // Ítems 1 al 10: Exactamente los 10 requisitos del Formato Oficial 10.F.S01.0006 (5 en Cuota Fija, 4 en Compra Única, 10 en General)
+    // Ítems 11 y 12: Requisitos de Cumplimiento Legal de la Política Corporativa POL.GLE.001 (30-03-2026) para formalización de contrato
     const officialDocsList = [
-        { num: '1', doc: 'Formato de Alta de Proveedor (10.F.S01.0006)', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'OBLIGATORIO', spec: 'Firmado y sellado' },
-        { num: '2', doc: 'Copia de Cédula del Representante Legal / Titular', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'OBLIGATORIO', spec: 'Copia legible vigente' },
-        { num: '3', doc: 'Copia de Cédula RUC emitida por la DGI', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'OBLIGATORIO', spec: 'Constancia RUC vigente' },
-        { num: '4', doc: 'Copia de Matrícula de Alcaldía Municipal', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'No Aplica', spec: 'Año en curso' },
-        { num: '5', doc: 'Copia de Factura en Blanco autorizada por DGI', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'No Aplica', spec: 'Pie de imprenta válido' },
-        { num: '6', doc: 'Copia de Acta de Constitución (Personería Jurídica)', gen: 'OBLIGATORIO', cuota: 'No Aplica', unica: 'No Aplica', spec: 'Inscrita Reg. Mercantil' },
-        { num: '7', doc: 'Poder General de Administración', gen: 'OBLIGATORIO', cuota: 'No Aplica', unica: 'No Aplica', spec: 'Inscrito Reg. Público' },
-        { num: '8', doc: 'Copia de Constancia de Inscripción DGI', gen: 'OBLIGATORIO', cuota: 'No Aplica', unica: 'No Aplica', spec: 'Constancia actualizada' },
-        { num: '9', doc: 'Constancia de No Retención (Si aplica)', gen: 'Si Aplica', cuota: 'No Aplica', unica: 'No Aplica', spec: 'Emitida por la DGI' },
-        { num: '10', doc: 'Copia de Constancia de Recaudador de IVA', gen: 'OBLIGATORIO', cuota: 'No Aplica', unica: 'OBLIGATORIO', spec: 'Constancia oficial DGI' },
-        { num: '11', doc: 'Constancia de Afiliación al INSS', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'No Aplica', spec: 'Constancia vigente' }
+        { num: '1', doc: 'Formato de Alta de Proveedor (10.F.S01.0006) firmado y sellado', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'OBLIGATORIO', spec: 'Base 10.F.S01.0006' },
+        { num: '2', doc: 'Copia de Cédula del Representante Legal o Proveedor (Vigente)', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'OBLIGATORIO', spec: 'Base 10.F.S01.0006' },
+        { num: '3', doc: 'Copia de Cédula RUC Vigente emitida por la DGI', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'OBLIGATORIO', spec: 'Base 10.F.S01.0006' },
+        { num: '4', doc: 'Copia de Matrícula de la Alcaldía Vigente (Año en curso)', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'No Aplica', spec: 'Base 10.F.S01.0006' },
+        { num: '5', doc: 'Copia de Factura en Blanco (Con pie de imprenta DGI vigente)', gen: 'OBLIGATORIO', cuota: 'OBLIGATORIO', unica: 'No Aplica', spec: 'Base 10.F.S01.0006' },
+        { num: '6', doc: 'Copia de Acta de Constitución de la Empresa (Personería Jurídica)', gen: 'OBLIGATORIO', cuota: 'No Aplica', unica: 'No Aplica', spec: 'Solo Rég. General' },
+        { num: '7', doc: 'Poder General de Administración (Inscrito en Registro Mercantil)', gen: 'OBLIGATORIO', cuota: 'No Aplica', unica: 'No Aplica', spec: 'Solo Rég. General' },
+        { num: '8', doc: 'Copia de Constancia de Inscripción DGI', gen: 'OBLIGATORIO', cuota: 'No Aplica', unica: 'No Aplica', spec: 'Solo Rég. General' },
+        { num: '9', doc: 'Constancia de No Retención (Si aplica)', gen: 'Si Aplica', cuota: 'No Aplica', unica: 'No Aplica', spec: 'Solo si aplica DGI' },
+        { num: '10', doc: 'Copia de Constancia de Recaudador del IVA', gen: 'OBLIGATORIO', cuota: 'No Aplica', unica: 'OBLIGATORIO', spec: 'General / C. Única' },
+        { num: '11', doc: 'Solvencia Fiscal Actualizada y Declaratoria de Ética SINSA', gen: 'Contrato Legal', cuota: 'Contrato Legal', unica: 'No Aplica', spec: 'POL.GLE.001 (2026)' },
+        { num: '12', doc: 'Certificado Beneficiario Final (Sociedades) / INSS (Si tiene planilla)', gen: 'Si Aplica', cuota: 'Si Aplica', unica: 'No Aplica', spec: 'POL.GLE.001 Art. 18' }
     ];
 
     const regimeRows = [regimeTableHeader];
     officialDocsList.forEach((row, i) => {
         const bg = i % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
-        const isGen = row.gen === 'OBLIGATORIO' || row.gen === 'Si Aplica';
-        const isCuota = row.cuota === 'OBLIGATORIO';
-        const isUnica = row.unica === 'OBLIGATORIO';
+        const renderStatusCell = (val) => {
+            const isOblig = val === 'OBLIGATORIO';
+            const isLegal = val === 'Contrato Legal' || val === 'Si Aplica';
+            const cellFill = isOblig ? 'ECFDF5' : (isLegal ? 'EFF6FF' : bg);
+            const textColor = isOblig ? '059669' : (isLegal ? '1D4ED8' : textMuted);
+            const label = isOblig ? '✓ Exigido' : val;
+            return new TableCell({
+                width: { size: 13, type: WidthType.PERCENTAGE },
+                borders: cellBorderLight,
+                shading: { fill: cellFill },
+                margins: { top: 26, bottom: 26, left: 20, right: 20 },
+                verticalAlign: 'center',
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: label, bold: isOblig || isLegal, font, size: 11, color: textColor })] })]
+            });
+        };
 
         regimeRows.push(new TableRow({
             cantSplit: true,
             children: [
-                new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 50, bottom: 50, left: 25, right: 25 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: row.num, bold: true, font, size: 14, color: primaryColor })] })] }),
-                new TableCell({ width: { size: 39, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 50, bottom: 50, left: 60, right: 60 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: row.doc, bold: true, font, size: 14, color: darkNavy })] })] }),
-                new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: isGen ? 'ECFDF5' : bg }, margins: { top: 50, bottom: 50, left: 25, right: 25 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: row.gen === 'OBLIGATORIO' ? '✓ Exigido' : row.gen, bold: isGen, font, size: 13, color: isGen ? '059669' : textMuted })] })] }),
-                new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: isCuota ? 'ECFDF5' : bg }, margins: { top: 50, bottom: 50, left: 25, right: 25 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isCuota ? '✓ Exigido' : 'No Aplica', bold: isCuota, font, size: 13, color: isCuota ? '059669' : textMuted })] })] }),
-                new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: isUnica ? 'ECFDF5' : bg }, margins: { top: 50, bottom: 50, left: 25, right: 25 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isUnica ? '✓ Exigido' : 'No Aplica', bold: isUnica, font, size: 13, color: isUnica ? '059669' : textMuted })] })] }),
-                new TableCell({ width: { size: 17, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 50, bottom: 50, left: 40, right: 40 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: row.spec, font, size: 13, color: textMuted })] })] })
+                new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 26, bottom: 26, left: 20, right: 20 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: row.num, bold: true, font, size: 12, color: primaryColor })] })] }),
+                new TableCell({ width: { size: 41, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 26, bottom: 26, left: 45, right: 45 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: row.doc, bold: i < 5, font, size: 11.5, color: darkNavy })] })] }),
+                renderStatusCell(row.gen),
+                renderStatusCell(row.cuota),
+                renderStatusCell(row.unica),
+                new TableCell({ width: { size: 15, type: WidthType.PERCENTAGE }, borders: cellBorderLight, shading: { fill: bg }, margins: { top: 26, bottom: 26, left: 30, right: 30 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: row.spec, font, size: 10.5, color: textMuted })] })] })
             ]
         }));
     });
@@ -9113,26 +9164,43 @@ async function buildProviderOnboardingKitDocx(data = {}) {
         rows: regimeRows
     }));
 
+    children.push(new Paragraph({
+        alignment: AlignmentType.LEFT,
+        spacing: { before: 18, after: 18 },
+        children: [
+            new TextRun({ text: 'Nota Normativa Oficial: ', bold: true, font, size: 11, color: darkNavy }),
+            new TextRun({ text: 'Para ', font, size: 11, color: textMuted }),
+            new TextRun({ text: 'Régimen Cuota Fija', bold: true, font, size: 11, color: primaryColor }),
+            new TextRun({ text: ', los requisitos base son únicamente del ', font, size: 11, color: textMuted }),
+            new TextRun({ text: '1 al 5', bold: true, font, size: 11, color: darkNavy }),
+            new TextRun({ text: ' (Formato 10.F.S01.0006). Los ítems 11 y 12 aplican cuando se suscribe contrato de servicios con Gestión Legal (Política POL.GLE.001 del 30-03-2026; el INSS no es obligatorio si no tiene planilla). Para ', font, size: 11, color: textMuted }),
+            new TextRun({ text: 'Servicios No Inscrito en DGI', bold: true, font, size: 11, color: darkNavy }),
+            new TextRun({ text: ', solo aplican los ítems 1 y 2.', font, size: 11, color: textMuted })
+        ]
+    }));
+
     // =========================================================================
     // TABLA 2 (DEBAJO EN LA MISMA PRIMERA HOJA):
-    // CHECKLIST SIMPLE PARA EL PROVEEDOR (ASEGURAR LO QUE TIENE Y LO QUE NO)
+    // CHECKLIST INTERACTIVO DIGITAL / MANUAL PARA EL PROVEEDOR
     // =========================================================================
     children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 80, after: 25 },
+        spacing: { before: 25, after: 15 },
         shading: { fill: primaryColor },
         children: [
-            new TextRun({ text: '2. CHECKLIST DE CONTROL PARA EL PROVEEDOR (ASEGURE LO QUE TIENE Y LO QUE LE FALTA)', bold: true, font, size: 16, color: 'FFFFFF' })
+            new TextRun({ text: '2. CHECKLIST DE CONTROL PARA EL PROVEEDOR (PARA LLENAR DIGITAL EN WORD O MANUAL A MANO)', bold: true, font, size: 14, color: 'FFFFFF' })
         ]
     }));
 
     children.push(new Paragraph({
         alignment: AlignmentType.LEFT,
-        spacing: { before: 15, after: 35 },
+        spacing: { before: 8, after: 20 },
         children: [
-            new TextRun({ text: 'Estimado proveedor: Utilice este cuadro para controlar sus documentos antes de entregarlos. Marque con una ', font, size: 14, color: textMuted }),
-            new TextRun({ text: 'X', bold: true, font, size: 14, color: darkNavy }),
-            new TextRun({ text: ' si ya cuenta con el documento o si aún lo tiene pendiente:', font, size: 14, color: textMuted })
+            new TextRun({ text: 'Estimado proveedor: Marque con una ', font, size: 11.5, color: textMuted }),
+            new TextRun({ text: 'X', bold: true, font, size: 11.5, color: darkNavy }),
+            new TextRun({ text: ' dentro de los corchetes ', font, size: 11.5, color: textMuted }),
+            new TextRun({ text: '[  X  ]', bold: true, font, size: 11.5, color: '1E3A8A' }),
+            new TextRun({ text: ' en las celdas celestes según tenga listo cada documento de su régimen:', font, size: 11.5, color: textMuted })
         ]
     }));
 
@@ -9140,11 +9208,12 @@ async function buildProviderOnboardingKitDocx(data = {}) {
         tableHeader: true,
         cantSplit: true,
         children: [
-            new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 60, bottom: 60, left: 25, right: 25 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Nº', bold: true, font, size: 14, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 41, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 60, bottom: 60, left: 60, right: 60 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DOCUMENTO A VERIFICAR POR EL PROVEEDOR', bold: true, font, size: 14, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 60, bottom: 60, left: 25, right: 25 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SÍ LO TENGO', bold: true, font, size: 14, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 60, bottom: 60, left: 25, right: 25 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ME FALTA', bold: true, font, size: 14, color: 'FFFFFF' })] })] }),
-            new TableCell({ width: { size: 26, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 60, bottom: 60, left: 50, right: 50 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'OBSERVACIONES DEL PROVEEDOR', bold: true, font, size: 14, color: 'FFFFFF' })] })] })
+            new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 32, bottom: 32, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Nº', bold: true, font, size: 11.5, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 42, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 32, bottom: 32, left: 45, right: 45 }, children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'DOCUMENTO A VERIFICAR POR EL PROVEEDOR', bold: true, font, size: 11.5, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 32, bottom: 32, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SÍ LO TENGO', bold: true, font, size: 11, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 32, bottom: 32, left: 20, right: 20 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'PENDIENTE', bold: true, font, size: 11, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 11, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 32, bottom: 32, left: 15, right: 15 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'NO APLICA', bold: true, font, size: 11, color: 'FFFFFF' })] })] }),
+            new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: '1E293B' }, margins: { top: 32, bottom: 32, left: 30, right: 30 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'COMENTARIO / NOTA', bold: true, font, size: 11, color: 'FFFFFF' })] })] })
         ]
     });
 
@@ -9154,11 +9223,12 @@ async function buildProviderOnboardingKitDocx(data = {}) {
         providerChecklistRows.push(new TableRow({
             cantSplit: true,
             children: [
-                new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 75, bottom: 75, left: 25, right: 25 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: row.num, bold: true, font, size: 15, color: darkNavy })] })] }),
-                new TableCell({ width: { size: 41, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 75, bottom: 75, left: 60, right: 60 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: row.doc, font, size: 15, color: darkNavy })] })] }),
-                new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 75, bottom: 75, left: 25, right: 25 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '☐   Sí', bold: true, font, size: 16, color: '059669' })] })] }),
-                new TableCell({ width: { size: 14, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 75, bottom: 75, left: 25, right: 25 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '☐   No', bold: true, font, size: 16, color: 'DC2626' })] })] }),
-                new TableCell({ width: { size: 26, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: 'FFFFFF' }, margins: { top: 75, bottom: 75, left: 50, right: 50 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: '', font, size: 15 })] })] })
+                new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 30, bottom: 30, left: 20, right: 20 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: row.num, bold: true, font, size: 12, color: darkNavy })] })] }),
+                new TableCell({ width: { size: 42, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: bg }, margins: { top: 30, bottom: 30, left: 45, right: 45 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: row.doc, font, size: 11.5, color: darkNavy })] })] }),
+                new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: softBlueChecklistBg }, margins: { top: 30, bottom: 30, left: 20, right: 20 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '[     ]  Sí', bold: true, font, size: 12, color: '059669' })] })] }),
+                new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: softBlueChecklistBg }, margins: { top: 30, bottom: 30, left: 20, right: 20 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '[     ]  No', bold: true, font, size: 12, color: 'DC2626' })] })] }),
+                new TableCell({ width: { size: 11, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: softBlueChecklistBg }, margins: { top: 30, bottom: 30, left: 15, right: 15 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '[     ]  N/A', bold: true, font, size: 11.5, color: '475569' })] })] }),
+                new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, borders: cellBorderSolid, shading: { fill: blueProviderBg }, margins: { top: 30, bottom: 30, left: 30, right: 30 }, verticalAlign: 'center', children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: '', font, size: 11.5 })] })] })
             ]
         }));
     });
@@ -9212,7 +9282,7 @@ async function buildProviderOnboardingKitDocx(data = {}) {
     formatoHeaderCells.push(makeCell([
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 8 }, children: [new TextRun({ text: 'Código: 10.F.S01.0006', bold: true, font, size: 12, color: darkNavy })] }),
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 8 }, children: [new TextRun({ text: 'Versión: 1', font, size: 12 })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Fecha: ${diaStr}/${mesStr.slice(0,3).toUpperCase()}/${anioStr}`, bold: true, font, size: 11, color: primaryColor })] })
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isBlank ? 'Fecha: ___/___/2026' : `Fecha: ${diaStr}/${mesStr.slice(0,3).toUpperCase()}/${anioStr}`, bold: true, font, size: 11, color: primaryColor })] })
     ], 24, lightGrayBg));
 
     children.push(new Table({
@@ -9257,11 +9327,11 @@ async function buildProviderOnboardingKitDocx(data = {}) {
                         new Paragraph({
                             children: [
                                 new TextRun({ text: 'DÍA: ', bold: true, font, size: 11 }),
-                                new TextRun({ text: `${diaStr}   `, font, size: 11 }),
+                                new TextRun({ text: isBlank ? '____   ' : `${diaStr}   `, font, size: 11 }),
                                 new TextRun({ text: 'MES: ', bold: true, font, size: 11 }),
-                                new TextRun({ text: `${mesStr.slice(0, 3).toUpperCase()}   `, font, size: 11 }),
+                                new TextRun({ text: isBlank ? '____   ' : `${mesStr.slice(0, 3).toUpperCase()}   `, font, size: 11 }),
                                 new TextRun({ text: 'AÑO: ', bold: true, font, size: 11 }),
-                                new TextRun({ text: anioStr, font, size: 11 })
+                                new TextRun({ text: isBlank ? '2026' : anioStr, font, size: 11 })
                             ]
                         })
                     ], 32, blueProviderBg)
@@ -9274,7 +9344,7 @@ async function buildProviderOnboardingKitDocx(data = {}) {
                         new Paragraph({
                             children: [
                                 new TextRun({ text: 'TIPO DE GESTIÓN: ', bold: true, font, size: 11 }),
-                                new TextRun({ text: '☐ Nuevo proveedor   ☐ Actualización   ☐ Compra Única', font, size: 10 })
+                                new TextRun({ text: '[   ] Nuevo   [   ] Actualización   [   ] Compra Única', font, size: 10 })
                             ]
                         })
                     ], 38, blueProviderBg),
@@ -9282,7 +9352,7 @@ async function buildProviderOnboardingKitDocx(data = {}) {
                         new Paragraph({
                             children: [
                                 new TextRun({ text: 'TIPO PROVEEDOR: ', bold: true, font, size: 11 }),
-                                new TextRun({ text: '☐ Nacional   ☐ Extranjero   ☐ Servicios', font, size: 10 })
+                                new TextRun({ text: '[   ] Nacional   [   ] Extranjero   [   ] Servicios', font, size: 10 })
                             ]
                         })
                     ], 30, blueProviderBg),
@@ -9833,17 +9903,18 @@ async function downloadProviderOnboardingKitDocx(isCurrentData = true) {
         if (!window.docx) {
             throw new Error("Librería docx.js no disponible.");
         }
+        const forceBlank = !isCurrentData;
         const data = isCurrentData ? (typeof getWizardData === 'function' ? getWizardData() : {}) : {};
-        const provName = (data.nombre_comercial || data.nombre || '').trim();
-        const safeName = provName ? provName.replace(/[^a-zA-Z0-9_-]/g, '_') : 'EN_BLANCO';
+        const rawProvName = forceBlank ? '' : (data.nombre_comercial || data.nombre || '').trim();
+        const safeName = rawProvName ? rawProvName.replace(/[^a-zA-Z0-9_-]/g, '_') : 'EN_BLANCO';
 
-        const doc = await buildProviderOnboardingKitDocx(data);
+        const doc = await buildProviderOnboardingKitDocx(data, forceBlank);
         const blob = await window.docx.Packer.toBlob(doc);
 
         if (blob && blob.size > 1000) {
             const fileName = `KIT_ALTA_PROVEEDOR_SINSA_10.F.S01.0006_${safeName}.docx`;
             saveBlobAsFile(blob, fileName);
-            alert(`📥 Kit de Alta de Proveedor descargado exitosamente:\n\n📄 Archivo: ${fileName}\n\nIncluye:\n1. Checklist oficial de requisitos según régimen (POL.GLE.001 / 10.P.S01.0001) para completamiento por el contratista.\n2. Formato Oficial de Solicitud de Alta de Proveedores (10.F.S01.0006) respetando estrictamente las secciones de SINSA (I a VI) con campos azul para el contratista.`);
+            alert(`📥 Kit de Alta de Proveedor descargado exitosamente:\n\n📄 Archivo: ${fileName}\n\nIncluye:\n1. Hoja 1: Cuadro editable de identificación y selección de régimen (sin marcas prefijadas), Guía Oficial conciliada (Formato 10.F.S01.0006 + Política POL.GLE.001 2026) y Checklist interactivo digital/manual.\n2. Hoja 2: Formato Oficial de Solicitud de Alta de Proveedores (10.F.S01.0006) respetando las secciones de SINSA (I a VI) con campos celestes editables.`);
         } else {
             throw new Error("El archivo generado está vacío.");
         }
@@ -9861,31 +9932,37 @@ function downloadProviderOnboardingKitExcel(isCurrentData = true) {
     }
 
     try {
+        const forceBlank = !isCurrentData;
         const data = isCurrentData ? (typeof getWizardData === 'function' ? getWizardData() : {}) : {};
-        const provName = (data.nombre_comercial || data.nombre || '').trim();
-        const repName = (data.nombre_representante || '').trim();
-        const regimen = data.regimen || 'Régimen de Cuota Fija';
+        const rawProvName = (data.nombre_comercial || data.nombre || '').trim();
+        const rawRepName = (data.nombre_representante || '').trim();
+        const isBlank = forceBlank || (!rawProvName && !rawRepName);
+
+        const provName = isBlank ? '' : rawProvName;
+        const repName = isBlank ? '' : rawRepName;
+        const regimen = (!isBlank && data.precheckRegimen) ? (data.regimen || '') : '';
         const isRegGeneral = regimen.includes('General');
         const isCuotaFija = regimen.includes('Cuota Fija');
-        const isCompraUnica = regimen.includes('Compra Única') || regimen.includes('Natural') || regimen.includes('No Inscrita');
-        const cedula = (data.cedula || '').trim();
-        const ruc = (data.ruc || '').trim();
-        const tel = (data.telefono || '').trim();
-        const correo = (data.correo || '').trim();
-        const dir = (data.direccion || '').trim();
-        const contactoOp = (data.contacto_operativo || '').trim();
-        const banco = (data.banco || 'BAC Credomatic').trim();
-        const cuenta = (data.cuenta_bancaria || '').trim();
-        const titular = (data.titular_cuenta || repName || provName || '').trim();
-        const condicionPago = data.condicion_pago || 'SEMANAL';
-        const tipoCobertura = data.tipo_cobertura || 'MANAGUA';
+        const isCompraUnica = regimen.includes('Compra Única');
+        const isNoInscrito = regimen.includes('Natural') || regimen.includes('No Inscrita');
+
+        const cedula = isBlank ? '' : (data.cedula || '').trim();
+        const ruc = isBlank ? '' : (data.ruc || '').trim();
+        const tel = isBlank ? '' : (data.telefono || '').trim();
+        const correo = isBlank ? '' : (data.correo || '').trim();
+        const dir = isBlank ? '' : (data.direccion || '').trim();
+        const contactoOp = isBlank ? '' : (data.contacto_operativo || '').trim();
+        const banco = isBlank ? '' : (data.banco || '').trim();
+        const cuenta = isBlank ? '' : (data.cuenta_bancaria || '').trim();
+        const titular = isBlank ? '' : (data.titular_cuenta || repName || provName || '').trim();
+        const condicionPago = isBlank ? '' : (data.condicion_pago || '');
 
         const now = new Date();
         const diaStr = String(data.dia || now.getDate()).padStart(2, '0');
         const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
         const mesStr = data.mes || meses[now.getMonth()];
         const anioStr = String(data.anio || now.getFullYear());
-        const fechaCompleta = `${diaStr} de ${mesStr} de ${anioStr}`;
+        const fechaCompleta = isBlank ? '' : `${diaStr} de ${mesStr} de ${anioStr}`;
 
         // =====================================================================
         // 1. PESTAÑA: CHECKLIST_COMPLETAMIENTO (Guía por Régimen + Checklist del Proveedor)
@@ -9893,119 +9970,125 @@ function downloadProviderOnboardingKitExcel(isCurrentData = true) {
         const checklistData = [
             ["SILVA INTERNACIONAL S.A. (SINSA)"],
             ["GERENCIA ADMINISTRATIVA FINANCIERA / GESTIÓN LEGAL"],
-            ["POLÍTICA DE ALTA DE PROVEEDORES (POL.GLE.001 / 10.P.S01.0001)"],
+            ["KIT DE ALTA DE PROVEEDORES (POL.GLE.001 / 10.P.S01.0001 / 10.F.S01.0006)"],
+            ["INSTRUCCIÓN: Complete las celdas de identificación, marque con X su régimen entre los corchetes [ X ] y verifique sus documentos en el Checklist."],
             [],
-            ["Proveedor / Razón Social:", provName || "______________________________", "", "Régimen:", regimen || "☐ General   ☐ Cuota Fija   ☐ Compra Única"],
-            ["Titular / Representante:", repName || "______________________________", "", "Fecha Entrega:", fechaCompleta],
+            ["PROVEEDOR / RAZÓN SOCIAL:", provName, "", "FECHA DE LLENADO:", fechaCompleta, ""],
+            ["TITULAR / REP. LEGAL:", repName, "", "CÉDULA / N° RUC:", ruc || cedula, ""],
+            ["TELÉFONO / CELULAR:", tel, "", "CORREO E-MAIL:", correo, ""],
+            ["SELECCIONE SU RÉGIMEN (Marque con X):", `[ ${isRegGeneral ? 'X' : '   '} ] Régimen General`, `[ ${isCuotaFija ? 'X' : '   '} ] Régimen Cuota Fija`, `[ ${isCompraUnica ? 'X' : '   '} ] Compra Única`, `[ ${isNoInscrito ? 'X' : '   '} ] No Inscrito DGI`, ""],
             [],
-            ["1. GUÍA DE REQUISITOS SEGÚN TIPO DE RÉGIMEN"],
-            ["Nº", "DOCUMENTO / REQUISITO EXIGIDO", "RÉGIMEN GENERAL", "CUOTA FIJA", "COMPRA ÚNICA", "ESPECIFICACIÓN"],
-            ["1", "Formato de Alta de Proveedor (10.F.S01.0006)", "✓ Exigido", "✓ Exigido", "✓ Exigido", "Firmado y sellado"],
-            ["2", "Copia de Cédula del Representante Legal / Titular", "✓ Exigido", "✓ Exigido", "✓ Exigido", "Copia legible vigente"],
-            ["3", "Copia de Cédula RUC emitida por la DGI", "✓ Exigido", "✓ Exigido", "✓ Exigido", "Constancia RUC vigente"],
-            ["4", "Copia de Matrícula de Alcaldía Municipal", "✓ Exigido", "✓ Exigido", "No Aplica", "Año en curso"],
-            ["5", "Copia de Factura en Blanco autorizada por DGI", "✓ Exigido", "✓ Exigido", "No Aplica", "Pie de imprenta válido"],
-            ["6", "Copia de Acta de Constitución (Personería Jurídica)", "✓ Exigido", "No Aplica", "No Aplica", "Inscrita Reg. Mercantil"],
-            ["7", "Poder General de Administración", "✓ Exigido", "No Aplica", "No Aplica", "Inscrito Reg. Público"],
-            ["8", "Copia de Constancia de Inscripción DGI", "✓ Exigido", "No Aplica", "No Aplica", "Constancia actualizada"],
-            ["9", "Constancia de No Retención (Si aplica)", "Si Aplica", "No Aplica", "No Aplica", "Emitida por la DGI"],
-            ["10", "Copia de Constancia de Recaudador de IVA", "✓ Exigido", "No Aplica", "✓ Exigido", "Constancia oficial DGI"],
-            ["11", "Constancia de Afiliación al INSS", "✓ Exigido", "✓ Exigido", "No Aplica", "Constancia vigente"],
+            ["1. GUÍA OFICIAL DE REQUISITOS SEGÚN TIPO DE RÉGIMEN (10.F.S01.0006 / POL.GLE.001)"],
+            ["Nº", "DOCUMENTO / REQUISITO OFICIAL SINSA", "RÉGIMEN GENERAL", "CUOTA FIJA", "COMPRA ÚNICA", "BASE NORMATIVA"],
+            ["1", "Formato de Alta de Proveedor (10.F.S01.0006) firmado y sellado", "✓ Exigido", "✓ Exigido", "✓ Exigido", "Base 10.F.S01.0006"],
+            ["2", "Copia de Cédula del Representante Legal o Proveedor (Vigente)", "✓ Exigido", "✓ Exigido", "✓ Exigido", "Base 10.F.S01.0006"],
+            ["3", "Copia de Cédula RUC Vigente emitida por la DGI", "✓ Exigido", "✓ Exigido", "✓ Exigido", "Base 10.F.S01.0006"],
+            ["4", "Copia de Matrícula de la Alcaldía Vigente (Año en curso)", "✓ Exigido", "✓ Exigido", "No Aplica", "Base 10.F.S01.0006"],
+            ["5", "Copia de Factura en Blanco (Con pie de imprenta DGI vigente)", "✓ Exigido", "✓ Exigido", "No Aplica", "Base 10.F.S01.0006"],
+            ["6", "Copia de Acta de Constitución de la Empresa (Personería Jurídica)", "✓ Exigido", "No Aplica", "No Aplica", "Solo Rég. General"],
+            ["7", "Poder General de Administración (Inscrito en Registro Mercantil)", "✓ Exigido", "No Aplica", "No Aplica", "Solo Rég. General"],
+            ["8", "Copia de Constancia de Inscripción DGI", "✓ Exigido", "No Aplica", "No Aplica", "Solo Rég. General"],
+            ["9", "Constancia de No Retención (Si aplica)", "Si Aplica", "No Aplica", "No Aplica", "Solo si aplica DGI"],
+            ["10", "Copia de Constancia de Recaudador del IVA", "✓ Exigido", "No Aplica", "✓ Exigido", "General / C. Única"],
+            ["11", "Solvencia Fiscal Actualizada y Declaratoria de Ética SINSA", "Contrato Legal", "Contrato Legal", "No Aplica", "POL.GLE.001 (2026)"],
+            ["12", "Certificado Beneficiario Final (Sociedades) / INSS (Si tiene planilla)", "Si Aplica", "Si Aplica", "No Aplica", "POL.GLE.001 Art. 18"],
+            ["Nota Normativa Oficial: Para Régimen Cuota Fija, los requisitos base son del 1 al 5 (Formato 10.F.S01.0006). Los ítems 11 y 12 aplican al suscribir contrato con Gestión Legal (POL.GLE.001 del 30-03-2026; el INSS no es obligatorio si no tiene planilla)."],
             [],
-            ["2. CHECKLIST DE CONTROL PARA EL PROVEEDOR (ASEGURE LO QUE TIENE Y LO QUE LE FALTA)"],
-            ["Estimado proveedor: Utilice este cuadro para controlar sus documentos antes de entregarlos. Marque con una X si ya cuenta con el documento o si aún lo tiene pendiente:"],
-            ["Nº", "DOCUMENTO A VERIFICAR POR EL PROVEEDOR", "SÍ LO TENGO", "ME FALTA", "OBSERVACIONES DEL PROVEEDOR"],
-            ["1", "Formato de Alta de Proveedor (10.F.S01.0006)", "☐  Sí", "☐  No", ""],
-            ["2", "Copia de Cédula del Representante Legal / Titular", "☐  Sí", "☐  No", ""],
-            ["3", "Copia de Cédula RUC emitida por la DGI", "☐  Sí", "☐  No", ""],
-            ["4", "Copia de Matrícula de Alcaldía Municipal", "☐  Sí", "☐  No", ""],
-            ["5", "Copia de Factura en Blanco autorizada por DGI", "☐  Sí", "☐  No", ""],
-            ["6", "Copia de Acta de Constitución (Personería Jurídica)", "☐  Sí", "☐  No", ""],
-            ["7", "Poder General de Administración", "☐  Sí", "☐  No", ""],
-            ["8", "Copia de Constancia de Inscripción DGI", "☐  Sí", "☐  No", ""],
-            ["9", "Constancia de No Retención (Si aplica)", "☐  Sí", "☐  No", ""],
-            ["10", "Copia de Constancia de Recaudador de IVA", "☐  Sí", "☐  No", ""],
-            ["11", "Constancia de Afiliación al INSS", "☐  Sí", "☐  No", ""]
+            ["2. CHECKLIST DE CONTROL PARA EL PROVEEDOR (PARA LLENAR DIGITAL EN EXCEL O MANUAL A MANO)"],
+            ["Estimado proveedor: Marque con una X dentro de los corchetes [  X  ] según tenga listo cada documento de su régimen:"],
+            ["Nº", "DOCUMENTO A VERIFICAR POR EL PROVEEDOR", "SÍ LO TENGO", "PENDIENTE", "NO APLICA", "COMENTARIO / NOTA"],
+            ["1", "Formato de Alta de Proveedor (10.F.S01.0006) firmado y sellado", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["2", "Copia de Cédula del Representante Legal o Proveedor (Vigente)", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["3", "Copia de Cédula RUC Vigente emitida por la DGI", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["4", "Copia de Matrícula de la Alcaldía Vigente (Año en curso)", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["5", "Copia de Factura en Blanco (Con pie de imprenta DGI vigente)", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["6", "Copia de Acta de Constitución de la Empresa (Personería Jurídica)", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["7", "Poder General de Administración (Inscrito en Registro Mercantil)", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["8", "Copia de Constancia de Inscripción DGI", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["9", "Constancia de No Retención (Si aplica)", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["10", "Copia de Constancia de Recaudador del IVA", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["11", "Solvencia Fiscal Actualizada y Declaratoria de Ética SINSA", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""],
+            ["12", "Certificado Beneficiario Final (Sociedades) / INSS (Si tiene planilla)", "[     ]  Sí", "[     ]  No", "[     ]  N/A", ""]
         ];
 
         const wsChecklist = XLSX.utils.aoa_to_sheet(checklistData);
         wsChecklist['!cols'] = [
-            { wch: 6 },  // Nº
-            { wch: 52 }, // Documento
-            { wch: 20 }, // Col 3
-            { wch: 18 }, // Col 4
-            { wch: 35 }, // Col 5
-            { wch: 28 }  // Col 6
+            { wch: 8 },  // Nº
+            { wch: 58 }, // Documento
+            { wch: 22 }, // Col 3
+            { wch: 22 }, // Col 4
+            { wch: 20 }, // Col 5
+            { wch: 30 }  // Col 6
         ];
 
         // =====================================================================
         // 2. PESTAÑA: FORMATO OFICIAL 10.F.S01.0006 (Estructura exacta oficial SINSA)
         // =====================================================================
-        const fProv = isCurrentData ? (provName || "") : "";
-        const fRep = isCurrentData ? (repName || "") : "";
-        const fRuc = isCurrentData ? (ruc || cedula || "") : "";
-        const fTel = isCurrentData ? (tel || "") : "";
-        const fCorreo = isCurrentData ? (correo || "") : "";
-        const fDir = isCurrentData ? (dir || "") : "";
-        const fBanco = isCurrentData ? (banco || "BAC Credomatic") : "";
-        const fCuenta = isCurrentData ? (cuenta || "") : "";
-        const fTitular = isCurrentData ? (titular || repName || provName || "") : "";
-        const fCond = isCurrentData ? (condicionPago === "SEMANAL" ? "7 días" : condicionPago) : "";
-        const fRegimen = isCurrentData ? (regimen || "Régimen de Cuota Fija") : "";
-        const fDia = isCurrentData ? diaStr : "";
-        const fMes = isCurrentData ? mesStr.slice(0, 3).toUpperCase() : "";
-        const fAnio = isCurrentData ? anioStr : "";
+        const fProv = !isBlank ? (provName || "") : "";
+        const fRep = !isBlank ? (repName || "") : "";
+        const fRuc = !isBlank ? (ruc || cedula || "") : "";
+        const fTel = !isBlank ? (tel || "") : "";
+        const fCorreo = !isBlank ? (correo || "") : "";
+        const fDir = !isBlank ? (dir || "") : "";
+        const fBanco = !isBlank ? (banco || "") : "";
+        const fCuenta = !isBlank ? (cuenta || "") : "";
+        const fTitular = !isBlank ? (titular || repName || provName || "") : "";
+        const fCond = !isBlank ? (condicionPago === "SEMANAL" ? "7 días" : condicionPago) : "";
+        const fRegimen = !isBlank ? (regimen || "") : "";
+        const fDia = !isBlank ? diaStr : "";
+        const fMes = !isBlank ? mesStr.slice(0, 3).toUpperCase() : "";
+        const fAnio = !isBlank ? anioStr : "";
 
         const formatoData = [
             ["", "", "SILVA INTERNACIONAL S.A.", "", "", "", "", "", "", "Código:"],
             ["", "", "SINSA", "", "", "", "", "", "", "10.F.S01.0006"],
             ["", "", "Gerencia Financiera - Contabilidad", "", "", "", "", "", "", "Versión:"],
-            ["", "", "Formato de Solictud de Alta de Proveedores ", "", "", "", "", "", "", "1"],
+            ["", "", "Formato de Solicitud de Alta de Proveedores ", "", "", "", "", "", "", "1"],
             [],
             ["I- DATOS GENERALES (FUSION, RMS Y REIM)"],
             ["PROVEEDOR O RAZÓN SOCIAL:", "", fProv, "", "", "", "", "", "", "DÍA", "MES", "AÑO"],
-            ["TIPO DE GESTIÓN:", isCurrentData ? "Nuevo proveedor" : "", "TIPO PROVEEDOR:", isCurrentData ? "Servicios" : "", "BENEFICIARIO:", fTitular, "", "", "", fDia, fMes, fAnio],
+            ["TIPO DE GESTIÓN:", !isBlank ? "Nuevo proveedor" : "", "TIPO PROVEEDOR:", !isBlank ? "Servicios" : "", "BENEFICIARIO:", fTitular, "", "", "", fDia, fMes, fAnio],
             ["II- DATOS GENERALES (FUSION y RMS)"],
-            ["NOMBRE COMPLETO DEL CONTACTO:", "", fRep, "", "", "", "", "MUNICIPIO:", "", isCurrentData ? (data.municipio || "Managua") : ""],
-            ["TELÉFONO:", fTel, "COLONIA:", isCurrentData ? (data.colonia || data.barrio || "") : "", "", "", "PAÍS:", isCurrentData ? "Nicaragua" : "", "", "ESTADO:", "", isCurrentData ? (data.departamento || "Managua") : ""],
-            ["E-MAIL:", fCorreo, "", "FAX:", isCurrentData ? (data.fax || "") : "", "CÓDIGO POSTAL:", isCurrentData ? (data.codigo_postal || "10000") : "", "CIUDAD:", "", isCurrentData ? (data.ciudad || "Managua") : ""],
-            ["MÉTODO DE PAGO:", isCurrentData ? "Transferencia Bancaria" : "", "CONDICIONES DE PAGO:", "", fCond, "CÓDIGO FUSIÓN:"],
+            ["NOMBRE COMPLETO DEL CONTACTO:", "", fRep, "", "", "", "", "MUNICIPIO:", "", !isBlank ? (data.municipio || "") : ""],
+            ["TELÉFONO:", fTel, "COLONIA:", !isBlank ? (data.colonia || data.barrio || "") : "", "", "", "PAÍS:", !isBlank ? "Nicaragua" : "", "", "ESTADO:", "", !isBlank ? (data.departamento || "") : ""],
+            ["E-MAIL:", fCorreo, "", "FAX:", !isBlank ? (data.fax || "") : "", "CÓDIGO POSTAL:", !isBlank ? (data.codigo_postal || "") : "", "CIUDAD:", "", !isBlank ? (data.ciudad || "") : ""],
+            ["MÉTODO DE PAGO:", !isBlank ? "Transferencia Bancaria" : "", "CONDICIONES DE PAGO:", "", fCond, "CÓDIGO FUSIÓN:"],
             ["DIRECCIÓN 1:", fDir, "", "", "", "", "CONTACTO:", fRep],
-            ["CIUDAD 1:", isCurrentData ? (data.ciudad || "Managua") : "", "", "PAIS:", isCurrentData ? "Nicaragua" : "", "", "ESTADO:", isCurrentData ? (data.departamento || "Managua") : ""],
-            ["DIRECCIÓN 2:", isCurrentData && contactoOp ? ("Base Operativa: " + contactoOp) : "", "", "", "", "", "CONTACTO:", isCurrentData ? (data.contacto_secundario || "") : ""],
-            ["CIUDAD 2:", isCurrentData ? (data.ciudad || "Managua") : "", "", "PAIS:", isCurrentData ? "Nicaragua" : "", "", "ESTADO:", isCurrentData ? (data.departamento || "Managua") : ""],
+            ["CIUDAD 1:", !isBlank ? (data.ciudad || "") : "", "", "PAIS:", !isBlank ? "Nicaragua" : "", "", "ESTADO:", !isBlank ? (data.departamento || "") : ""],
+            ["DIRECCIÓN 2:", !isBlank && contactoOp ? ("Base Operativa: " + contactoOp) : "", "", "", "", "", "CONTACTO:", !isBlank ? (data.contacto_secundario || "") : ""],
+            ["CIUDAD 2:", "", "", "PAIS:", "", "", "ESTADO:", ""],
             ["DIRECCIÓN 3:", "", "", "", "", "", "CONTACTO:", ""],
-            ["CIUDAD 3:", "", "", "PAIS:", isCurrentData ? "Nicaragua" : "", "", "ESTADO:", ""],
+            ["CIUDAD 3:", "", "", "PAIS:", "", "", "ESTADO:", ""],
             ["III- DATOS GENERALES (FUSION)"],
-            ["TIPO DE ORGANIZACIÓN FISCAL:", "", fRegimen, "", "TIPO DE PROVEEDOR:", "", isCurrentData ? "Servicios" : "", "", "RELACIÓN COMERCIAL:", "", "", isCurrentData ? "Contratista A/A" : ""],
-            ["RUC O N° DE REGISTRO FISCAL:", "", fRuc, "", "IVA:", isCurrentData ? (isRegGeneral ? "SÍ" : "NO") : "", "RETENCIÓN DE IMPUESTOS:", "", "", "", isCurrentData ? "Aplica Retención" : ""],
+            ["TIPO DE ORGANIZACIÓN FISCAL:", "", fRegimen, "", "TIPO DE PROVEEDOR:", "", !isBlank ? "Servicios" : "", "", "RELACIÓN COMERCIAL:", "", "", !isBlank ? "Contratista" : ""],
+            ["RUC O N° DE REGISTRO FISCAL:", "", fRuc, "", "IVA:", !isBlank && regimen ? (isRegGeneral ? "SÍ" : "NO") : "", "RETENCIÓN DE IMPUESTOS:", "", "", "", ""],
             ["N° DE CUENTA:", fCuenta, "", "", "NOMBRE DE LA CUENTA:", "", fTitular],
             ["BANCO DEL PROVEEDOR:", "", fBanco],
-            ["IBAN:", isCurrentData ? (data.iban || "") : "", "", "ABBA:", isCurrentData ? (data.abba || "") : "", "", "CLAVE:", "", isCurrentData ? (data.clave || "") : ""],
-            ["MONEDA:", isCurrentData ? "Córdobas (C$)" : "", "SWIFT:", isCurrentData ? (data.swift || "") : "", "", "", "PAIS", "", isCurrentData ? "Nicaragua" : ""],
-            ["SUCURSAL BANCARIA:", "", isCurrentData ? (data.sucursal || "Principal Managua") : "", "", "", "", "CORRESPONSAL:", "", "", isCurrentData ? (data.corresponsal || "") : ""],
-            ["N° DE CUENTA:", fCuenta, "", "", "NOMBRE DE LA CUENTA:", "", fTitular],
-            ["BANCO BENEFICIARIO:", "", fBanco],
+            ["IBAN:", !isBlank ? (data.iban || "") : "", "", "ABBA:", !isBlank ? (data.abba || "") : "", "", "CLAVE:", "", !isBlank ? (data.clave || "") : ""],
+            ["MONEDA:", !isBlank ? "Córdobas (C$)" : "", "SWIFT:", !isBlank ? (data.swift || "") : "", "", "", "PAIS", "", !isBlank ? "Nicaragua" : ""],
+            ["SUCURSAL BANCARIA:", "", !isBlank ? (data.sucursal || "") : "", "", "", "", "CORRESPONSAL:", "", "", !isBlank ? (data.corresponsal || "") : ""],
+            ["N° DE CUENTA:", "", "", "", "NOMBRE DE LA CUENTA:", "", ""],
+            ["BANCO BENEFICIARIO:", "", ""],
             ["IBAN:", "", "", "ABBA:", "", "", "CLAVE:", "", ""],
-            ["MONEDA:", isCurrentData ? "Córdobas (C$)" : "", "SWIFT:", "", "", "", "PAIS", "", isCurrentData ? "Nicaragua" : ""],
-            ["SUCURSAL BANCARIA:", "", isCurrentData ? "Principal" : "", "", "", "", "CORRESPONSAL:", "", "", ""],
+            ["MONEDA:", "", "SWIFT:", "", "", "", "PAIS", "", ""],
+            ["SUCURSAL BANCARIA:", "", "", "", "", "", "CORRESPONSAL:", "", "", ""],
             ["N° DE CUENTA:", "", "", "", "NOMBRE DE LA CUENTA:", "", ""],
             ["BANCO INTERMEDIARIO:", "", ""],
             ["IBAN:", "", "", "ABBA:", "", "", "CLAVE:", "", ""],
             ["MONEDA:", "", "SWIFT:", "", "", "", "PAIS", "", ""],
             ["SUCURSAL BANCARIA:", "", "", "", "", "", "CORRESPONSAL:", "", "", ""],
             ["IV- TÉRMINOS FISCALES (RMS)"],
-            ["CONDICIONES DE FLETE:", "", "Flete Pagado", "COMPONENTE:", "", "Servicios", "", "MÉTODO DE ENVÍO:", "", "Terrestre"],
-            ["POLITICA DE ENTREGA:", "", "Siguiente día de entrega Programado", "", "PUERTO DE EMBARQUE:", "", "Managua"],
-            ["MONEDA:", "C$", "DEVOLUCIONES PERMITIDAS", "SÍ", "AUTORIZACIÓN NECESARIA", "SÍ", "PREMARCA:", "", "SI"],
-            ["Confirmación necesaria de servicios realizados", "SÍ", "PLAZO", "7 días", "EDT", "Inmediato", "TIPO DE DIRECCIÓN:", "", "Operativa", "DIRECCIÓN PRINCIPAL:", "", "SÍ"],
-            ["PUERTO DE DESCARGA:", "", "Managua", "FACTURA EN:", "C$", "FACTURAS PREPAGADAS DE PROVEEDOR:", "NO", "PERMITIR AL PROVEEDOR COBRAR EL FLETE:", "", "NO", "CANT. EN ÓRDEN DE COMPRA:", "Unidad"],
+            ["CONDICIONES DE FLETE:", "", "", "COMPONENTE:", "", "", "", "MÉTODO DE ENVÍO:", "", ""],
+            ["POLITICA DE ENTREGA:", "", "Siguiente día de entrega Programado", "", "PUERTO DE EMBARQUE:", "", ""],
+            ["MONEDA:", "", "DEVOLUCIONES PERMITIDAS", "", "AUTORIZACIÓN NECESARIA", "", "PREMARCA:", "", "SI"],
+            ["Confirmación necesaria de servicios realizados", "", "PLAZO", "", "EDT", "", "TIPO DE DIRECCIÓN:", "", "", "DIRECCIÓN PRINCIPAL:", "", ""],
+            ["PUERTO DE DESCARGA:", "", "", "FACTURA EN:", "", "FACTURAS PREPAGADAS DE PROVEEDOR:", "", "PERMITIR AL PROVEEDOR COBRAR EL FLETE:", "", "", "CANT. EN ÓRDEN DE COMPRA:", "Unidad"],
             ["V- TÉRMINOS FISCALES (REIM)"],
-            ["GRUPO DE PROVEEDORES", "", "Servicios de Climatización e Instalaciones"],
-            ["ENVIAR NOTA DE DÉBITO", "SÍ", "", "ESTRATEGIA DE CONFRONTACIÓN:", "", "", "3 Vías (OC - Recepción - Factura)"],
-            ["REVISOR DE CUENTAS A PAGAR:", "Analista Cuentas por Pagar", "", "DÍAS DISCREPANCIA ANTES DE ENRUTAMIENTO:", "", "", "3", "Utiliza siempre condiciones de factura", "", "SÍ"],
-            ["Factura para pago manual por proveedor", "NO", "", "Cantidad total de confrontación", "", "", "SÍ", "Confrontación principal en línea", "", "SÍ"],
-            ["Permite fecha de devolución de productos", "SÍ", "", "Retiene facturas hasta recibir la nota de crédito", "", "", "SÍ", "Cantidad total de cabecera es necesaria", "", "SÍ"],
+            ["GRUPO DE PROVEEDORES", "", ""],
+            ["ENVIAR NOTA DE DÉBITO", "", "", "ESTRATEGIA DE CONFRONTACIÓN:", "", "", ""],
+            ["REVISOR DE CUENTAS A PAGAR:", "", "", "DÍAS DISCREPANCIA ANTES DE ENRUTAMIENTO:", "", "", "", "Utiliza siempre condiciones de factura", "", ""],
+            ["Factura para pago manual por proveedor", "", "", "Cantidad total de confrontación", "", "", "", "Confrontación principal en línea", "", ""],
+            ["Permite fecha de devolución de productos", "", "", "Retiene facturas hasta recibir la nota de crédito", "", "", "", "Cantidad total de cabecera es necesaria", "", ""],
             ["VI- RÚBRICAS"],
             ["", "", "", "", "", "", "", ""],
             ["", "", "", "", "", "", "", ""],
@@ -10036,7 +10119,7 @@ function downloadProviderOnboardingKitExcel(isCurrentData = true) {
         XLSX.utils.book_append_sheet(wb, wsChecklist, "Checklist_Completamiento");
         XLSX.utils.book_append_sheet(wb, wsFormato, "Formato_10.F.S01.0006");
 
-        const safeName = (provName || 'PROSPECTO').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const safeName = (provName || 'EN_BLANCO').replace(/[^a-zA-Z0-9_-]/g, '_');
         const fileName = `KIT_ALTA_PROVEEDOR_SINSA_10.F.S01.0006_${safeName}.xlsx`;
         XLSX.writeFile(wb, fileName);
     } catch (err) {
@@ -10044,7 +10127,6 @@ function downloadProviderOnboardingKitExcel(isCurrentData = true) {
         alert("⚠️ Error al generar el archivo Excel: " + (err.message || err));
     }
 }
-
 
 // Descargador unificado de contrato
 async function downloadContractDocxFile(data) {
