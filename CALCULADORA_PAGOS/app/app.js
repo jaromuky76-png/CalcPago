@@ -122,19 +122,32 @@ function setupGlobalAliases() {
 }
 
 function consolidateEnergyProvider() {
+    const isEnergyBlocked = (typeof isProviderDeleted === 'function' && isProviderDeleted('ENERGY SYSTEM')) ||
+        (Array.isArray(proveedoresRegistrados) && proveedoresRegistrados.some(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', 'ENERGY SYSTEM') && p.estado === 'DESVINCULADO'));
+
     if (tablaOferta && typeof tablaOferta === 'object') {
-        if (!tablaOferta['ENERGY SYSTEM']) {
-            tablaOferta['ENERGY SYSTEM'] = {};
-        }
-        if (tablaOferta['ENERGY']) {
-            Object.assign(tablaOferta['ENERGY SYSTEM'], tablaOferta['ENERGY']);
+        if (isEnergyBlocked) {
+            delete tablaOferta['ENERGY SYSTEM'];
             delete tablaOferta['ENERGY'];
-        }
-        if (tablaOferta['ENERGY SYSTEMS']) {
-            Object.assign(tablaOferta['ENERGY SYSTEM'], tablaOferta['ENERGY SYSTEMS']);
             delete tablaOferta['ENERGY SYSTEMS'];
+        } else {
+            if (tablaOferta['ENERGY'] || tablaOferta['ENERGY SYSTEMS']) {
+                if (!tablaOferta['ENERGY SYSTEM']) {
+                    tablaOferta['ENERGY SYSTEM'] = {};
+                }
+            }
+            if (tablaOferta['ENERGY']) {
+                Object.assign(tablaOferta['ENERGY SYSTEM'], tablaOferta['ENERGY']);
+                delete tablaOferta['ENERGY'];
+            }
+            if (tablaOferta['ENERGY SYSTEMS']) {
+                Object.assign(tablaOferta['ENERGY SYSTEM'], tablaOferta['ENERGY SYSTEMS']);
+                delete tablaOferta['ENERGY SYSTEMS'];
+            }
+            if (tablaOferta['ENERGY SYSTEM']) {
+                setupEnergyAliases();
+            }
         }
-        setupEnergyAliases();
         localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
     }
 
@@ -204,6 +217,16 @@ function syncAllProvidersToTablaOferta() {
         proveedoresRegistrados.forEach(prov => {
             const pName = (prov.nombre_comercial || prov.nombre || '').trim();
             if (!pName) return;
+
+            // Si el proveedor está DESVINCULADO o ELIMINADO, retirarlo de tablaOferta activa de pagos
+            if (prov.estado === 'DESVINCULADO' || (typeof isProviderDeleted === 'function' && isProviderDeleted(pName))) {
+                if (typeof removeProviderFromTablaOferta === 'function') {
+                    removeProviderFromTablaOferta(pName);
+                } else {
+                    delete tablaOferta[pName];
+                }
+                return;
+            }
 
             if (prov.tarifas && Array.isArray(prov.tarifas) && prov.tarifas.length > 0) {
                 const newRates = {};
@@ -507,9 +530,25 @@ btnSaveProvider.addEventListener('click', () => {
 });
 
 btnDeleteProvider.addEventListener('click', () => {
-    if (currentEditingProvider && confirm(`¿Seguro que deseas eliminar a ${currentEditingProvider}?`)) {
-        delete tablaOferta[currentEditingProvider];
+    if (currentEditingProvider && confirm(`¿Seguro que deseas eliminar definitivamente a "${currentEditingProvider}" del sistema y del directorio?`)) {
+        if (typeof markProviderDeleted === 'function') {
+            markProviderDeleted(currentEditingProvider);
+        }
+        if (typeof removeProviderFromTablaOferta === 'function') {
+            removeProviderFromTablaOferta(currentEditingProvider);
+        } else {
+            delete tablaOferta[currentEditingProvider];
+        }
+        if (Array.isArray(proveedoresRegistrados)) {
+            proveedoresRegistrados = proveedoresRegistrados.filter(p => !areProviderNamesEqual(p.nombre_comercial || p.nombre || '', currentEditingProvider));
+            if (typeof safeSaveProvidersLocally === 'function') {
+                safeSaveProvidersLocally(proveedoresRegistrados);
+            }
+        }
         saveAndRefresh();
+        if (typeof renderDirectory === 'function') {
+            renderDirectory();
+        }
         manageProviderSelect.value = '';
         providerEditor.classList.add('hidden');
     }
@@ -2604,6 +2643,61 @@ let isRestoringDraft = false;
 let autosaveTimer = null;
 const STORAGE_KEY_WIZARD_DRAFT = 'calcPago_activeWizardDraft';
 const STORAGE_KEY_PROVIDERS = 'calcPago_proveedoresRegistrados';
+const STORAGE_KEY_DELETED_PROVIDERS = 'calcPago_deletedProviders';
+
+function getDeletedProvidersList() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_DELETED_PROVIDERS);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function isProviderDeleted(name) {
+    if (!name) return false;
+    const list = getDeletedProvidersList();
+    return list.some(deletedName => areProviderNamesEqual(deletedName, name));
+}
+
+function markProviderDeleted(name) {
+    if (!name) return;
+    const list = getDeletedProvidersList();
+    if (!list.some(deletedName => areProviderNamesEqual(deletedName, name))) {
+        list.push(name.trim());
+        try {
+            localStorage.setItem(STORAGE_KEY_DELETED_PROVIDERS, JSON.stringify(list));
+        } catch (e) {}
+    }
+}
+
+function unmarkProviderDeleted(name) {
+    if (!name) return;
+    const list = getDeletedProvidersList().filter(deletedName => !areProviderNamesEqual(deletedName, name));
+    try {
+        localStorage.setItem(STORAGE_KEY_DELETED_PROVIDERS, JSON.stringify(list));
+    } catch (e) {}
+}
+
+function removeProviderFromTablaOferta(provName) {
+    if (!provName || !tablaOferta || typeof tablaOferta !== 'object') return;
+    Object.keys(tablaOferta).forEach(k => {
+        if (areProviderNamesEqual(k, provName)) {
+            delete tablaOferta[k];
+        }
+    });
+    if (areProviderNamesEqual(provName, 'ENERGY')) {
+        delete tablaOferta['ENERGY SYSTEM'];
+        delete tablaOferta['ENERGY'];
+        delete tablaOferta['ENERGY SYSTEMS'];
+    }
+    if (areProviderNamesEqual(provName, 'GLOBAL')) {
+        delete tablaOferta['GLOBAL AIR'];
+        delete tablaOferta['GLOBAL'];
+        delete tablaOferta['GLOBALAIR'];
+    }
+}
 
 // Utilidades del Módulo de Proveedores
 function escapeHtml(str) {
@@ -3385,6 +3479,9 @@ async function saveCurrentWizardAsDraft(goToDirectory = false) {
             fecha_modificacion: new Date().toLocaleString()
         };
 
+        // Si estaba en la lista de excluidos/eliminados, rehabilitarlo al guardarlo explícitamente
+        unmarkProviderDeleted(name);
+
         // Guardar o actualizar en proveedoresRegistrados (en memoria)
         if (idx >= 0) {
             proveedoresRegistrados[idx] = draftRecord;
@@ -3486,20 +3583,93 @@ function resumeProviderOnboarding(prov) {
     window.scrollTo({ top: 120, behavior: 'smooth' });
 }
 
-// Eliminar o descartar un borrador
-async function deleteProviderDraft(provName) {
-    if (!confirm(`¿Estás seguro de eliminar el borrador de "${provName}"?`)) {
+// Desvincular (Inactivar conservando expediente histórico) o Reactivar un proveedor
+async function toggleUnlinkProvider(prov) {
+    if (!prov) return;
+    const provName = (prov.nombre_comercial || prov.nombre || 'Contratista').trim();
+    const isCurrentlyUnlinked = prov.estado === 'DESVINCULADO';
+
+    if (isCurrentlyUnlinked) {
+        if (!confirm(`🔄 REACTIVAR PROVEEDOR: "${provName}"\n\n¿Deseas reactivar a este contratista a estado 🟢 ACTIVO y habilitar nuevamente sus tarifas en el módulo de Liquidación de Pagos?`)) {
+            return;
+        }
+        prov.estado = 'ACTIVO';
+        prov.fecha_reactivacion = new Date().toLocaleDateString();
+        delete prov.motivo_desvinculacion;
+        unmarkProviderDeleted(provName);
+
+        safeSaveProvidersLocally(proveedoresRegistrados);
+        syncAllProvidersToTablaOferta();
+
+        try {
+            await fetch('/api/save-provider', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(prov)
+            });
+        } catch (e) {}
+
+        renderDirectory();
+        alert(`🟢 El proveedor "${provName}" ha sido reactivado exitosamente. Sus tarifas ya están disponibles nuevamente en Liquidar Pagos.`);
         return;
     }
+
+    const motivo = prompt(
+        `🔌 DESVINCULAR / INACTIVAR PROVEEDOR: "${provName}"\n\n` +
+        `Al desvincular a este contratista:\n` +
+        `• Su estado cambiará a 🔴 DESVINCULADO (Inactivo).\n` +
+        `• Se conservarán su Expediente Digital, Ficha y Contrato en el Directorio como respaldo histórico y de auditoría legal para SINSA.\n` +
+        `• Se retirarán sus tarifas activas de "Liquidar Pagos" para evitar que se le liquiden nuevas OTs por error.\n\n` +
+        `Indica el motivo de la desvinculación (o presiona Aceptar para confirmar):`,
+        prov.motivo_desvinculacion || "Terminación de contrato / Fin de relación comercial"
+    );
+
+    if (motivo === null) return; // Cancelado por el usuario
+
+    prov.estado = 'DESVINCULADO';
+    prov.fecha_desvinculacion = new Date().toLocaleDateString();
+    prov.motivo_desvinculacion = motivo.trim() || 'Terminación de relación comercial';
+
+    removeProviderFromTablaOferta(provName);
+    safeSaveProvidersLocally(proveedoresRegistrados);
+    syncAllProvidersToTablaOferta();
+
+    try {
+        await fetch('/api/save-provider', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(prov)
+        });
+    } catch (e) {}
+
+    renderDirectory();
+    alert(`🔴 El proveedor "${provName}" ha quedado DESVINCULADO.\n\nSu expediente digital e historial se mantienen resguardados en el Directorio (puedes filtrarlo en "Solo Desvinculados"), y sus tarifas fueron deshabilitadas de la calculadora de pagos.`);
+}
+
+// Eliminar definitivamente un proveedor o borrador del sistema
+async function deleteProviderDraft(provName) {
+    const existingProv = proveedoresRegistrados.find(p =>
+        areProviderNamesEqual(p.nombre_comercial || p.nombre || '', provName)
+    );
+    const isDraft = !existingProv || existingProv.estado === 'BORRADOR';
+
+    const confirmMsg = isDraft
+        ? `🗑️ ELIMINAR BORRADOR: "${provName}"\n\n¿Estás seguro de eliminar definitivamente este borrador del directorio?`
+        : `⚠️ ELIMINAR DEFINITIVAMENTE DEL SISTEMA: "${provName}"\n\n• Esta acción borrará por completo su registro, expediente y tarifas del Directorio y de la Calculadora.\n• (Sugerencia: Si el proveedor ya trabajó con SINSA y deseas conservar su expediente para auditoría bloqueando nuevos pagos, cancela este mensaje y usa el botón "🔌 Desvincular").\n\n¿Confirmas que deseas ELIMINAR DEFINITIVAMENTE a "${provName}"?`;
+
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    // Registrar en lista de excluidos para que no se recree al refrescar la página
+    markProviderDeleted(provName);
 
     proveedoresRegistrados = proveedoresRegistrados.filter(p => 
         !areProviderNamesEqual(p.nombre_comercial || p.nombre || '', provName)
     );
     safeSaveProvidersLocally(proveedoresRegistrados);
 
-    if (tablaOferta && tablaOferta[provName]) {
-        delete tablaOferta[provName];
-    }
+    removeProviderFromTablaOferta(provName);
     syncAllProvidersToTablaOferta();
 
     // Si coincide con el borrador activo, limpiarlo
@@ -3507,7 +3677,8 @@ async function deleteProviderDraft(provName) {
     if (activeDraftJson) {
         try {
             const activeDraft = JSON.parse(activeDraftJson);
-            if ((activeDraft.nombre_comercial || activeDraft.nombre || '').trim().toUpperCase() === provName.trim().toUpperCase()) {
+            if (areProviderNamesEqual(activeDraft.nombre_comercial || activeDraft.nombre || '', provName)) {
+                localStorage.removeItem(STORAGE_KEY_WIZARD_DRAFT);
                 resetWizardForm();
             }
         } catch(e){}
@@ -3582,12 +3753,18 @@ async function loadProveedoresRegistrados() {
         } catch(e) {}
     }
 
+    // Filtrar cualquier proveedor que haya sido eliminado explícitamente por el usuario
+    if (Array.isArray(proveedoresRegistrados)) {
+        proveedoresRegistrados = proveedoresRegistrados.filter(p => !isProviderDeleted(p.nombre_comercial || p.nombre || ''));
+    }
+
     if (Array.isArray(serverList) && serverList.length > 0) {
+        const cleanServerList = serverList.filter(sp => !isProviderDeleted(sp.nombre_comercial || sp.nombre || ''));
         if (!Array.isArray(proveedoresRegistrados) || proveedoresRegistrados.length === 0) {
-            proveedoresRegistrados = serverList;
+            proveedoresRegistrados = cleanServerList;
         } else {
             // Incorporar proveedores base faltantes respetando lo que ya tiene guardado el usuario en localStorage
-            serverList.forEach(sp => {
+            cleanServerList.forEach(sp => {
                 const spName = sp.nombre_comercial || sp.nombre || '';
                 if (!proveedoresRegistrados.some(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', spName))) {
                     proveedoresRegistrados.push(sp);
@@ -3598,7 +3775,7 @@ async function loadProveedoresRegistrados() {
 
     // 2.5 Respetar y asegurar proveedor ENERGY / ENERGY SYSTEM sin destruir ediciones del usuario
     const hasEnergy = proveedoresRegistrados.some(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', 'ENERGY'));
-    if (!hasEnergy) {
+    if (!hasEnergy && !isProviderDeleted('ENERGY SYSTEM')) {
         const seedEnergy = {
             nombre_comercial: 'ENERGY SYSTEM',
             nombre_representante: 'Roberto Blandón Sánchez',
@@ -3712,37 +3889,50 @@ async function loadProveedoresRegistrados() {
         progreso: 45
     };
 
-    const bajoCeroExistingIdx = proveedoresRegistrados.findIndex(p => {
-        const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
-        return k === 'BAJO CERO' || k === 'BAJOCERO' || k === 'BAJO CERO CHINANDEGA';
-    });
-    if (bajoCeroExistingIdx < 0) {
-        proveedoresRegistrados.splice(1, 0, bajoCeroProv);
-    }
+    if (!isProviderDeleted('BAJO CERO')) {
+        const bajoCeroExistingIdx = proveedoresRegistrados.findIndex(p => {
+            const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
+            return k === 'BAJO CERO' || k === 'BAJOCERO' || k === 'BAJO CERO CHINANDEGA';
+        });
+        if (bajoCeroExistingIdx < 0) {
+            proveedoresRegistrados.splice(1, 0, bajoCeroProv);
+        }
 
-    if (!tablaOferta['BAJO CERO']) {
-        tablaOferta['BAJO CERO'] = {};
-    }
-    const idxBajoCero = proveedoresRegistrados.findIndex(p => {
-        const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
-        return k === 'BAJO CERO' || k === 'BAJOCERO' || k === 'BAJO CERO CHINANDEGA';
-    });
-    if (idxBajoCero >= 0 && proveedoresRegistrados[idxBajoCero].tarifas && proveedoresRegistrados[idxBajoCero].tarifas.length > 0) {
-        proveedoresRegistrados[idxBajoCero].tarifas.forEach(t => {
-            if (t.descripcion) tablaOferta['BAJO CERO'][t.descripcion] = parseFloat(t.tarifa) || 0;
+        const idxBajoCero = proveedoresRegistrados.findIndex(p => {
+            const k = (p.nombre_comercial || p.nombre || '').trim().toUpperCase();
+            return k === 'BAJO CERO' || k === 'BAJOCERO' || k === 'BAJO CERO CHINANDEGA';
         });
-    } else {
-        bajoCeroTarifas.forEach(t => {
-            if (tablaOferta['BAJO CERO'][t.descripcion] === undefined) {
-                tablaOferta['BAJO CERO'][t.descripcion] = t.tarifa;
+        const isBajoCeroUnlinked = idxBajoCero >= 0 && proveedoresRegistrados[idxBajoCero].estado === 'DESVINCULADO';
+        if (!isBajoCeroUnlinked) {
+            if (!tablaOferta['BAJO CERO']) {
+                tablaOferta['BAJO CERO'] = {};
             }
-        });
+            if (idxBajoCero >= 0 && proveedoresRegistrados[idxBajoCero].tarifas && proveedoresRegistrados[idxBajoCero].tarifas.length > 0) {
+                proveedoresRegistrados[idxBajoCero].tarifas.forEach(t => {
+                    if (t.descripcion) tablaOferta['BAJO CERO'][t.descripcion] = parseFloat(t.tarifa) || 0;
+                });
+            } else {
+                bajoCeroTarifas.forEach(t => {
+                    if (tablaOferta['BAJO CERO'][t.descripcion] === undefined) {
+                        tablaOferta['BAJO CERO'][t.descripcion] = t.tarifa;
+                    }
+                });
+            }
+        } else {
+            removeProviderFromTablaOferta('BAJO CERO');
+        }
+    } else {
+        removeProviderFromTablaOferta('BAJO CERO');
     }
     localStorage.setItem('calcPago_tablaOferta', JSON.stringify(tablaOferta));
 
-    // 3. Si tablaOferta tiene proveedores que no están en el directorio, agregarlos como base
+    // 3. Si tablaOferta tiene proveedores que no están en el directorio, agregarlos como base (salvo si fueron eliminados)
     Object.keys(tablaOferta).forEach(rawPName => {
         const pName = normalizeProviderName(rawPName);
+        if (isProviderDeleted(pName)) {
+            delete tablaOferta[rawPName];
+            return;
+        }
         if (!proveedoresRegistrados.some(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', pName))) {
             const acts = tablaOferta[pName] || tablaOferta[rawPName] || {};
             const actList = Object.keys(acts).map(a => ({
@@ -10165,8 +10355,11 @@ async function finishProviderOnboarding() {
         return;
     }
 
+    unmarkProviderDeleted(provName);
     data.estado = 'ACTIVO';
     data.progreso = 100;
+    delete data.motivo_desvinculacion;
+    delete data.fecha_desvinculacion;
     data.fecha_formalizacion = new Date().toLocaleDateString();
     if (!data.contrato_rubricado && wizardContratoRubricado) {
         data.contrato_rubricado = JSON.parse(JSON.stringify(wizardContratoRubricado));
@@ -10319,11 +10512,14 @@ function renderDirectory() {
         const ruc = (p.ruc || p.cedula || '').toLowerCase();
         const reg = p.regimen || 'Régimen de Cuota Fija';
         const isDraft = p.estado === 'BORRADOR';
+        const isUnlinked = p.estado === 'DESVINCULADO';
+        const isActive = !isDraft && !isUnlinked;
         const hasRubricado = !!(p.contrato_rubricado && p.contrato_rubricado.fileName);
 
         const matchesStatus = statusFilter === 'ALL' || 
                               (statusFilter === 'BORRADOR' && isDraft) || 
-                              (statusFilter === 'ACTIVO' && !isDraft);
+                              (statusFilter === 'ACTIVO' && isActive) ||
+                              (statusFilter === 'DESVINCULADO' && isUnlinked);
 
         const matchesContract = contractFilter === 'ALL' ||
                                 (contractFilter === 'RUBRICADO' && hasRubricado) ||
@@ -10351,6 +10547,7 @@ function renderDirectory() {
         const totalActs = (prov.tarifas && prov.tarifas.length) || (tablaOferta[provName] ? Object.keys(tablaOferta[provName]).length : 0);
         const fuelRate = (prov.tarifa_combustible !== undefined && prov.tarifa_combustible > 0) ? prov.tarifa_combustible : 0;
         const isDraft = prov.estado === 'BORRADOR';
+        const isUnlinked = prov.estado === 'DESVINCULADO';
         const prog = prov.progreso !== undefined ? prov.progreso : (isDraft ? calculateOnboardingProgress(prov) : 100);
         const hasRubricado = !!(prov.contrato_rubricado && prov.contrato_rubricado.fileName);
 
@@ -10359,23 +10556,30 @@ function renderDirectory() {
         if (isDraft) {
             card.style.borderColor = 'rgba(245, 158, 11, 0.45)';
             card.style.background = 'linear-gradient(180deg, rgba(245, 158, 11, 0.04), var(--bg-panel))';
+        } else if (isUnlinked) {
+            card.style.borderColor = 'rgba(239, 68, 68, 0.45)';
+            card.style.background = 'linear-gradient(180deg, rgba(239, 68, 68, 0.05), var(--bg-panel))';
         }
+
+        const statusBadgeHtml = isDraft
+            ? `<span class="badge-tag badge-draft" style="margin: 0; font-size: 0.7rem;">🟡 Borrador (${prog}%)</span>`
+            : isUnlinked
+                ? `<span class="badge-tag" style="margin: 0; font-size: 0.7rem; background: rgba(239, 68, 68, 0.14); color: #DC2626; border: 1px solid rgba(239, 68, 68, 0.35);">🔴 Desvinculado</span>`
+                : `<span class="badge-tag badge-active" style="margin: 0; font-size: 0.7rem;">🟢 Activo</span>`;
 
         card.innerHTML = `
             <div>
                 <div class="directory-card-header">
                     <div>
                         <div class="directory-prov-title-wrap">
-                            <div class="directory-prov-name">${provName}</div>
+                            <div class="directory-prov-name" style="${isUnlinked ? 'color: #64748B; text-decoration: line-through;' : ''}">${provName}</div>
                             <button class="btn-card-edit-pencil" data-dir-edit-wizard="${provName}" title="Editar ${provName} y actualizar en asistente de 4 pasos">✏️</button>
                         </div>
                         <div class="directory-prov-rep">👤 ${repName}</div>
                     </div>
                     <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
                         <span class="badge-tag" style="margin: 0; font-size: 0.7rem;">${prov.regimen || 'Cuota Fija'}</span>
-                        <span class="badge-tag ${isDraft ? 'badge-draft' : 'badge-active'}" style="margin: 0; font-size: 0.7rem;">
-                            ${isDraft ? `🟡 Borrador (${prog}%)` : '🟢 Activo'}
-                        </span>
+                        ${statusBadgeHtml}
                         <span class="badge-tag ${hasRubricado ? 'badge-rubricated' : 'badge-legal-pending'}" style="margin: 0; font-size: 0.7rem;">
                             ${hasRubricado ? '✓ Rubricado' : '⏳ VoBo Legal Pendiente'}
                         </span>
@@ -10394,6 +10598,13 @@ function renderDirectory() {
                     </div>
                 ` : ''}
 
+                ${isUnlinked ? `
+                    <div style="margin: 0.55rem 0 0.75rem 0; padding: 0.5rem 0.65rem; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.28); border-radius: 8px; font-size: 0.75rem; color: #991B1B; line-height: 1.35;">
+                        <div><strong>🚫 Proveedor Desvinculado / Inactivo para Pagos</strong> ${prov.fecha_desvinculacion ? `(${escapeHtml(prov.fecha_desvinculacion)})` : ''}</div>
+                        ${prov.motivo_desvinculacion ? `<div style="margin-top: 2px; color: #7F1D1D;">Motivo: <em>"${escapeHtml(prov.motivo_desvinculacion)}"</em></div>` : ''}
+                    </div>
+                ` : ''}
+
                 <div class="directory-card-body">
                     <div class="directory-data-row">
                         <span class="directory-data-label">Cédula / RUC:</span>
@@ -10405,7 +10616,7 @@ function renderDirectory() {
                     </div>
                     <div class="directory-data-row">
                         <span class="directory-data-label">Tarifas Acordadas:</span>
-                        <span class="directory-data-value" style="color: var(--primary); font-weight: 700;">${totalActs} actividades</span>
+                        <span class="directory-data-value" style="color: ${isUnlinked ? '#64748B' : 'var(--primary)'}; font-weight: 700;">${totalActs} actividades ${isUnlinked ? '(Pausadas)' : ''}</span>
                     </div>
                     <div class="directory-data-row">
                         <span class="directory-data-label">Tarifa Combustible:</span>
@@ -10424,7 +10635,12 @@ function renderDirectory() {
                     <button class="btn btn-outline" data-dir-exp="${provName}" title="Ver Expediente Digital">📁 Expediente</button>
                     <button class="btn btn-outline" data-dir-tariffs="${provName}" title="Ver Tarifas Acordadas">💲 Tarifas</button>
                     <button class="btn btn-outline btn-edit-pencil" data-dir-edit-wizard="${provName}" title="Editar contratista y actualizar en asistente (Paso 1 al 4)">✏️</button>
-                    ${isDraft ? `<button class="btn btn-outline btn-del-draft" data-dir-del="${provName}" title="Eliminar Borrador">🗑️</button>` : ''}
+                    ${!isDraft ? `
+                        <button class="btn btn-outline" data-dir-unlink="${provName}" style="${isUnlinked ? 'color: #059669; border-color: rgba(16, 185, 129, 0.45);' : 'color: #D97706; border-color: rgba(245, 158, 11, 0.45);'}" title="${isUnlinked ? 'Reactivar Proveedor y habilitar tarifas en Pagos' : 'Desvincular / Inactivar proveedor conservando su expediente histórico'}">
+                            ${isUnlinked ? '🔄 Reactivar' : '🔌 Desvincular'}
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-outline btn-del-draft" data-dir-del="${provName}" title="${isDraft ? 'Eliminar Borrador' : 'Eliminar definitivamente del sistema'}">🗑️</button>
                 </div>
                 ${isDraft ? `
                     <div style="display: flex; gap: 8px; width: 100%;">
@@ -10437,6 +10653,10 @@ function renderDirectory() {
                         </button>
                         ` : ''}
                     </div>
+                ` : isUnlinked ? `
+                    <button class="btn btn-outline" data-dir-unlink-bottom="${provName}" style="width: 100%; border-color: rgba(16, 185, 129, 0.5); color: #059669; font-weight: 700;" title="Volver a activar a este contratista para liquidación de pagos">
+                        <span>🔄</span> Reactivar Proveedor en Sistema
+                    </button>
                 ` : `
                     <button class="btn directory-btn-pay" data-dir-pay="${provName}" title="Liquidar Pagos de Facturas">
                         <span>🧮</span> Liquidar Pagos
@@ -10475,6 +10695,14 @@ function renderDirectory() {
 
         card.querySelector(`[data-dir-resume="${provName}"]`)?.addEventListener('click', () => {
             resumeProviderOnboarding(prov);
+        });
+
+        card.querySelector(`[data-dir-unlink="${provName}"]`)?.addEventListener('click', () => {
+            toggleUnlinkProvider(prov);
+        });
+
+        card.querySelector(`[data-dir-unlink-bottom="${provName}"]`)?.addEventListener('click', () => {
+            toggleUnlinkProvider(prov);
         });
 
         card.querySelector(`[data-dir-del="${provName}"]`)?.addEventListener('click', () => {
