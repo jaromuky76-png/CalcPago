@@ -529,29 +529,16 @@ btnSaveProvider.addEventListener('click', () => {
     btnDeleteProvider.classList.remove('hidden');
 });
 
+document.getElementById('btn-unlink-provider-setup')?.addEventListener('click', () => {
+    if (!currentEditingProvider) return;
+    setupOverlay.classList.add('hidden');
+    openBajaProviderModal(currentEditingProvider, 'UNLINK');
+});
+
 btnDeleteProvider.addEventListener('click', () => {
-    if (currentEditingProvider && confirm(`¿Seguro que deseas eliminar definitivamente a "${currentEditingProvider}" del sistema y del directorio?`)) {
-        if (typeof markProviderDeleted === 'function') {
-            markProviderDeleted(currentEditingProvider);
-        }
-        if (typeof removeProviderFromTablaOferta === 'function') {
-            removeProviderFromTablaOferta(currentEditingProvider);
-        } else {
-            delete tablaOferta[currentEditingProvider];
-        }
-        if (Array.isArray(proveedoresRegistrados)) {
-            proveedoresRegistrados = proveedoresRegistrados.filter(p => !areProviderNamesEqual(p.nombre_comercial || p.nombre || '', currentEditingProvider));
-            if (typeof safeSaveProvidersLocally === 'function') {
-                safeSaveProvidersLocally(proveedoresRegistrados);
-            }
-        }
-        saveAndRefresh();
-        if (typeof renderDirectory === 'function') {
-            renderDirectory();
-        }
-        manageProviderSelect.value = '';
-        providerEditor.classList.add('hidden');
-    }
+    if (!currentEditingProvider) return;
+    setupOverlay.classList.add('hidden');
+    openBajaProviderModal(currentEditingProvider, 'DELETE');
 });
 
 function saveAndRefresh() {
@@ -3583,52 +3570,217 @@ function resumeProviderOnboarding(prov) {
     window.scrollTo({ top: 120, behavior: 'smooth' });
 }
 
-// Desvincular (Inactivar conservando expediente histórico) o Reactivar un proveedor
-async function toggleUnlinkProvider(prov) {
-    if (!prov) return;
-    const provName = (prov.nombre_comercial || prov.nombre || 'Contratista').trim();
-    const isCurrentlyUnlinked = prov.estado === 'DESVINCULADO';
+// Modal Unificado para las 2 Opciones: (1) Desvincular / Inactivar o (2) Eliminar Definitivamente
+let currentBajaModalProvider = null;
+let bajaModalListenersInitialized = false;
 
-    if (isCurrentlyUnlinked) {
-        if (!confirm(`🔄 REACTIVAR PROVEEDOR: "${provName}"\n\n¿Deseas reactivar a este contratista a estado 🟢 ACTIVO y habilitar nuevamente sus tarifas en el módulo de Liquidación de Pagos?`)) {
-            return;
+function resolveProviderObject(provOrName) {
+    if (!provOrName) return null;
+    if (typeof provOrName === 'object') return provOrName;
+    const found = (proveedoresRegistrados || []).find(p =>
+        areProviderNamesEqual(p.nombre_comercial || p.nombre || '', provOrName)
+    );
+    if (found) return found;
+    return {
+        nombre_comercial: String(provOrName).trim(),
+        estado: 'ACTIVO',
+        regimen: 'Régimen de Cuota Fija',
+        tarifas: []
+    };
+}
+
+function highlightBajaOption(opt) {
+    const cardUnlink = document.getElementById('baja-card-opt-unlink');
+    const cardDelete = document.getElementById('baja-card-opt-delete');
+    const panelUnlink = document.getElementById('baja-panel-unlink');
+    const panelDelete = document.getElementById('baja-panel-delete');
+
+    if (opt === 'DELETE') {
+        if (cardDelete) {
+            cardDelete.style.borderColor = '#DC2626';
+            cardDelete.style.boxShadow = '0 0 0 3px rgba(220, 38, 38, 0.2)';
         }
-        prov.estado = 'ACTIVO';
-        prov.fecha_reactivacion = new Date().toLocaleDateString();
-        delete prov.motivo_desvinculacion;
-        unmarkProviderDeleted(provName);
+        if (cardUnlink) {
+            cardUnlink.style.borderColor = 'rgba(245, 158, 11, 0.45)';
+            cardUnlink.style.boxShadow = 'none';
+        }
+        if (panelDelete) {
+            panelDelete.style.borderColor = '#DC2626';
+            panelDelete.style.background = 'rgba(239, 68, 68, 0.1)';
+        }
+    } else {
+        if (cardUnlink) {
+            cardUnlink.style.borderColor = '#D97706';
+            cardUnlink.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.22)';
+        }
+        if (cardDelete) {
+            cardDelete.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+            cardDelete.style.boxShadow = 'none';
+        }
+        if (panelDelete) {
+            panelDelete.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+            panelDelete.style.background = 'rgba(239, 68, 68, 0.05)';
+        }
+    }
+}
 
-        safeSaveProvidersLocally(proveedoresRegistrados);
-        syncAllProvidersToTablaOferta();
+function initBajaModalListeners() {
+    if (bajaModalListenersInitialized) return;
+    bajaModalListenersInitialized = true;
 
-        try {
-            await fetch('/api/save-provider', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(prov)
-            });
-        } catch (e) {}
+    const modal = document.getElementById('baja-provider-modal-overlay');
+    const closeModal = () => modal?.classList.add('hidden');
 
-        renderDirectory();
-        alert(`🟢 El proveedor "${provName}" ha sido reactivado exitosamente. Sus tarifas ya están disponibles nuevamente en Liquidar Pagos.`);
-        return;
+    document.getElementById('close-baja-modal')?.addEventListener('click', closeModal);
+    document.getElementById('btn-close-baja-modal')?.addEventListener('click', closeModal);
+    modal?.addEventListener('click', (e) => {
+        if (e.target.id === 'baja-provider-modal-overlay') closeModal();
+    });
+
+    document.getElementById('baja-card-opt-unlink')?.addEventListener('click', () => highlightBajaOption('UNLINK'));
+    document.getElementById('baja-card-opt-delete')?.addEventListener('click', () => highlightBajaOption('DELETE'));
+
+    // Botón Descargar Acta de Desvinculación y Finiquito (.docx)
+    document.getElementById('btn-download-acta-finiquito')?.addEventListener('click', () => {
+        if (!currentBajaModalProvider) return;
+        downloadActaFiniquitoDocx(currentBajaModalProvider);
+    });
+
+    // Botón Confirmar Desvinculación (Opción 1)
+    document.getElementById('btn-confirm-unlink-modal')?.addEventListener('click', async () => {
+        if (!currentBajaModalProvider) return;
+        await executeUnlinkFromModal(currentBajaModalProvider);
+    });
+
+    // Botón Reactivar Proveedor desde el modal
+    document.getElementById('btn-reactivate-from-modal')?.addEventListener('click', async () => {
+        if (!currentBajaModalProvider) return;
+        await reactivateProviderNow(currentBajaModalProvider);
+        closeModal();
+    });
+
+    // Botón Eliminar Definitivamente (Opción 2)
+    document.getElementById('btn-confirm-delete-modal')?.addEventListener('click', async () => {
+        if (!currentBajaModalProvider) return;
+        const pName = currentBajaModalProvider.nombre_comercial || currentBajaModalProvider.nombre || '';
+        const deleted = await executePermanentDelete(pName);
+        if (deleted) closeModal();
+    });
+}
+
+function openBajaProviderModal(provOrName, initialOption = 'UNLINK') {
+    initBajaModalListeners();
+    const prov = resolveProviderObject(provOrName);
+    if (!prov) return;
+    currentBajaModalProvider = prov;
+
+    const modal = document.getElementById('baja-provider-modal-overlay');
+    const titleEl = document.getElementById('baja-modal-title');
+    const reasonSelect = document.getElementById('baja-unlink-reason-select');
+    const dateInput = document.getElementById('baja-unlink-date');
+    const notesInput = document.getElementById('baja-unlink-notes');
+    const btnReactivate = document.getElementById('btn-reactivate-from-modal');
+    const btnConfirmUnlink = document.getElementById('btn-confirm-unlink-modal');
+
+    const provName = (prov.nombre_comercial || prov.nombre || 'Contratista').trim();
+    if (titleEl) {
+        titleEl.innerHTML = `<span>⚙️</span> <span>Gestión de Baja: ${escapeHtml(provName)}</span>`;
     }
 
-    const motivo = prompt(
-        `🔌 DESVINCULAR / INACTIVAR PROVEEDOR: "${provName}"\n\n` +
-        `Al desvincular a este contratista:\n` +
-        `• Su estado cambiará a 🔴 DESVINCULADO (Inactivo).\n` +
-        `• Se conservarán su Expediente Digital, Ficha y Contrato en el Directorio como respaldo histórico y de auditoría legal para SINSA.\n` +
-        `• Se retirarán sus tarifas activas de "Liquidar Pagos" para evitar que se le liquiden nuevas OTs por error.\n\n` +
-        `Indica el motivo de la desvinculación (o presiona Aceptar para confirmar):`,
-        prov.motivo_desvinculacion || "Terminación de contrato / Fin de relación comercial"
-    );
+    if (dateInput) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
 
-    if (motivo === null) return; // Cancelado por el usuario
+    if (reasonSelect && prov.motivo_desvinculacion) {
+        const existsOpt = Array.from(reasonSelect.options).some(o => o.value === prov.motivo_desvinculacion);
+        if (existsOpt) reasonSelect.value = prov.motivo_desvinculacion;
+    }
+
+    if (notesInput) {
+        notesInput.value = prov.finiquito_observaciones || '';
+    }
+
+    const chkOt = document.getElementById('baja-chk-ot');
+    const chkConsig = document.getElementById('baja-chk-consignacion');
+    const chkGafete = document.getElementById('baja-chk-gafete');
+    const chkFacturas = document.getElementById('baja-chk-facturas');
+
+    if (prov.finiquito_checklist) {
+        if (chkOt) chkOt.checked = !!prov.finiquito_checklist.sin_ot_pendientes;
+        if (chkConsig) chkConsig.checked = !!prov.finiquito_checklist.consignacion_conciliada;
+        if (chkGafete) chkGafete.checked = !!prov.finiquito_checklist.gafetes_devueltos;
+        if (chkFacturas) chkFacturas.checked = !!prov.finiquito_checklist.facturas_conciliadas;
+    } else {
+        if (chkOt) chkOt.checked = true;
+        if (chkConsig) chkConsig.checked = true;
+        if (chkGafete) chkGafete.checked = true;
+        if (chkFacturas) chkFacturas.checked = true;
+    }
+
+    if (prov.estado === 'DESVINCULADO') {
+        if (btnReactivate) btnReactivate.classList.remove('hidden');
+        if (btnConfirmUnlink) btnConfirmUnlink.textContent = '💾 Actualizar Datos de Desvinculación';
+    } else {
+        if (btnReactivate) btnReactivate.classList.add('hidden');
+        if (btnConfirmUnlink) btnConfirmUnlink.textContent = '🔌 Confirmar Desvinculación (Inactivar)';
+    }
+
+    highlightBajaOption(initialOption);
+    if (modal) modal.classList.remove('hidden');
+}
+
+async function reactivateProviderNow(prov) {
+    if (!prov) return;
+    const provName = (prov.nombre_comercial || prov.nombre || 'Contratista').trim();
+    if (!confirm(`🔄 REACTIVAR PROVEEDOR: "${provName}"\n\n¿Deseas reactivar a este contratista a estado 🟢 ACTIVO y habilitar nuevamente sus tarifas en el módulo de Liquidación de Pagos?`)) {
+        return;
+    }
+    prov.estado = 'ACTIVO';
+    prov.fecha_reactivacion = new Date().toLocaleDateString();
+    delete prov.motivo_desvinculacion;
+    unmarkProviderDeleted(provName);
+
+    safeSaveProvidersLocally(proveedoresRegistrados);
+    syncAllProvidersToTablaOferta();
+
+    try {
+        await fetch('/api/save-provider', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(prov)
+        });
+    } catch (e) {}
+
+    renderDirectory();
+    alert(`🟢 El proveedor "${provName}" ha sido reactivado exitosamente. Sus tarifas ya están disponibles nuevamente en Liquidar Pagos.`);
+}
+
+async function executeUnlinkFromModal(prov) {
+    if (!prov) return;
+    const provName = (prov.nombre_comercial || prov.nombre || 'Contratista').trim();
+    const reason = document.getElementById('baja-unlink-reason-select')?.value || 'Terminación de relación comercial';
+    const rawDate = document.getElementById('baja-unlink-date')?.value;
+    const formattedDate = rawDate ? new Date(rawDate + 'T12:00:00').toLocaleDateString('es-NI') : new Date().toLocaleDateString('es-NI');
+    const notes = (document.getElementById('baja-unlink-notes')?.value || '').trim();
 
     prov.estado = 'DESVINCULADO';
-    prov.fecha_desvinculacion = new Date().toLocaleDateString();
-    prov.motivo_desvinculacion = motivo.trim() || 'Terminación de relación comercial';
+    prov.fecha_desvinculacion = formattedDate;
+    prov.motivo_desvinculacion = reason;
+    prov.finiquito_observaciones = notes;
+    prov.finiquito_checklist = {
+        sin_ot_pendientes: !!document.getElementById('baja-chk-ot')?.checked,
+        consignacion_conciliada: !!document.getElementById('baja-chk-consignacion')?.checked,
+        gafetes_devueltos: !!document.getElementById('baja-chk-gafete')?.checked,
+        facturas_conciliadas: !!document.getElementById('baja-chk-facturas')?.checked
+    };
+
+    // Asegurar que exista en proveedoresRegistrados
+    const idx = proveedoresRegistrados.findIndex(p => areProviderNamesEqual(p.nombre_comercial || p.nombre || '', provName));
+    if (idx >= 0) {
+        proveedoresRegistrados[idx] = prov;
+    } else {
+        proveedoresRegistrados.push(prov);
+    }
 
     removeProviderFromTablaOferta(provName);
     safeSaveProvidersLocally(proveedoresRegistrados);
@@ -3642,12 +3794,21 @@ async function toggleUnlinkProvider(prov) {
         });
     } catch (e) {}
 
+    document.getElementById('baja-provider-modal-overlay')?.classList.add('hidden');
     renderDirectory();
-    alert(`🔴 El proveedor "${provName}" ha quedado DESVINCULADO.\n\nSu expediente digital e historial se mantienen resguardados en el Directorio (puedes filtrarlo en "Solo Desvinculados"), y sus tarifas fueron deshabilitadas de la calculadora de pagos.`);
+    alert(`🔴 El proveedor "${provName}" ha quedado DESVINCULADO (Inactivo para Pagos).\n\n• Causal: ${reason}\n• Fecha: ${formattedDate}\n\nSu expediente digital e historial se mantienen resguardados en el Directorio para auditoría, y sus tarifas fueron retiradas de la calculadora activa.`);
 }
 
-// Eliminar definitivamente un proveedor o borrador del sistema
-async function deleteProviderDraft(provName) {
+async function toggleUnlinkProvider(prov) {
+    if (!prov) return;
+    if (prov.estado === 'DESVINCULADO') {
+        await reactivateProviderNow(prov);
+    } else {
+        openBajaProviderModal(prov, 'UNLINK');
+    }
+}
+
+async function executePermanentDelete(provName) {
     const existingProv = proveedoresRegistrados.find(p =>
         areProviderNamesEqual(p.nombre_comercial || p.nombre || '', provName)
     );
@@ -3655,13 +3816,12 @@ async function deleteProviderDraft(provName) {
 
     const confirmMsg = isDraft
         ? `🗑️ ELIMINAR BORRADOR: "${provName}"\n\n¿Estás seguro de eliminar definitivamente este borrador del directorio?`
-        : `⚠️ ELIMINAR DEFINITIVAMENTE DEL SISTEMA: "${provName}"\n\n• Esta acción borrará por completo su registro, expediente y tarifas del Directorio y de la Calculadora.\n• (Sugerencia: Si el proveedor ya trabajó con SINSA y deseas conservar su expediente para auditoría bloqueando nuevos pagos, cancela este mensaje y usa el botón "🔌 Desvincular").\n\n¿Confirmas que deseas ELIMINAR DEFINITIVAMENTE a "${provName}"?`;
+        : `⚠️ CONFIRMAR ELIMINACIÓN DEFINITIVA: "${provName}"\n\nEsta acción borrará por completo su registro, expediente y tarifas del Directorio y de la Calculadora de Pagos sin posibilidad de recuperación.\n\n¿Confirmas que deseas ELIMINAR DEFINITIVAMENTE a "${provName}"?`;
 
     if (!confirm(confirmMsg)) {
-        return;
+        return false;
     }
 
-    // Registrar en lista de excluidos para que no se recree al refrescar la página
     markProviderDeleted(provName);
 
     proveedoresRegistrados = proveedoresRegistrados.filter(p => 
@@ -3672,7 +3832,6 @@ async function deleteProviderDraft(provName) {
     removeProviderFromTablaOferta(provName);
     syncAllProvidersToTablaOferta();
 
-    // Si coincide con el borrador activo, limpiarlo
     const activeDraftJson = localStorage.getItem(STORAGE_KEY_WIZARD_DRAFT);
     if (activeDraftJson) {
         try {
@@ -3684,7 +3843,6 @@ async function deleteProviderDraft(provName) {
         } catch(e){}
     }
 
-    // Sincronizar borrado con backend
     try {
         await fetch('/api/delete-provider', {
             method: 'POST',
@@ -3693,7 +3851,217 @@ async function deleteProviderDraft(provName) {
         });
     } catch(e){}
 
+    const manageSelect = document.getElementById('manage-provider-select');
+    const provEditor = document.getElementById('provider-editor');
+    if (manageSelect && areProviderNamesEqual(manageSelect.value, provName)) {
+        manageSelect.value = '';
+        if (provEditor) provEditor.classList.add('hidden');
+    }
+
     renderDirectory();
+    return true;
+}
+
+// Al hacer clic en 🗑️ en el Directorio: si es borrador, confirma directo; si es proveedor activo/desvinculado, abre el modal en la Opción 2
+async function deleteProviderDraft(provName) {
+    const existingProv = proveedoresRegistrados.find(p =>
+        areProviderNamesEqual(p.nombre_comercial || p.nombre || '', provName)
+    );
+    const isDraft = !existingProv || existingProv.estado === 'BORRADOR';
+    if (isDraft) {
+        await executePermanentDelete(provName);
+    } else {
+        openBajaProviderModal(existingProv, 'DELETE');
+    }
+}
+
+// Generador de Acta de Desvinculación, Cierre Operativo y Finiquito de Servicios (.docx)
+async function downloadActaFiniquitoDocx(prov) {
+    if (!window.docx) {
+        alert("La librería docx.js no está disponible.");
+        return;
+    }
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } = window.docx;
+
+    const provName = (prov.nombre_comercial || prov.nombre || 'CONTRATISTA').trim().toUpperCase();
+    const repName = (prov.nombre_representante || provName).trim().toUpperCase();
+    const rucCedula = (prov.ruc || prov.cedula || 'N/D').trim();
+    const regimen = prov.regimen || 'Régimen Tributario';
+    const baseOp = prov.base_operativa || prov.domicilio || 'Managua';
+
+    const reason = document.getElementById('baja-unlink-reason-select')?.value || prov.motivo_desvinculacion || 'Terminación de relación comercial';
+    const rawDate = document.getElementById('baja-unlink-date')?.value;
+    const dateStr = rawDate ? new Date(rawDate + 'T12:00:00').toLocaleDateString('es-NI') : (prov.fecha_desvinculacion || new Date().toLocaleDateString('es-NI'));
+    const notes = (document.getElementById('baja-unlink-notes')?.value || prov.finiquito_observaciones || 'Sin observaciones adicionales.').trim();
+
+    const chkOt = document.getElementById('baja-chk-ot') ? document.getElementById('baja-chk-ot').checked : true;
+    const chkConsig = document.getElementById('baja-chk-consignacion') ? document.getElementById('baja-chk-consignacion').checked : true;
+    const chkGafete = document.getElementById('baja-chk-gafete') ? document.getElementById('baja-chk-gafete').checked : true;
+    const chkFacturas = document.getElementById('baja-chk-facturas') ? document.getElementById('baja-chk-facturas').checked : true;
+
+    const borderThin = { style: BorderStyle.SINGLE, size: 6, color: "94A3B8" };
+    const cellBorders = { top: borderThin, bottom: borderThin, left: borderThin, right: borderThin };
+
+    const makeRow = (label, value) => new TableRow({
+        children: [
+            new TableCell({
+                width: { size: 35, type: WidthType.PERCENTAGE },
+                borders: cellBorders,
+                shading: { fill: "F1F5F9" },
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 19, font: "Arial", color: "1E293B" })] })]
+            }),
+            new TableCell({
+                width: { size: 65, type: WidthType.PERCENTAGE },
+                borders: cellBorders,
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun({ text: value, size: 19, font: "Arial", color: "0F172A" })] })]
+            })
+        ]
+    });
+
+    const makeCheckRow = (itemText, isChecked) => new TableRow({
+        children: [
+            new TableCell({
+                width: { size: 75, type: WidthType.PERCENTAGE },
+                borders: cellBorders,
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun({ text: itemText, size: 19, font: "Arial" })] })]
+            }),
+            new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                borders: cellBorders,
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [new TextRun({
+                        text: isChecked ? "☑ CUMPLIDO / VERIFICADO" : "☐ PENDIENTE",
+                        bold: true,
+                        size: 18,
+                        font: "Arial",
+                        color: isChecked ? "047857" : "B45309"
+                    })]
+                })]
+            })
+        ]
+    });
+
+    const doc = new Document({
+        sections: [{
+            properties: {
+                page: { margin: { top: 900, right: 900, bottom: 900, left: 900 } }
+            },
+            children: [
+                new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 80 },
+                    children: [new TextRun({ text: "SILVA INTERNACIONAL, S.A. (SINSA)", bold: true, size: 26, font: "Arial", color: "1E3A8A" })]
+                }),
+                new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 240 },
+                    children: [new TextRun({ text: "ACTA DE DESVINCULACIÓN DE PROVEEDOR, CIERRE OPERATIVO Y FINIQUITO DE SERVICIOS", bold: true, size: 21, font: "Arial", color: "B45309" })]
+                }),
+                new Paragraph({
+                    alignment: AlignmentType.JUSTIFIED,
+                    spacing: { after: 200, line: 276 },
+                    children: [
+                        new TextRun({ text: "En la ciudad de Managua, a la fecha ", size: 20, font: "Arial" }),
+                        new TextRun({ text: dateStr, bold: true, size: 20, font: "Arial" }),
+                        new TextRun({ text: ", por medio de la presente Acta Administrativa de Cierre Operativo, ", size: 20, font: "Arial" }),
+                        new TextRun({ text: "SILVA INTERNACIONAL, S.A. (SINSA)", bold: true, size: 20, font: "Arial" }),
+                        new TextRun({ text: " a través del área de Centro de Servicios / Maestros, hace constar la desvinculación e inactivación en el catálogo de contratistas activos del proveedor detallado a continuación:", size: 20, font: "Arial" })
+                    ]
+                }),
+                new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    rows: [
+                        makeRow("Nombre Comercial / Contratista:", provName),
+                        makeRow("Representante Legal / Titular:", repName),
+                        makeRow("Cédula de Identidad / RUC:", rucCedula),
+                        makeRow("Régimen Tributario y Sede:", `${regimen} — ${baseOp}`),
+                        makeRow("Causal de Desvinculación:", reason),
+                        makeRow("Fecha Efectiva de Baja:", dateStr)
+                    ]
+                }),
+                new Paragraph({
+                    spacing: { before: 260, after: 120 },
+                    children: [new TextRun({ text: "1. VERIFICACIÓN DE CIERRE OPERATIVO Y ENTREGA DE RECURSOS:", bold: true, size: 20, font: "Arial", color: "1E3A8A" })]
+                }),
+                new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    rows: [
+                        makeCheckRow("1. Cierre de Órdenes de Trabajo (OT) asignadas y atención de garantías reportadas a la fecha", chkOt),
+                        makeCheckRow("2. Conciliación y devolución de Inventario de Materiales en Consignación (Anexo II) en bodega SINSA", chkConsig),
+                        makeCheckRow("3. Devolución de gafetes de identificación oficial y distintivos corporativos de SINSA", chkGafete),
+                        makeCheckRow("4. Conciliación de facturas comerciales y liquidación final de servicios ejecutados", chkFacturas)
+                    ]
+                }),
+                new Paragraph({
+                    spacing: { before: 240, after: 80 },
+                    children: [new TextRun({ text: "2. OBSERVACIONES Y ACUERDOS DE CIERRE:", bold: true, size: 20, font: "Arial", color: "1E3A8A" })]
+                }),
+                new Paragraph({
+                    alignment: AlignmentType.JUSTIFIED,
+                    spacing: { after: 200, line: 276 },
+                    children: [new TextRun({ text: notes, size: 19, font: "Arial" })]
+                }),
+                new Paragraph({
+                    alignment: AlignmentType.JUSTIFIED,
+                    spacing: { after: 450, line: 276 },
+                    children: [new TextRun({
+                        text: "DECLARACIÓN DE RESGUARDO Y SUBSISTENCIA DE GARANTÍAS: Con la suscripción de la presente acta, las tarifas del contratista quedan inactivadas para nuevas asignaciones en el sistema de liquidación de SINSA, conservándose su expediente digital para efectos de auditoría interna y cumplimiento legal. Conforme a la Cláusula Décima y Décima Novena del contrato marco, la desvinculación no extingue las obligaciones de garantía de mano de obra ni de confidencialidad sobre los trabajos previamente ejecutados y liquidados.",
+                        size: 18,
+                        italics: true,
+                        font: "Arial",
+                        color: "334155"
+                    })]
+                }),
+                new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    borders: {
+                        top: { style: BorderStyle.NONE, size: 0 },
+                        bottom: { style: BorderStyle.NONE, size: 0 },
+                        left: { style: BorderStyle.NONE, size: 0 },
+                        right: { style: BorderStyle.NONE, size: 0 },
+                        insideHorizontal: { style: BorderStyle.NONE, size: 0 },
+                        insideVertical: { style: BorderStyle.NONE, size: 0 }
+                    },
+                    rows: [
+                        new TableRow({
+                            children: [
+                                new TableCell({
+                                    width: { size: 45, type: WidthType.PERCENTAGE },
+                                    borders: { top: { style: BorderStyle.SINGLE, size: 8, color: "000000" }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } },
+                                    children: [
+                                        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: "POR SINSA — CENTRO DE SERVICIOS", bold: true, size: 18, font: "Arial" })] }),
+                                        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Coordinación Maestros / Administración", size: 17, font: "Arial", color: "475569" })] })
+                                    ]
+                                }),
+                                new TableCell({
+                                    width: { size: 10, type: WidthType.PERCENTAGE },
+                                    borders: { top: { style: BorderStyle.NONE, size: 0 }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } },
+                                    children: [new Paragraph({ text: "" })]
+                                }),
+                                new TableCell({
+                                    width: { size: 45, type: WidthType.PERCENTAGE },
+                                    borders: { top: { style: BorderStyle.SINGLE, size: 8, color: "000000" }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } },
+                                    children: [
+                                        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: "POR EL CONTRATISTA", bold: true, size: 18, font: "Arial" })] }),
+                                        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${repName} (${provName})`, size: 17, font: "Arial", color: "475569" })] })
+                                    ]
+                                })
+                            ]
+                        })
+                    ]
+                })
+            ]
+        }]
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const safeName = provName.replace(/[^A-Z0-9_-]/g, '_');
+    saveBlobAsFile(blob, `ACTA_DESVINCULACION_FINIQUITO_SINSA_${safeName}.docx`);
 }
 
 const DOCS_BY_REGIMEN = {
@@ -10923,6 +11291,14 @@ function openExpedienteModal(prov) {
     const dlCompBtn = document.getElementById('btn-expediente-download-compliance');
     if (dlCompBtn) {
         dlCompBtn.onclick = () => downloadProviderComplianceDocx(prov);
+    }
+
+    const manageBajaBtn = document.getElementById('btn-expediente-manage-baja');
+    if (manageBajaBtn) {
+        manageBajaBtn.onclick = () => {
+            modal.classList.add('hidden');
+            openBajaProviderModal(prov, 'UNLINK');
+        };
     }
 
     modal.classList.remove('hidden');
